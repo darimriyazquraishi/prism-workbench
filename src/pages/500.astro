@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ErrorPage from '../components/ErrorPage.astro';
+---
+
+<Layout title="500 — Internal Server Error | LUMI">
+	<ErrorPage
+		code="500"
+		title="Internal Server Error"
+		message="The on-premise agent hit an unexpected error while processing your request. No external services are involved — try again, or start a fresh task from the workbench."
+		hint="ERR_INTERNAL · the local agent log may contain more details"
+	/>
+</Layout>

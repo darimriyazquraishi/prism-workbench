@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ErrorPage from '../components/ErrorPage.astro';
+---
+
+<Layout title="404 — Page Not Found | LUMI">
+	<ErrorPage
+		code="404"
+		title="Page Not Found"
+		message="The page or workspace view you're looking for doesn't exist, was moved, or was never generated. All requests are handled locally — nothing left this machine."
+		hint="ERR_NOT_FOUND · check the URL or run a command from Ctrl+K"
+	/>
+</Layout>

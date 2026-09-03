@@ -1,0 +1,9 @@
+Log_ID,Pump_Tag,Location_Unit,Operating_Hours,Failures_Count,Failure_Mode,Downtime_Hours,Repair_Cost_INR
+LOG-101,P-102A,CDU-5,720,2,Mechanical Seal Leak,18.5,45000
+LOG-102,P-102B,CDU-5,680,1,Bearing High Vibration,8.0,22000
+LOG-103,P-103A,VDU-2,710,3,Impeller Cavitation,24.0,78000
+LOG-104,P-103B,VDU-2,690,0,None (Normal Run),0.0,0
+LOG-105,P-104A,FCCU-1,740,2,Coupling Misalignment,12.0,35000
+LOG-106,P-104B,FCCU-1,730,1,Lube Oil Degradation,6.5,15000
+LOG-107,P-105A,HYDROCRACKER,700,4,Shaft Runout & Seal,32.0,112000
+LOG-108,P-105B,HYDROCRACKER,715,1,Motor Overcurrent,5.0,18000

@@ -1,0 +1,40 @@
+# SovereignAI Workbench Configuration (SIH26117)
+app:
+  name: "SovereignAI Workbench"
+  version: "1.0.0"
+  environment: "air-gapped"
+  organization: "Mangalore Refinery and Petrochemicals Limited (MRPL)"
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+
+models:
+  provider: "ollama"
+  base_url: "http://localhost:11434"
+  vram_budget_mb: 16384
+  default_general: "qwen3:8b"
+  default_vision: "qwen2.5-vl:7b"
+  default_coding: "qwen2.5-coder:7b"
+  default_embedding: "nomic-embed-text"
+
+rag:
+  chunk_size: 512
+  chunk_overlap: 64
+  top_k: 5
+  collection_name: "mrpl_industrial_knowledge"
+
+sandbox:
+  enabled: true
+  docker_image: "sovereign-sandbox:latest"
+  timeout_seconds: 30
+  memory_limit_mb: 256
+  cpu_limit: 1.0
+
+security:
+  strict_air_gap: true
+  allow_external_network: false
+  max_upload_size_mb: 100
