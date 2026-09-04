@@ -12,7 +12,7 @@ venv/
 .venv/
 
 # Large AI Models and Weights (DO NOT COMMIT)
-models/
+/models/
 llama/
 *.gguf
 *.bin
@@ -22,6 +22,7 @@ llama/
 *.onnx
 *.weights
 *.h5
+!sovereign-ai-workbench/backend/app/models/
 
 # Compiled Binaries & Executables
 *.dll
@@ -61,3 +62,6 @@ chroma_db/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/launch.json
+
+# Tool caches
+.impeccable/
