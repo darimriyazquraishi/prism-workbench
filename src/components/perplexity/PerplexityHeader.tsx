@@ -14,7 +14,9 @@ import {
   Trash2, 
   Check,
   PanelLeftOpen,
-  Cpu
+  Cpu,
+  Settings,
+  AlertCircle
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
 
@@ -34,7 +36,11 @@ export const PerplexityHeader: React.FC<PerplexityHeaderProps> = ({
     toggleSidebar, 
     isBottomPanelOpen, 
     setBottomPanelOpen,
-    activeTask
+    activeTask,
+    selectedModel,
+    setSettingsOpen,
+    setSettingsTab,
+    userProfile
   } = useWorkbenchStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -128,10 +134,25 @@ export const PerplexityHeader: React.FC<PerplexityHeaderProps> = ({
       {/* Right Actions Area: More Menu (...), Share, Computer Mode */}
       <div className="flex items-center gap-2">
         {/* Active Local Model Pill */}
-        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#202222] border border-[#2E3133] text-[11px] text-[#A2A8AB] font-mono">
-          <Cpu className="w-3 h-3 text-[#20B8CD]" />
-          <span className="text-white font-sans">{activeTask?.selected_model_id || 'Qwen3-14B'}</span>
-        </div>
+        {selectedModel ? (
+          <button
+            onClick={() => { setSettingsOpen(true); setSettingsTab('models'); }}
+            title="Active Local Model - Click to configure"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#202222] hover:bg-[#282A2C] border border-[#2E3133] hover:border-[#3D4143] text-[11px] text-[#A2A8AB] font-mono transition-colors cursor-pointer"
+          >
+            <Cpu className="w-3 h-3 text-[#20B8CD]" />
+            <span className="text-white font-sans">{selectedModel}</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => { setSettingsOpen(true); setSettingsTab('models'); }}
+            title="No model selected - Click to select a model in Settings"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#262020] hover:bg-[#322424] border border-[#522929] hover:border-[#7A3F3F] text-[11px] text-[#E58888] font-mono transition-colors cursor-pointer"
+          >
+            <AlertCircle className="w-3 h-3 text-[#E58888]" />
+            <span>No model selected</span>
+          </button>
+        )}
 
         {/* ... More Actions Dropdown Menu (Matches WhatsApp Image 2026-09-04 at 8.52.50 PM.jpeg) */}
         <div className="relative" ref={menuRef}>
@@ -151,13 +172,24 @@ export const PerplexityHeader: React.FC<PerplexityHeaderProps> = ({
                   {title}
                 </div>
                 <div className="flex justify-between text-[10px] text-[#5F6467]">
-                  <span>Created by sangyansahu (You)</span>
+                  <span>Created by {userProfile?.displayName || 'Local User'} (You)</span>
                   <span>Today</span>
                 </div>
               </div>
 
               {/* Action List */}
               <div className="space-y-0.5">
+                <button 
+                  onClick={() => {
+                    setSettingsOpen(true);
+                    setMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-[#262829] hover:text-white transition-colors text-left cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-[#20B8CD]" />
+                  <span>Workbench Settings...</span>
+                </button>
+
                 <button 
                   onClick={() => setMenuOpen(false)}
                   className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-[#262829] hover:text-white transition-colors text-left cursor-pointer"

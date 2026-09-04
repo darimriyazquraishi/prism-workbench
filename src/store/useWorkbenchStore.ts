@@ -40,6 +40,20 @@ interface WorkbenchStore {
   // System & Models
   sovereignty: SovereigntyReport | null;
   models: ModelMetadata[];
+  selectedModel: string | null;
+  setSelectedModel: (model: string | null) => void;
+
+  // Settings Modal & User Profile
+  isSettingsOpen: boolean;
+  setSettingsOpen: (isOpen: boolean) => void;
+  settingsTab: 'models' | 'engine' | 'privacy' | 'profile';
+  setSettingsTab: (tab: 'models' | 'engine' | 'privacy' | 'profile') => void;
+  userProfile: { displayName: string; role: string; plan: string };
+  setUserProfile: (profile: Partial<{ displayName: string; role: string; plan: string }>) => void;
+
+  // Sessions History
+  savedSessions: Array<{ id: string; title: string; createdAt: string; messageCount: number }>;
+  saveCurrentSession: () => void;
 
   // Actions
   addMessage: (msg: ChatMessage) => void;
@@ -108,15 +122,46 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => ({
     external_api_calls: 0,
     internet_dependency: 'None (Physical Air-Gap Verified)',
     network_mode: 'HOST_ONLY_ISOLATED',
-    local_inference_status: 'ONLINE (Qwen3 8B)',
+    local_inference_status: 'OFFLINE / UNLOADED',
     local_ocr_status: 'ONLINE (PyMuPDF / PaddleOCR)',
     local_rag_status: 'ONLINE (ChromaDB Local)',
     local_sandbox_status: 'ONLINE (Docker --net=none)',
     blocked_external_attempts: [],
     telemetry_policy: 'ZERO_OUTBOUND_TELEMETRY',
-    active_services: ['ollama', 'chromadb', 'docker-sandbox', 'sqlite-audit']
+    active_services: ['chromadb', 'docker-sandbox', 'sqlite-audit']
   },
   models: [],
+  selectedModel: null,
+  setSelectedModel: (selectedModel) => set({ selectedModel }),
+
+  isSettingsOpen: false,
+  setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
+  settingsTab: 'models',
+  setSettingsTab: (settingsTab) => set({ settingsTab }),
+  userProfile: {
+    displayName: 'Local User',
+    role: 'Security & Engineering Operator',
+    plan: 'Offline Air-Gapped Edition'
+  },
+  setUserProfile: (profile) => set((state) => ({
+    userProfile: { ...state.userProfile, ...profile }
+  })),
+
+  savedSessions: [],
+  saveCurrentSession: () => set((state) => {
+    if (state.messages.length === 0) return state;
+    const firstUserMsg = state.messages.find(m => m.sender === 'user');
+    const title = firstUserMsg ? firstUserMsg.text.slice(0, 40) + '...' : 'Air-Gap Session';
+    const newSession = {
+      id: `session-${Date.now()}`,
+      title,
+      createdAt: new Date().toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      messageCount: state.messages.length
+    };
+    return {
+      savedSessions: [newSession, ...state.savedSessions.slice(0, 19)]
+    };
+  }),
 
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
   updateMessage: (id, updater) => set((state) => ({

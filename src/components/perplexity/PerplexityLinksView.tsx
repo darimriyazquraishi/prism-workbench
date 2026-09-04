@@ -7,53 +7,22 @@ export const PerplexityLinksView: React.FC = () => {
   const [filterQuery, setFilterQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Extract all citations from messages
+  // Extract all citations from messages safely
   const allCitations = messages.flatMap((m, msgIdx) => 
-    (m.citations || []).map((c, cIdx) => ({
-      id: `cite-${msgIdx}-${cIdx}`,
-      source_file: c.source_file,
-      domain: c.source_file.split('.').slice(0, -1).join('.') || 'local',
-      snippet: c.snippet,
-      relevance_score: c.relevance_score,
-      page_number: c.page_number
-    }))
+    (m.citations || []).map((c, cIdx) => {
+      const fileName = c?.source_file || 'Document';
+      return {
+        id: `cite-${msgIdx}-${cIdx}`,
+        source_file: fileName,
+        domain: fileName.split('/').pop()?.split('.').slice(0, -1).join('.') || 'local',
+        snippet: c?.snippet || 'Source reference snippet',
+        relevance_score: c?.relevance_score || 1.0,
+        page_number: c?.page_number || 1
+      };
+    })
   );
 
-  // Fallback demo links if no chat citations yet
-  const displaySources = allCitations.length > 0 ? allCitations : [
-    {
-      id: 'demo-1',
-      source_file: 'demo/meeting_notes_quarterly_review.md',
-      domain: 'meeting_notes_quarterly_review',
-      snippet: 'Key Accomplishments: Product Growth +34% to 56,280 MAU; 99.98% platform uptime beating 99.95% target. Action items assigned across teams.',
-      relevance_score: 0.96,
-      page_number: 1
-    },
-    {
-      id: 'demo-2',
-      source_file: 'demo/sales_leads_q3.csv',
-      domain: 'sales_leads_q3',
-      snippet: 'Dataset records 8 enterprise deals with total pipeline of $284,000 USD and won revenue of $161,000 USD. Average deal size $35,500.',
-      relevance_score: 0.94,
-      page_number: 1
-    },
-    {
-      id: 'demo-3',
-      source_file: 'demo/sample_code_analysis.py',
-      domain: 'sample_code_analysis',
-      snippet: 'Statistical outlier detection using standard deviation thresholding and Python MTBF calculations. Validated for zero division edge cases.',
-      relevance_score: 0.89,
-      page_number: 2
-    },
-    {
-      id: 'demo-4',
-      source_file: 'demo/customer_feedback.json',
-      domain: 'customer_feedback',
-      snippet: 'Feedback synthesis from user interviews: 75% positive sentiment for on-premise privacy and local execution without external leaks.',
-      relevance_score: 0.85,
-      page_number: 1
-    }
-  ];
+  const displaySources = allCitations;
 
   const filtered = displaySources.filter(s => 
     s.source_file.toLowerCase().includes(filterQuery.toLowerCase()) ||
@@ -91,13 +60,22 @@ export const PerplexityLinksView: React.FC = () => {
           </div>
         </div>
 
-        {/* Links Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((src) => (
-            <div 
-              key={src.id}
-              className="bg-[#202222] border border-[#2E3133] hover:border-[#3D4143] rounded-2xl p-4 transition-all space-y-3 flex flex-col justify-between shadow-sm group"
-            >
+        {/* Links Grid or Clean Empty State */}
+        {filtered.length === 0 ? (
+          <div className="py-16 text-center space-y-3 bg-[#202222]/40 border border-[#2E3133] rounded-2xl p-8">
+            <Globe className="w-8 h-8 text-[#5F6467] mx-auto" />
+            <div className="text-sm font-semibold text-white">No Link Citations Yet</div>
+            <p className="text-xs text-[#858A8E] max-w-sm mx-auto">
+              When the local model cites internal documents or knowledge chunks during an answer, verifiable sources will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map((src) => (
+              <div 
+                key={src.id}
+                className="bg-[#202222] border border-[#2E3133] hover:border-[#3D4143] rounded-2xl p-4 transition-all space-y-3 flex flex-col justify-between shadow-sm group"
+              >
               <div className="space-y-2">
                 {/* Domain / File Badge */}
                 <div className="flex items-center justify-between">
@@ -147,6 +125,7 @@ export const PerplexityLinksView: React.FC = () => {
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   );

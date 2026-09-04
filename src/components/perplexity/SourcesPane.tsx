@@ -52,7 +52,7 @@ export const SourcesPane: React.FC<SourcesPaneProps> = ({ sources = [], onOpenSo
     }
   ];
 
-  const activeSources = sources.length > 0 ? sources : defaultSources;
+  const activeSources = Array.isArray(sources) && sources.length > 0 ? sources : defaultSources;
 
   return (
     <div className="w-full lg:w-72 xl:w-80 flex-shrink-0">
@@ -77,21 +77,23 @@ export const SourcesPane: React.FC<SourcesPaneProps> = ({ sources = [], onOpenSo
         {isExpanded && (
           <div className="space-y-2">
             {activeSources.map((src, idx) => {
-              const isPdf = src.source_file.endsWith('.pdf');
-              const isCsv = src.source_file.endsWith('.csv');
+              const filename = src?.source_file || src?.domain || 'Document';
+              const isPdf = typeof filename === 'string' && filename.toLowerCase().endsWith('.pdf');
+              const isCsv = typeof filename === 'string' && filename.toLowerCase().endsWith('.csv');
+              const snippetText = typeof src?.snippet === 'string' ? src.snippet : 'Source citation text';
 
               return (
                 <div
-                  key={src.id || idx}
+                  key={src?.id || idx}
                   onClick={() => {
                     if (onOpenSource) {
                       onOpenSource(src);
                     } else {
                       openTab({
                         id: `tab-source-${idx}`,
-                        title: src.source_file,
+                        title: filename,
                         type: 'document',
-                        file: src.source_file,
+                        file: src?.source_file || filename,
                         isClosable: true
                       });
                     }
@@ -107,15 +109,15 @@ export const SourcesPane: React.FC<SourcesPaneProps> = ({ sources = [], onOpenSo
                     ) : (
                       <Globe className="w-3.5 h-3.5 text-[#20B8CD] flex-shrink-0" />
                     )}
-                    <span className="font-mono truncate">{src.domain || src.source_file}</span>
-                    {src.page_number && (
+                    <span className="font-mono truncate">{src?.domain || filename}</span>
+                    {src?.page_number && (
                       <span className="text-[10px] text-[#5F6467]">p.{src.page_number}</span>
                     )}
                   </div>
 
                   {/* Title / Snippet */}
                   <div className="text-xs font-semibold text-[#E6E6E6] group-hover:text-white line-clamp-2 leading-snug">
-                    {src.snippet.slice(0, 90)}...
+                    {snippetText.slice(0, 90)}...
                   </div>
                 </div>
               );

@@ -23,7 +23,8 @@ import {
   Clock,
   Circle,
   HelpCircle,
-  Info
+  Info,
+  AlertCircle
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
 import { api } from '../../services/api';
@@ -173,12 +174,15 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
     clearAttachments,
     activeTask,
     isBottomPanelOpen,
-    setBottomPanelOpen
+    setBottomPanelOpen,
+    selectedModel,
+    setSelectedModel,
+    setSettingsOpen,
+    setSettingsTab
   } = useWorkbenchStore();
 
   const [inputPrompt, setInputPrompt] = useState('');
   const [selectedFocus, setSelectedFocus] = useState('All');
-  const [selectedModel, setSelectedModel] = useState('Qwen3-14B');
   const [isFocusOpen, setIsFocusOpen] = useState(false);
   const [isModelOpen, setIsModelOpen] = useState(false);
   const [isStepsExpanded, setIsStepsExpanded] = useState(false);
@@ -212,6 +216,14 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputPrompt.trim() || isProcessing) return;
+    
+    // If no model is selected, prompt user or open Settings
+    if (!selectedModel) {
+      setSettingsOpen(true);
+      setSettingsTab('models');
+      return;
+    }
+
     const promptToSend = inputPrompt;
     const filesToSend = [...attachedFiles];
     setInputPrompt('');
@@ -219,31 +231,31 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
     onExecutePrompt(promptToSend, filesToSend);
   };
 
-  // General-purpose demo prompts library (Matching Perplexity cards)
+  // General-purpose productivity prompt cards
   const quickPrompts = [
     {
-      title: 'Summarize Meeting Notes',
-      prompt: 'Analyze the attached quarterly review notes (demo/meeting_notes_quarterly_review.md). Provide a clear executive summary of key achievements, highlight the primary challenges, and format all assigned action items into a clean priority table.',
-      file: 'demo/meeting_notes_quarterly_review.md',
+      title: 'Analyze & Summarize Documents',
+      prompt: 'Analyze the attached document, extract all critical findings, summarize key takeaways, and format actionable next steps into a clean priority table.',
+      desc: 'Local text extraction & structured action plan',
       icon: FileText
     },
     {
-      title: 'Analyze Sales Pipeline Data',
-      prompt: 'Inspect the attached sales dataset (demo/sales_leads_q3.csv). Calculate the overall win rate, total pipeline volume, won revenue, and list the top 3 highest-value strategic opportunities in progress.',
-      file: 'demo/sales_leads_q3.csv',
-      icon: FileSpreadsheet
-    },
-    {
-      title: 'Review Python Code & Logic',
-      prompt: 'Review the attached Python script (demo/sample_code_analysis.py). Explain the statistical outlier methodology, identify any edge cases, and suggest performance optimizations.',
-      file: 'demo/sample_code_analysis.py',
+      title: 'Code Sandbox & Analytics',
+      prompt: 'Write and execute a Python script inside the isolated local sandbox to compute summary statistics, analyze distributions, and report key insights.',
+      desc: 'Sandboxed Python execution with zero external network',
       icon: FileCode
     },
     {
-      title: 'Synthesize Customer Feedback',
-      prompt: 'Examine customer_feedback.json. Group the user comments by sentiment and category, and formulate the top 3 actionable product recommendations.',
-      file: 'demo/customer_feedback.json',
-      icon: MessageSquare
+      title: 'Vision & Engineering Diagrams',
+      prompt: 'Perform visual inspection on the provided technical drawing or schematic, identify component tags, and describe the piping/flow connections.',
+      desc: 'Multimodal vision for drawings and P&ID schematics',
+      icon: FileSpreadsheet
+    },
+    {
+      title: 'Air-Gapped Knowledge Search',
+      prompt: 'Search the local indexed documentation and standard operating procedures to verify operational guidelines and safety thresholds.',
+      desc: 'Sub-millisecond local vector RAG search',
+      icon: Globe
     }
   ];
 
@@ -378,17 +390,47 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
                 <div className="flex items-center gap-2">
                   {/* Model Selector Dropdown */}
                   <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsModelOpen(!isModelOpen)}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-[#262829] text-[#858A8E] hover:text-white transition-colors cursor-pointer text-xs"
-                    >
-                      <span>{selectedModel}</span>
-                      <ChevronDown className="w-3 h-3" />
-                    </button>
+                    {selectedModel ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsModelOpen(!isModelOpen)}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-[#262829] text-[#A2A8AB] hover:text-white transition-colors cursor-pointer text-xs font-mono"
+                      >
+                        <Cpu className="w-3 h-3 text-[#20B8CD]" />
+                        <span>{selectedModel}</span>
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSettingsOpen(true);
+                          setSettingsTab('models');
+                        }}
+                        title="No model selected - Click to select in Settings"
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[#E58888] bg-[#292020] hover:bg-[#352525] border border-[#522929] hover:border-[#7A3F3F] transition-colors cursor-pointer text-xs font-mono"
+                      >
+                        <AlertCircle className="w-3 h-3 text-[#E58888]" />
+                        <span>No model selected</span>
+                      </button>
+                    )}
 
                     {isModelOpen && (
-                      <div className="absolute right-0 bottom-8 w-48 bg-[#1C1D1E] border border-[#2E3133] rounded-xl p-1.5 shadow-2xl z-40 text-xs space-y-0.5 font-mono">
+                      <div className="absolute right-0 bottom-8 w-56 bg-[#1C1D1E] border border-[#2E3133] rounded-xl p-1.5 shadow-2xl z-40 text-xs space-y-0.5 font-mono">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedModel(null);
+                            setIsModelOpen(false);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#262829] text-[#E58888] hover:text-[#FFA0A0] transition-colors flex items-center justify-between"
+                        >
+                          <span>No model selected</span>
+                          {selectedModel === null && <Check className="w-3 h-3 text-[#E58888]" />}
+                        </button>
+
+                        <div className="h-px bg-[#262829] my-1" />
+
                         {['Qwen3-14B', 'Qwen2.5-Coder-7B', 'Qwen3-VL-8B'].map((m) => (
                           <button
                             key={m}
@@ -403,6 +445,20 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
                             {selectedModel === m && <Check className="w-3 h-3 text-[#20B8CD]" />}
                           </button>
                         ))}
+
+                        <div className="h-px bg-[#262829] my-1" />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsModelOpen(false);
+                            setSettingsOpen(true);
+                            setSettingsTab('models');
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#262829] text-[#20B8CD] hover:text-white transition-colors text-[11px]"
+                        >
+                          Open Settings...
+                        </button>
                       </div>
                     )}
                   </div>
@@ -433,7 +489,7 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
               </div>
             </div>
 
-            {/* Quick Demo Starters Grid */}
+            {/* Quick Productivity Starters Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full pt-2">
               {quickPrompts.map((qp, idx) => {
                 const Icon = qp.icon;
@@ -441,8 +497,6 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
                   <button
                     key={idx}
                     onClick={() => {
-                      clearAttachments();
-                      attachFile(qp.file);
                       setInputPrompt(qp.prompt);
                     }}
                     className="p-3.5 rounded-2xl bg-[#1C1D1E] hover:bg-[#222425] border border-[#27292A] hover:border-[#323638] text-left transition-all flex items-start gap-3 group cursor-pointer shadow-sm"
@@ -452,8 +506,8 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
                       <div className="text-xs font-semibold text-[#D1D5DB] group-hover:text-white leading-snug">
                         {qp.title}
                       </div>
-                      <div className="text-[11px] text-[#5F6467] mt-1 truncate font-mono">
-                        📎 {qp.file.split('/').pop()}
+                      <div className="text-[11px] text-[#5F6467] mt-1 line-clamp-1 leading-snug">
+                        {qp.desc}
                       </div>
                     </div>
                   </button>
@@ -601,11 +655,11 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
                     <SourcesPane 
                       sources={msg.citations?.map((c, i) => ({
                         id: `cite-${i}`,
-                        source_file: c.source_file,
-                        domain: c.source_file.split('.').slice(0, -1).join('.'),
-                        page_number: c.page_number,
-                        snippet: c.snippet,
-                        relevance_score: c.relevance_score
+                        source_file: c?.source_file || 'Document',
+                        domain: (c?.source_file || 'source').split('/').pop()?.split('.').slice(0, -1).join('.') || 'source',
+                        page_number: c?.page_number,
+                        snippet: c?.snippet || '',
+                        relevance_score: c?.relevance_score || 1.0
                       }))}
                     />
                   </div>
@@ -700,7 +754,21 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[#858A8E] font-mono">Model: {selectedModel}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettingsOpen(true);
+                      setSettingsTab('models');
+                    }}
+                    title="Click to configure model in Settings"
+                    className={`text-[11px] font-mono px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                      selectedModel 
+                        ? 'text-[#858A8E] hover:text-white border-[#2A2C2E] bg-[#1C1D1E]' 
+                        : 'text-[#E58888] border-[#522929] bg-[#292020]'
+                    }`}
+                  >
+                    Model: {selectedModel || 'No model selected'}
+                  </button>
 
                   <button
                     type="button"

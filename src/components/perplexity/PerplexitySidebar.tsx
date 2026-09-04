@@ -43,37 +43,17 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
     isBottomPanelOpen, 
     setBottomPanelOpen,
     setSecurityModalOpen,
-    setCommandPaletteOpen
+    setCommandPaletteOpen,
+    openTab,
+    setActiveTabId,
+    setSettingsOpen,
+    setSettingsTab,
+    userProfile,
+    savedSessions
   } = useWorkbenchStore();
 
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [sessionsExpanded, setSessionsExpanded] = useState(true);
-
-  const sampleSessions = [
-    {
-      title: 'Sovereign Industrial AI Workbench (SIH)',
-      prompt: 'I am preparing a solution for Smart India Hackathon (SIH) based on the following problem statement:\n\nTitle: Sovereign On-Premise Agentic AI Workbench using Open-Weight Multimodal LLMs for Confidential Industrial Work\n\nProvide an executive recommendation and technical architecture.',
-      time: 'Just now'
-    },
-    {
-      title: 'Quarterly review & action plan',
-      prompt: 'Analyze the attached quarterly review notes (demo/meeting_notes_quarterly_review.md). Provide a clear executive summary of achievements, primary roadblocks, and format the assigned action items into a clean priority table.',
-      file: 'demo/meeting_notes_quarterly_review.md',
-      time: '2h ago'
-    },
-    {
-      title: 'Sales leads & pipeline evaluation',
-      prompt: 'Inspect the attached sales dataset (demo/sales_leads_q3.csv). Calculate the overall win rate, total pipeline volume, won revenue, and list the top 3 highest-value strategic opportunities in progress.',
-      file: 'demo/sales_leads_q3.csv',
-      time: '1d ago'
-    },
-    {
-      title: 'Python outlier detection & MTBF logic',
-      prompt: 'Review the attached Python script (demo/sample_code_analysis.py). Explain the statistical outlier methodology, identify any edge cases, and suggest performance optimizations.',
-      file: 'demo/sample_code_analysis.py',
-      time: '3d ago'
-    }
-  ];
 
   // ==========================================
   // 1. COLLAPSED VIEW (Slim Icon Rail ~56px)
@@ -117,8 +97,11 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
 
           {/* Artefacts */}
           <button
-            onClick={() => onSelectPrompt('Inspect the generated project deliverables and output files.')}
-            title="Artefacts"
+            onClick={() => {
+              openTab({ id: 'tab-deliverables', title: 'Deliverables & Artefacts', type: 'artifacts' });
+              setActiveTabId('tab-deliverables');
+            }}
+            title="Deliverables & Artefacts"
             className="w-9 h-9 rounded-xl flex items-center justify-center text-[#858A8E] hover:text-white hover:bg-[#202222] transition-colors cursor-pointer"
           >
             <LayoutGrid className="w-4 h-4" />
@@ -126,8 +109,11 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
 
           {/* Customise / Settings */}
           <button
-            onClick={() => setSecurityModalOpen(true)}
-            title="Customise & Settings"
+            onClick={() => {
+              setSettingsOpen(true);
+              setSettingsTab('models');
+            }}
+            title="Workbench Settings & Model Selection"
             className="w-9 h-9 rounded-xl flex items-center justify-center text-[#858A8E] hover:text-white hover:bg-[#202222] transition-colors cursor-pointer"
           >
             <Settings className="w-4 h-4" />
@@ -135,8 +121,11 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
 
           {/* Projects / Folder */}
           <button
-            onClick={toggleSidebar}
-            title="Projects"
+            onClick={() => {
+              openTab({ id: 'tab-docs', title: 'Document Intelligence', type: 'document' });
+              setActiveTabId('tab-docs');
+            }}
+            title="Documents & Vault"
             className="w-9 h-9 rounded-xl flex items-center justify-center text-[#858A8E] hover:text-white hover:bg-[#202222] transition-colors cursor-pointer"
           >
             <Folder className="w-4 h-4" />
@@ -163,11 +152,14 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
           </button>
 
           <button
-            onClick={() => setSecurityModalOpen(true)}
-            title="User Profile"
-            className="w-8 h-8 rounded-full bg-[#2E3133] border border-[#3C4043] flex items-center justify-center text-xs font-semibold text-white cursor-pointer"
+            onClick={() => {
+              setSettingsOpen(true);
+              setSettingsTab('profile');
+            }}
+            title={`User Profile: ${userProfile.displayName}`}
+            className="w-8 h-8 rounded-full bg-[#282A2C] border border-[#3C4043] flex items-center justify-center text-xs font-semibold text-[#20B8CD] hover:border-[#20B8CD] transition-colors cursor-pointer"
           >
-            S
+            {(userProfile.displayName || 'U')[0].toUpperCase()}
           </button>
         </div>
       </aside>
@@ -237,16 +229,22 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
 
         {/* Artefacts */}
         <button
-          onClick={() => onSelectPrompt('Display all generated artifacts, deliverables, and reports created in this workspace.')}
+          onClick={() => {
+            openTab({ id: 'tab-deliverables', title: 'Deliverables & Artefacts', type: 'artifacts' });
+            setActiveTabId('tab-deliverables');
+          }}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#858A8E] hover:text-white hover:bg-[#1C1D1E] font-medium transition-colors cursor-pointer"
         >
           <LayoutGrid className="w-4 h-4" />
           <span>Artefacts</span>
         </button>
 
-        {/* Customise */}
+        {/* Customise / Settings */}
         <button
-          onClick={() => setSecurityModalOpen(true)}
+          onClick={() => {
+            setSettingsOpen(true);
+            setSettingsTab('models');
+          }}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#858A8E] hover:text-white hover:bg-[#1C1D1E] font-medium transition-colors cursor-pointer"
         >
           <Settings className="w-4 h-4" />
@@ -277,11 +275,14 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
                 </div>
               </div>
               <button
-                onClick={() => onSelectPrompt('Load the general demo project files from demo/ directory and summarize available datasets.')}
+                onClick={() => {
+                  openTab({ id: 'tab-docs', title: 'Document Intelligence', type: 'document' });
+                  setActiveTabId('tab-docs');
+                }}
                 className="w-full py-1.5 px-2 rounded-lg bg-[#252829] hover:bg-[#2E3234] border border-[#323638] text-white text-[11px] font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <FolderPlus className="w-3.5 h-3.5 text-[#20B8CD]" />
-                <span>Create project</span>
+                <span>Document Vault</span>
               </button>
             </div>
           )}
@@ -299,20 +300,26 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
 
           {sessionsExpanded && (
             <div className="space-y-1 mt-1">
-              {sampleSessions.map((session, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => onSelectPrompt(session.prompt, session.file)}
-                  className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-[#1C1D1E] text-[#A2A8AB] hover:text-white transition-colors cursor-pointer truncate group"
-                >
-                  <div className="truncate font-medium text-[11.5px] group-hover:text-white">
-                    {session.title}
-                  </div>
-                  <div className="text-[10px] text-[#5F6467] mt-0.5 font-mono">
-                    {session.time}
-                  </div>
-                </button>
-              ))}
+              {Array.isArray(savedSessions) && savedSessions.length > 0 ? (
+                savedSessions.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() => onSelectPrompt(session.title)}
+                    className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-[#1C1D1E] text-[#A2A8AB] hover:text-white transition-colors cursor-pointer truncate group"
+                  >
+                    <div className="truncate font-medium text-[11.5px] group-hover:text-white">
+                      {session.title}
+                    </div>
+                    <div className="text-[10px] text-[#5F6467] mt-0.5 font-mono">
+                      {session.createdAt}
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="px-2.5 py-3 rounded-xl bg-[#1C1D1E]/40 text-center text-[#5F6467] text-[11px]">
+                  No previous sessions yet.
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -331,20 +338,33 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
 
         {/* User Account Row */}
         <div className="flex items-center justify-between pt-1 px-1">
-          <div className="flex items-center gap-2 truncate">
-            <div className="w-7 h-7 rounded-full bg-[#282A2C] border border-[#363A3D] flex items-center justify-center font-bold text-xs text-white flex-shrink-0">
-              S
+          <div 
+            onClick={() => {
+              setSettingsOpen(true);
+              setSettingsTab('profile');
+            }}
+            className="flex items-center gap-2 truncate cursor-pointer group"
+          >
+            <div className="w-7 h-7 rounded-full bg-[#282A2C] border border-[#363A3D] group-hover:border-[#20B8CD] flex items-center justify-center font-bold text-xs text-[#20B8CD] flex-shrink-0 transition-colors">
+              {(userProfile.displayName || 'U')[0].toUpperCase()}
             </div>
             <div className="truncate">
-              <div className="text-xs font-semibold text-white truncate">sangyansahu</div>
-              <div className="text-[10px] text-[#5F6467] leading-tight">Free plan</div>
+              <div className="text-xs font-semibold text-white truncate group-hover:text-[#20B8CD] transition-colors">
+                {userProfile.displayName}
+              </div>
+              <div className="text-[10px] text-[#5F6467] leading-tight truncate">
+                {userProfile.role}
+              </div>
             </div>
           </div>
 
           <button 
-            onClick={() => setSecurityModalOpen(true)}
+            onClick={() => {
+              setSettingsOpen(true);
+              setSettingsTab('privacy');
+            }}
             className="p-1 rounded-lg hover:bg-[#202222] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
-            title="Notifications & Security"
+            title="Settings & Privacy"
           >
             <Bell className="w-3.5 h-3.5" />
           </button>
