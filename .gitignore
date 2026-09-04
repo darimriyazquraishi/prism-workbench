@@ -12,8 +12,6 @@ venv/
 .venv/
 
 # Large AI Models and Weights (DO NOT COMMIT)
-/models/
-llama/
 *.gguf
 *.bin
 *.safetensors
@@ -22,7 +20,13 @@ llama/
 *.onnx
 *.weights
 *.h5
-!sovereign-ai-workbench/backend/app/models/
+models/**
+!models/
+!models/**/
+!models/README.md
+!models/**/README.md
+!models/**/.gitkeep
+llama/
 
 # Compiled Binaries & Executables
 *.dll
