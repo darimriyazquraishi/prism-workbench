@@ -30,6 +30,7 @@ llama/
 *.so
 *.dylib
 lib/
+LUMI_Desktop/
 
 # Caches and runtime
 .cache/
