@@ -233,8 +233,9 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
 
   return (
     <div className="h-full flex flex-col bg-[#1E1E1E] font-sans text-sm overflow-hidden relative">
-      {/* 1. CHAT MESSAGES STREAM */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 max-w-4xl w-full mx-auto">
+      {/* 1. CHAT MESSAGES STREAM (Full-width scroll container so scrollbar is on right-most edge) */}
+      <div className="flex-1 overflow-y-auto w-full">
+        <div className="max-w-4xl w-full mx-auto px-4 py-6 space-y-6">
         {/* Simple & Clean Empty State Landing */}
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4 space-y-6">
@@ -424,7 +425,8 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
           </div>
         )}
 
-        <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* 2. CHAT COMPOSER DOCK */}

@@ -151,17 +151,17 @@ export const WorkbenchApp: React.FC = () => {
           <DocumentTabsBar />
 
           {/* Active Tab Workspace View */}
-          <div className="flex-1 overflow-hidden p-2">
+          <div className="flex-1 overflow-hidden">
             {(!currentTab || currentTab.type === 'chat') && (
               <ChatWorkbench onExecutePrompt={handleExecutePrompt} />
             )}
-            {currentTab?.type === 'document' && <DocumentIntelligenceView />}
+            {currentTab?.type === 'document' && <div className="h-full p-2"><DocumentIntelligenceView /></div>}
             {currentTab?.type === 'drawing' && <PIDDrawingView />}
-            {currentTab?.type === 'knowledge' && <KnowledgeRAGView />}
-            {currentTab?.type === 'artifacts' && <DeliverablesView />}
-            {currentTab?.type === 'models' && <ModelRegistryView />}
-            {currentTab?.type === 'audit' && <AuditLogView />}
-            {currentTab?.type === 'security' && <SystemDiagnosticsView />}
+            {currentTab?.type === 'knowledge' && <div className="h-full p-2"><KnowledgeRAGView /></div>}
+            {currentTab?.type === 'artifacts' && <div className="h-full p-2"><DeliverablesView /></div>}
+            {currentTab?.type === 'models' && <div className="h-full p-2"><ModelRegistryView /></div>}
+            {currentTab?.type === 'audit' && <div className="h-full p-2"><AuditLogView /></div>}
+            {currentTab?.type === 'security' && <div className="h-full p-2"><SystemDiagnosticsView /></div>}
           </div>
         </main>
 
