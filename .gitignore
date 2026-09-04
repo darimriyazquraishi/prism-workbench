@@ -29,6 +29,7 @@ llama/
 *.exe
 *.so
 *.dylib
+lib/
 
 # Caches and runtime
 .cache/

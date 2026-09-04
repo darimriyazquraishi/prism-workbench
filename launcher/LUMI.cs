@@ -2,14 +2,15 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Diagnostics;
 using System.Threading;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Web.WebView2.Core;
 
-namespace LUMI.Launcher
+namespace LUMI.Desktop
 {
     public class HttpServer
     {
@@ -92,7 +93,7 @@ namespace LUMI.Launcher
 
             try
             {
-                // Set default CORS headers for local execution
+                // Standard CORS and security headers for offline local app
                 response.AddHeader("Access-Control-Allow-Origin", "*");
                 response.AddHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
                 response.AddHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
@@ -123,7 +124,7 @@ namespace LUMI.Launcher
                     return;
                 }
 
-                // 2. Direct file lookup in demo/ or models/ or public/
+                // 2. Direct file lookup in demo/ or models/ or per_design/
                 string targetFilePath = null;
 
                 if (urlPath.StartsWith("/demo/", StringComparison.OrdinalIgnoreCase) ||
@@ -219,7 +220,6 @@ namespace LUMI.Launcher
             response.ContentType = contentType;
             response.StatusCode = 200;
 
-            // Cache static assets (_astro) for performance, but not index.html
             if (filePath.Contains("_astro"))
             {
                 response.AddHeader("Cache-Control", "public, max-age=31536000, immutable");
@@ -303,24 +303,143 @@ namespace LUMI.Launcher
         }
     }
 
+    public class MainForm : Form
+    {
+        private readonly WebView2 _webView;
+        private readonly HttpServer _server;
+        private readonly int _port;
+        private bool _isFullscreen = false;
+        private FormWindowState _previousWindowState;
+        private FormBorderStyle _previousBorderStyle;
+
+        public MainForm(string baseDir, int port, HttpServer server)
+        {
+            _port = port;
+            _server = server;
+
+            // 1. Native Desktop Window Configuration
+            this.Text = "LUMI — Sovereign Industrial AI Workbench";
+            this.Width = 1440;
+            this.Height = 920;
+            this.MinimumSize = new Size(960, 600);
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.BackColor = Color.FromArgb(25, 26, 26); // Perplexity #191A1A matte dark
+
+            // Load custom application icon
+            string iconPath = Path.Combine(baseDir, "public", "favicon.ico");
+            if (!File.Exists(iconPath))
+            {
+                iconPath = Path.Combine(baseDir, "dist", "favicon.ico");
+            }
+            if (File.Exists(iconPath))
+            {
+                try { this.Icon = new Icon(iconPath); } catch { }
+            }
+
+            // 2. Embedded Native WebView2 Control
+            _webView = new WebView2();
+            _webView.Dock = DockStyle.Fill;
+            _webView.DefaultBackgroundColor = Color.FromArgb(25, 26, 26);
+            this.Controls.Add(_webView);
+
+            // 3. Native Keyboard Shortcuts (F11 Fullscreen, Ctrl+R Reload, F12 DevTools)
+            this.KeyPreview = true;
+            this.KeyDown += OnKeyDown;
+
+            // 4. Initialize on Form Load
+            this.Load += async (s, e) =>
+            {
+                try
+                {
+                    string userDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LUMI_Workbench_Data");
+                    var env = await CoreWebView2Environment.CreateAsync(null, userDataDir);
+                    await _webView.EnsureCoreWebView2Async(env);
+
+                    // Customize WebView2 for clean desktop software look
+                    _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                    _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+                    _webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
+                    _webView.CoreWebView2.Settings.IsZoomControlEnabled = true;
+
+                    // Navigate to local offline application
+                    _webView.CoreWebView2.Navigate(string.Format("http://127.0.0.1:{0}/", _port));
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        string.Format("Error initializing offline desktop view:\n\n{0}\n\nPlease ensure Microsoft Edge WebView2 Runtime is installed.", ex.Message),
+                        "LUMI — Initialization Error",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error
+                    );
+                }
+            };
+
+            // 5. Clean Shutdown when user closes the window
+            this.FormClosing += (s, e) =>
+            {
+                try
+                {
+                    if (_server != null)
+                    {
+                        _server.Stop();
+                    }
+                    _webView.Dispose();
+                }
+                catch { }
+            };
+        }
+
+        private void OnKeyDown(object sender, KeyEventArgs e)
+        {
+            // F11: Toggle Fullscreen
+            if (e.KeyCode == Keys.F11)
+            {
+                e.Handled = true;
+                ToggleFullscreen();
+            }
+            // F5 or Ctrl+R: Reload
+            else if (e.KeyCode == Keys.F5 || (e.Control && e.KeyCode == Keys.R))
+            {
+                e.Handled = true;
+                _webView.Reload();
+            }
+            // F12: Toggle DevTools
+            else if (e.KeyCode == Keys.F12)
+            {
+                e.Handled = true;
+                if (_webView.CoreWebView2 != null)
+                {
+                    _webView.CoreWebView2.OpenDevToolsWindow();
+                }
+            }
+        }
+
+        private void ToggleFullscreen()
+        {
+            if (!_isFullscreen)
+            {
+                _previousWindowState = this.WindowState;
+                _previousBorderStyle = this.FormBorderStyle;
+                this.FormBorderStyle = FormBorderStyle.None;
+                this.WindowState = FormWindowState.Maximized;
+                _isFullscreen = true;
+            }
+            else
+            {
+                this.FormBorderStyle = _previousBorderStyle;
+                this.WindowState = _previousWindowState;
+                _isFullscreen = false;
+            }
+        }
+    }
+
     static class Program
     {
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool AllocConsole();
 
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GetConsoleWindow();
-
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        private const int SW_HIDE = 0;
-        private const int SW_SHOW = 5;
-
-        private static NotifyIcon _trayIcon;
         private static HttpServer _server;
-        private static Process _browserProcess;
-        private static string _appUrl;
         private static string _baseDir;
         private static int _port = 4321;
 
@@ -331,7 +450,7 @@ namespace LUMI.Launcher
             Application.SetCompatibleTextRenderingDefault(false);
 
             bool showConsole = false;
-            bool noBrowser = false;
+            bool noWindow = false;
 
             foreach (string arg in args)
             {
@@ -340,9 +459,9 @@ namespace LUMI.Launcher
                 {
                     showConsole = true;
                 }
-                else if (arg.Equals("--no-browser", StringComparison.OrdinalIgnoreCase))
+                else if (arg.Equals("--no-window", StringComparison.OrdinalIgnoreCase))
                 {
-                    noBrowser = true;
+                    noWindow = true;
                 }
                 else if (arg.StartsWith("--port=", StringComparison.OrdinalIgnoreCase))
                 {
@@ -357,9 +476,9 @@ namespace LUMI.Launcher
             if (showConsole)
             {
                 AllocConsole();
-                Console.Title = "LUMI Server Console";
+                Console.Title = "LUMI Desktop Console";
                 Console.WriteLine("==================================================================");
-                Console.WriteLine("  LUMI / PRISM WORKBENCH — ON-PREMISE AI DESKTOP LAUNCHER");
+                Console.WriteLine("  LUMI — OFFLINE DESKTOP AGENTIC AI WORKBENCH");
                 Console.WriteLine("==================================================================");
             }
 
@@ -369,7 +488,6 @@ namespace LUMI.Launcher
             string distPath = Path.Combine(_baseDir, "dist");
             if (!Directory.Exists(distPath) || !File.Exists(Path.Combine(distPath, "index.html")))
             {
-                // Try to see if dist is in parent directory
                 string parentDist = Path.Combine(Directory.GetParent(_baseDir).FullName, "dist");
                 if (Directory.Exists(parentDist))
                 {
@@ -389,13 +507,12 @@ namespace LUMI.Launcher
 
             // Find available port starting from _port
             _port = FindAvailablePort(_port);
-            _appUrl = string.Format("http://127.0.0.1:{0}/", _port);
 
             if (showConsole)
             {
                 Console.WriteLine(string.Format("Serving files from: {0}", distPath));
-                Console.WriteLine(string.Format("Local HTTP URL:     {0}", _appUrl));
-                Console.WriteLine("Starting embedded server...");
+                Console.WriteLine(string.Format("Local HTTP URL:     http://127.0.0.1:{0}/", _port));
+                Console.WriteLine("Starting embedded offline server...");
             }
 
             // Start HTTP server
@@ -415,20 +532,22 @@ namespace LUMI.Launcher
                 return;
             }
 
-            // Setup System Tray Icon
-            SetupTrayIcon();
-
-            // Launch Desktop Window (Edge App Mode)
-            if (!noBrowser)
+            // Launch Native Desktop Window
+            if (!noWindow)
             {
-                LaunchDesktopWindow();
+                var mainForm = new MainForm(_baseDir, _port, _server);
+                Application.Run(mainForm);
+            }
+            else
+            {
+                Application.Run();
             }
 
-            // Message loop
-            Application.Run();
-
             // Clean shutdown
-            Shutdown();
+            if (_server != null)
+            {
+                _server.Stop();
+            }
         }
 
         private static int FindAvailablePort(int startingPort)
@@ -445,130 +564,6 @@ namespace LUMI.Launcher
                 catch { }
             }
             return startingPort;
-        }
-
-        private static void SetupTrayIcon()
-        {
-            _trayIcon = new NotifyIcon();
-            _trayIcon.Text = string.Format("LUMI — On-Premise AI ({0})", _appUrl);
-
-            // Try loading custom icon from public/favicon.ico or dist/favicon.ico
-            string iconPath = Path.Combine(_baseDir, "public", "favicon.ico");
-            if (!File.Exists(iconPath))
-            {
-                iconPath = Path.Combine(_baseDir, "dist", "favicon.ico");
-            }
-
-            if (File.Exists(iconPath))
-            {
-                try
-                {
-                    _trayIcon.Icon = new Icon(iconPath);
-                }
-                catch
-                {
-                    _trayIcon.Icon = SystemIcons.Application;
-                }
-            }
-            else
-            {
-                _trayIcon.Icon = SystemIcons.Application;
-            }
-
-            _trayIcon.Visible = true;
-
-            // Context Menu
-            ContextMenu menu = new ContextMenu();
-            menu.MenuItems.Add(new MenuItem("Open LUMI Window", (s, e) => LaunchDesktopWindow()));
-            menu.MenuItems.Add(new MenuItem("Open in Browser", (s, e) => Process.Start(_appUrl)));
-            menu.MenuItems.Add(new MenuItem("Open Project Folder", (s, e) => Process.Start("explorer.exe", _baseDir)));
-            menu.MenuItems.Add("-");
-            menu.MenuItems.Add(new MenuItem("Exit LUMI", (s, e) => {
-                Shutdown();
-                Application.Exit();
-            }));
-
-            _trayIcon.ContextMenu = menu;
-            _trayIcon.DoubleClick += (s, e) => LaunchDesktopWindow();
-        }
-
-        private static void LaunchDesktopWindow()
-        {
-            string[] candidatePaths = new string[]
-            {
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft\\Edge\\Application\\msedge.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft\\Edge\\Application\\msedge.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft\\Edge\\Application\\msedge.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google\\Chrome\\Application\\chrome.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Google\\Chrome\\Application\\chrome.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Google\\Chrome\\Application\\chrome.exe")
-            };
-
-            string browserExe = null;
-            foreach (string p in candidatePaths)
-            {
-                if (File.Exists(p))
-                {
-                    browserExe = p;
-                    break;
-                }
-            }
-
-            string userDataDir = Path.Combine(Path.GetTempPath(), "LUMI_App_Profile");
-
-            if (browserExe != null)
-            {
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = browserExe,
-                    Arguments = string.Format("--app=\"{0}\" --window-size=1440,920 --user-data-dir=\"{1}\" --no-first-run --no-default-browser-check", _appUrl, userDataDir),
-                    UseShellExecute = false
-                };
-
-                try
-                {
-                    _browserProcess = Process.Start(psi);
-
-                    // Monitor browser process: if closed and no other window, exit cleanly
-                    if (_browserProcess != null)
-                    {
-                        new Thread(() =>
-                        {
-                            try
-                            {
-                                _browserProcess.WaitForExit();
-                                Thread.Sleep(300);
-                                Application.Exit();
-                            }
-                            catch { }
-                        }) { IsBackground = true }.Start();
-                    }
-                }
-                catch
-                {
-                    Process.Start(_appUrl);
-                }
-            }
-            else
-            {
-                Process.Start(_appUrl);
-            }
-        }
-
-        private static void Shutdown()
-        {
-            if (_trayIcon != null)
-            {
-                _trayIcon.Visible = false;
-                _trayIcon.Dispose();
-                _trayIcon = null;
-            }
-
-            if (_server != null)
-            {
-                _server.Stop();
-                _server = null;
-            }
         }
     }
 }

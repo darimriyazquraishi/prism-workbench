@@ -24,7 +24,7 @@ if not exist "%CSC%" (
     exit /b 1
 )
 
-"%CSC%" /nologo /target:winexe /optimize+ /out:LUMI.exe /win32icon:public\favicon.ico /r:System.dll,System.Drawing.dll,System.Windows.Forms.dll,System.Core.dll launcher\LUMI.cs
+"%CSC%" /nologo /target:winexe /optimize+ /out:LUMI.exe /win32icon:public\favicon.ico /r:System.dll,System.Drawing.dll,System.Windows.Forms.dll,System.Core.dll,Microsoft.Web.WebView2.WinForms.dll,Microsoft.Web.WebView2.Core.dll launcher\LUMI.cs
 
 if %errorlevel% neq 0 (
     echo Error: C# compilation failed.
@@ -44,4 +44,4 @@ echo.
 echo   All files and folders remain available alongside LUMI.exe.
 echo   Double-click LUMI.exe to launch the desktop application.
 echo ======================================================================
-pause
+if "%~1"=="" pause
