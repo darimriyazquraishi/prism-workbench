@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.config import settings
 from app.documents.processor import document_processor
+from app.documents.metadata_cleaner import metadata_cleaner
 
 router = APIRouter(prefix="/documents", tags=["Document Processing & OCR"])
 
@@ -13,14 +14,26 @@ async def upload_document(file: UploadFile = File(...)):
     with open(target_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    parsed = document_processor.process_file(str(target_path))
+    # 1. Automatically inspect and clean file metadata using local engine & models
+    clean_path, clean_report = metadata_cleaner.clean_file(str(target_path))
+
+    # 2. Process the sanitized document
+    parsed = document_processor.process_file(clean_path)
 
     return {
         "file_name": file.filename,
-        "file_path": str(target_path),
-        "size_bytes": target_path.stat().st_size,
+        "file_path": clean_path,
+        "size_bytes": Path(clean_path).stat().st_size,
         "total_pages": parsed.total_pages,
         "is_primarily_scanned": parsed.is_primarily_scanned,
+        "metadata_cleaned": True,
+        "metadata_report": {
+            "stripped_tags": clean_report.stripped_tags,
+            "llm_sanitized": clean_report.llm_sanitized,
+            "summary": clean_report.summary,
+            "original_size": clean_report.original_size_bytes,
+            "cleaned_size": clean_report.cleaned_size_bytes
+        },
         "pages": [{"page": p.page_number, "is_scanned": p.is_scanned, "confidence": p.ocr_confidence} for p in parsed.pages]
     }
 

@@ -1,0 +1,34 @@
+[
+  {
+    "feedback_id": "FB-201",
+    "user": "Enterprise Architect",
+    "rating": 5,
+    "sentiment": "Positive",
+    "category": "Security & Privacy",
+    "comment": "Being able to run everything on our local GPU workstation without any external API calls is a game changer for our sensitive internal work."
+  },
+  {
+    "feedback_id": "FB-202",
+    "user": "Product Lead",
+    "rating": 3,
+    "sentiment": "Neutral",
+    "category": "User Experience",
+    "comment": "The agent execution is powerful, but the initial UI had way too many badges and telemetry panels open. Please keep the main interface simple and clean like VS Code and ChatGPT."
+  },
+  {
+    "feedback_id": "FB-203",
+    "user": "Data Analyst",
+    "rating": 5,
+    "sentiment": "Positive",
+    "category": "Analysis",
+    "comment": "The Python sandbox executed our CSV transformations and generated cleanly styled Excel reports in seconds. Extremely useful."
+  },
+  {
+    "feedback_id": "FB-204",
+    "user": "Operations Manager",
+    "rating": 4,
+    "sentiment": "Positive",
+    "category": "Feature Request",
+    "comment": "Automatic metadata stripping on uploaded files saves our team significant manual preparation time before archiving reports."
+  }
+]

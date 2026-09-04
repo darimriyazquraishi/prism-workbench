@@ -1,16 +1,14 @@
 import React from 'react';
 import { 
-  Folder, 
   FileText, 
   FileSpreadsheet, 
-  Sparkles, 
+  FileCode,
+  MessageSquare, 
   ChevronDown, 
   Plus, 
-  MessageSquare, 
-  BookOpen,
-  Compass,
-  FileCode,
-  ChevronsLeft
+  ChevronsLeft,
+  Paperclip,
+  Sparkles
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
 
@@ -19,168 +17,154 @@ interface SecondarySidebarProps {
 }
 
 export const SecondarySidebar: React.FC<SecondarySidebarProps> = ({ onSelectScenario }) => {
-  const { activeNavSection, openTab, activeTask, toggleSidebar } = useWorkbenchStore();
+  const { openTab, toggleSidebar, attachFile } = useWorkbenchStore();
 
-  const scenarios = [
+  const generalFiles = [
     {
-      id: 'demo1',
-      title: 'Inspection -> Word Note',
-      prompt: 'Analyze these inspection reports, compare them against our maintenance SOPs, identify critical issues, calculate the corrosion rate, and prepare an approval note in Word format.',
-      file: 'demo/synthetic/Inspection_Report_001.pdf',
-      badge: 'Flagship'
+      name: 'meeting_notes_quarterly_review.md',
+      path: 'demo/meeting_notes_quarterly_review.md',
+      type: 'markdown',
+      icon: FileText,
+      description: 'Quarterly team strategy & action items'
     },
     {
-      id: 'demo2',
-      title: 'Pump Failure -> Python Excel',
-      prompt: 'Analyze Pump_Failure_Data.xlsx, write and execute Python code in the isolated sandbox to calculate monthly MTBF statistics, and produce an Excel deliverable.',
-      file: 'demo/synthetic/Pump_Failure_Data.xlsx',
-      badge: 'Python'
+      name: 'sales_leads_q3.csv',
+      path: 'demo/sales_leads_q3.csv',
+      type: 'csv',
+      icon: FileSpreadsheet,
+      description: 'Sales pipeline with deal sizes & win status'
     },
     {
-      id: 'demo3',
-      title: 'P&ID Vision -> Drawing Tags',
-      prompt: 'Perform vision analysis on P_and_ID_Example.png, identify all pumps, valves, and flow lines, and generate an executive summary briefing deck.',
-      file: 'demo/synthetic/P_and_ID_Example.png',
-      badge: 'Vision'
+      name: 'research_summary_autonomous_agents.txt',
+      path: 'demo/research_summary_autonomous_agents.txt',
+      type: 'text',
+      icon: FileText,
+      description: 'AI agent loops & privacy architecture'
+    },
+    {
+      name: 'sample_code_analysis.py',
+      path: 'demo/sample_code_analysis.py',
+      type: 'python',
+      icon: FileCode,
+      description: 'Data transformation & outlier metrics'
+    },
+    {
+      name: 'customer_feedback.json',
+      path: 'demo/customer_feedback.json',
+      type: 'json',
+      icon: MessageSquare,
+      description: 'User sentiment & feature requests'
+    }
+  ];
+
+  const generalPrompts = [
+    {
+      title: 'Summarize Meeting Notes',
+      prompt: 'Analyze the attached quarterly review notes (demo/meeting_notes_quarterly_review.md). Provide a clear executive summary of achievements, primary roadblocks, and format the assigned action items into a clean priority table.',
+      file: 'demo/meeting_notes_quarterly_review.md'
+    },
+    {
+      title: 'Analyze Sales Pipeline',
+      prompt: 'Inspect the attached sales dataset (demo/sales_leads_q3.csv). Calculate the overall win rate, total pipeline volume, won revenue, and list the top 3 highest-value strategic opportunities in progress.',
+      file: 'demo/sales_leads_q3.csv'
+    },
+    {
+      title: 'Review Python Code',
+      prompt: 'Review the attached Python script (demo/sample_code_analysis.py). Explain the statistical outlier methodology, identify any edge cases, and suggest performance optimizations.',
+      file: 'demo/sample_code_analysis.py'
+    },
+    {
+      title: 'Synthesize Feedback',
+      prompt: 'Examine customer_feedback.json. Group the user comments by sentiment and category, and formulate the top 3 actionable product recommendations.',
+      file: 'demo/customer_feedback.json'
     }
   ];
 
   return (
-    <aside className="w-60 bg-[#252526] border-r border-[#3C3C3C] flex flex-col font-sans select-none flex-shrink-0 text-xs">
-      {/* Sidebar Section Header */}
-      <div className="h-10 px-3 flex items-center justify-between border-b border-[#3C3C3C] text-[#858585] uppercase font-bold text-[11px] tracking-wider font-mono">
-        <span>
-          {activeNavSection === 'chat' && 'WORKSPACE'}
-          {activeNavSection === 'explorer' && 'EXPLORER'}
-          {activeNavSection === 'documents' && 'DOCUMENTS'}
-          {activeNavSection === 'knowledge' && 'KNOWLEDGE'}
-          {activeNavSection === 'drawing' && 'SCHEMATICS'}
-          {activeNavSection === 'models' && 'MODELS'}
-          {activeNavSection === 'audit' && 'AUDIT TRAIL'}
-        </span>
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={toggleSidebar}
-            title="Collapse Workspace Panel (Ctrl+B)"
-            className="p-1 hover:bg-[#3C3C3C] rounded text-[#858585] hover:text-white"
-          >
-            <ChevronsLeft className="w-3.5 h-3.5" />
-          </button>
+    <aside className="w-64 bg-[#252526] border-r border-[#2D2D2D] flex flex-col font-sans select-none flex-shrink-0 text-xs">
+      {/* Sidebar Header */}
+      <div className="h-10 px-3 flex items-center justify-between border-b border-[#2D2D2D] text-[#858585] uppercase font-bold text-[11px] tracking-wider font-mono">
+        <span>EXPLORER</span>
+        <div className="flex items-center gap-1">
           <button
             onClick={() => {
-              useWorkbenchStore.getState().runDemo('inspection');
+              openTab({ id: 'tab-chat', title: 'New Chat', type: 'chat', isClosable: false });
             }}
-            title="New Task"
-            className="p-1 hover:bg-[#3C3C3C] rounded text-[#858585] hover:text-white"
+            title="New Chat"
+            className="p-1 hover:bg-[#333333] rounded text-[#858585] hover:text-white cursor-pointer transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={toggleSidebar}
+            title="Collapse Sidebar (Ctrl+B)"
+            className="p-1 hover:bg-[#333333] rounded text-[#858585] hover:text-white cursor-pointer transition-colors"
+          >
+            <ChevronsLeft className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Sidebar Content Tree */}
-      <div className="flex-1 p-2 space-y-3 overflow-y-auto font-sans">
-        {/* Quick Showcase Scenarios */}
+      <div className="flex-1 p-2 space-y-4 overflow-y-auto font-sans">
+        {/* General Demo Files */}
         <div>
           <div className="px-2 py-1 text-[10px] font-mono font-bold text-[#666666] uppercase tracking-wider flex items-center gap-1">
             <ChevronDown className="w-3 h-3" />
-            <span>Showcase Demos</span>
+            <span>General Demo Files</span>
           </div>
 
           <div className="space-y-1 mt-1">
-            {scenarios.map((sc) => (
-              <button
-                key={sc.id}
-                onClick={() => {
-                  const demoId = sc.id === 'demo1' ? 'inspection' : sc.id === 'demo2' ? 'pump' : 'pid';
-                  useWorkbenchStore.getState().runDemo(demoId);
-                }}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded bg-[#252526] hover:bg-[#2A2D2E] border border-[#3C3C3C] hover:border-[#007ACC] text-left transition-all text-xs group cursor-pointer"
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <Sparkles className="w-3.5 h-3.5 text-[#007ACC] flex-shrink-0" />
-                  <span className="text-[#CCCCCC] group-hover:text-white truncate font-medium">
-                    {sc.title}
+            {generalFiles.map((gf) => {
+              const Icon = gf.icon;
+              return (
+                <div
+                  key={gf.name}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-[#1E1E1E] hover:bg-[#2A2D2E] border border-transparent hover:border-[#3C3C3C] text-left transition-all text-xs group cursor-pointer"
+                  onClick={() => {
+                    attachFile(gf.path);
+                  }}
+                  title={`Click to attach ${gf.name} to chat`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Icon className="w-3.5 h-3.5 text-[#007ACC] flex-shrink-0" />
+                    <span className="text-[#CCCCCC] group-hover:text-white truncate font-mono text-[11.5px]">
+                      {gf.name}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[#666666] group-hover:text-[#4EC9B0] opacity-0 group-hover:opacity-100 transition-opacity">
+                    +attach
                   </span>
                 </div>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#252526] text-[#858585] border border-[#3C3C3C]">
-                  {sc.badge}
-                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Quick Prompts */}
+        <div>
+          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[#666666] uppercase tracking-wider flex items-center gap-1">
+            <ChevronDown className="w-3 h-3" />
+            <span>Sample Prompts</span>
+          </div>
+
+          <div className="space-y-1.5 mt-1">
+            {generalPrompts.map((gp, idx) => (
+              <button
+                key={idx}
+                onClick={() => onSelectScenario(gp.prompt, gp.file)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#1E1E1E] hover:bg-[#2A2D2E] border border-[#2D2D2D] hover:border-[#007ACC] text-left transition-all text-xs text-[#CCCCCC] hover:text-white group cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#007ACC] flex-shrink-0" />
+                <span className="text-[11.5px] truncate leading-tight font-medium">{gp.title}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Workspace Files */}
-        <div>
-          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[#666666] uppercase tracking-wider flex items-center gap-1">
-            <ChevronDown className="w-3 h-3" />
-            <span>Company Files</span>
-          </div>
-
-          <div className="space-y-0.5 mt-1 font-mono text-xs">
-            <button
-              onClick={() => openTab({ id: 'tab-doc-1', title: 'Inspection_Report_001.pdf', type: 'document', file: 'demo/synthetic/Inspection_Report_001.pdf', isClosable: true })}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-[#2A2D2E] text-[#858585] hover:text-[#CCCCCC] text-left transition-colors cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5 text-[#CCA700]" />
-              <span className="truncate">Inspection_Report_001.pdf</span>
-            </button>
-
-            <button
-              onClick={() => openTab({ id: 'tab-knowledge', title: 'Operations_SOP_014.rag', type: 'knowledge', isClosable: true })}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-[#2A2D2E] text-[#858585] hover:text-[#CCCCCC] text-left transition-colors cursor-pointer"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-[#007ACC]" />
-              <span className="truncate">Operations_SOP_014.pdf</span>
-            </button>
-
-            <button
-              onClick={() => openTab({ id: 'tab-drawing', title: 'P&ID Schematic.pid', type: 'drawing', isClosable: true })}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-[#2A2D2E] text-[#858585] hover:text-[#CCCCCC] text-left transition-colors cursor-pointer"
-            >
-              <Compass className="w-3.5 h-3.5 text-[#4EC9B0]" />
-              <span className="truncate">P_and_ID_Example.png</span>
-            </button>
-
-            <button
-              onClick={() => openTab({ id: 'tab-artifacts', title: 'Pump_Failure_Data.xlsx', type: 'artifacts', isClosable: true })}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-[#2A2D2E] text-[#858585] hover:text-[#CCCCCC] text-left transition-colors cursor-pointer"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#4EC9B0]" />
-              <span className="truncate">Pump_Failure_Data.xlsx</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Generated Artifacts folder */}
-        <div>
-          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[#666666] uppercase tracking-wider flex items-center gap-1">
-            <ChevronDown className="w-3 h-3" />
-            <span>Generated</span>
-          </div>
-
-          <div className="space-y-0.5 mt-1 font-mono text-xs">
-            <div className="flex items-center gap-2 px-2.5 py-1 text-[#858585]">
-              <FileCode className="w-3.5 h-3.5 text-[#4EC9B0]" />
-              <span className="truncate">Approval_Note.docx</span>
-            </div>
-            <div className="flex items-center gap-2 px-2.5 py-1 text-[#858585]">
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#007ACC]" />
-              <span className="truncate">failure_analysis.xlsx</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Node status bottom */}
-      <div className="p-2.5 border-t border-[#3C3C3C] bg-[#252526] font-mono text-[11px] text-[#666666]">
-        <div className="flex items-center justify-between text-[#4EC9B0]">
-          <span className="flex items-center gap-1.5 font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#4EC9B0]"></span>
-            ISOLATED NODE
-          </span>
-          <span>127.0.0.1</span>
+        {/* Privacy Note */}
+        <div className="pt-2 border-t border-[#2D2D2D] px-2 text-[10px] text-[#666666] leading-relaxed">
+          <span>Files attached here are automatically sanitized of EXIF, author tags, and system paths.</span>
         </div>
       </div>
     </aside>
