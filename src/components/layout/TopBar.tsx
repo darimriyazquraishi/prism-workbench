@@ -3,8 +3,6 @@ import {
   Cpu, 
   Command, 
   Terminal as TerminalIcon,
-  PanelRightOpen,
-  PanelRightClose,
   PanelLeftOpen,
   PanelLeftClose,
   ShieldCheck
@@ -84,26 +82,13 @@ export const TopBar: React.FC = () => {
           <span>K</span>
         </button>
 
-        {/* Security / Privacy Details */}
+        {/* System & Privacy Settings */}
         <button
           onClick={() => setSecurityModalOpen(true)}
-          title="Privacy & Metadata Cleaner Status"
-          className="p-1.5 rounded-lg bg-[#1E1E1E] hover:bg-[#2A2D2E] text-[#858585] hover:text-[#4EC9B0] border border-[#2D2D2D] transition-colors cursor-pointer"
+          title="System Diagnostics & Privacy Status"
+          className="p-1.5 rounded-lg bg-[#1E1E1E] hover:bg-[#2A2D2E] text-[#858585] hover:text-white border border-[#2D2D2D] transition-colors cursor-pointer"
         >
-          <ShieldCheck className="w-3.5 h-3.5 text-[#4EC9B0]" />
-        </button>
-
-        {/* Toggle Right Execution Steps Panel */}
-        <button
-          onClick={toggleTaskPanel}
-          title={isTaskPanelOpen ? 'Hide Execution Steps' : 'View Execution Steps'}
-          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-            isTaskPanelOpen 
-              ? 'bg-[#2A2D2E] border-[#007ACC] text-[#007ACC]' 
-              : 'bg-[#1E1E1E] border-[#2D2D2D] text-[#858585] hover:text-[#CCCCCC]'
-          }`}
-        >
-          {isTaskPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
+          <ShieldCheck className="w-3.5 h-3.5" />
         </button>
       </div>
     </header>

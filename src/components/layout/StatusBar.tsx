@@ -3,8 +3,7 @@ import {
   Terminal, 
   GitBranch,
   AlertCircle,
-  CheckCircle2,
-  ShieldCheck
+  CheckCircle2
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
 
@@ -52,16 +51,6 @@ export const StatusBar: React.FC = () => {
 
       {/* Right: Clean VS Code Indicators */}
       <div className="flex items-center gap-3 h-full text-[11px]">
-        {/* Privacy & Metadata indicator */}
-        <button
-          onClick={() => setSecurityModalOpen(true)}
-          className="hidden md:flex items-center gap-1 text-white/90 hover:bg-[#0E639C] px-1.5 py-0.5 rounded cursor-pointer transition-colors"
-          title="Automatic metadata cleaning active"
-        >
-          <ShieldCheck className="w-3 h-3" />
-          <span>Metadata Guard</span>
-        </button>
-
         <span className="hidden sm:inline text-white/80">Ln 1, Col 1</span>
         <span className="hidden sm:inline text-white/80">Spaces: 2</span>
         <span className="text-white">UTF-8</span>

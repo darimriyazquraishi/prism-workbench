@@ -4,11 +4,10 @@ import { ActivityBar } from './layout/ActivityBar';
 import { SecondarySidebar } from './layout/SecondarySidebar';
 import { DocumentTabsBar } from './layout/DocumentTabsBar';
 import { StatusBar } from './layout/StatusBar';
+import { TerminalPanel } from './layout/TerminalPanel';
 import { ChatWorkbench } from './chat/ChatWorkbench';
-import { TaskActivityPanel } from './agent/TaskActivityPanel';
 import { CommandPalette } from './modals/CommandPalette';
 import { SecurityStatusModal } from './modals/SecurityStatusModal';
-import { TerminalPanel } from './layout/TerminalPanel';
 
 import { PIDDrawingView } from './workspaces/PIDDrawingView';
 import { DocumentIntelligenceView } from './workspaces/DocumentIntelligenceView';
@@ -165,12 +164,9 @@ export const WorkbenchApp: React.FC = () => {
           </div>
         </main>
 
-        {/* Right-Side Antigravity-Style Task Activity Panel */}
-        <TaskActivityPanel />
+        {/* Right-Side Terminal & Execution Panel */}
+        <TerminalPanel />
       </div>
-
-      {/* Bottom Terminal Panel */}
-      <TerminalPanel />
 
       {/* 3. Bottom Status Bar */}
       <StatusBar />

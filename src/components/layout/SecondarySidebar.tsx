@@ -161,11 +161,6 @@ export const SecondarySidebar: React.FC<SecondarySidebarProps> = ({ onSelectScen
             ))}
           </div>
         </div>
-
-        {/* Privacy Note */}
-        <div className="pt-2 border-t border-[#2D2D2D] px-2 text-[10px] text-[#666666] leading-relaxed">
-          <span>Files attached here are automatically sanitized of EXIF, author tags, and system paths.</span>
-        </div>
       </div>
     </aside>
   );

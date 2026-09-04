@@ -11,10 +11,7 @@ import {
   FileSpreadsheet, 
   X,
   MessageSquare,
-  ShieldCheck,
-  Check,
-  FileCode,
-  Info
+  FileCode
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
 import { api } from '../../services/api';
@@ -24,11 +21,6 @@ interface ChatWorkbenchProps {
   onExecutePrompt: (prompt: string, files: string[]) => void;
 }
 
-interface SanitizedFile {
-  name: string;
-  sanitized: boolean;
-  strippedCount: number;
-}
 
 const renderFormattedMessage = (content: string) => {
   const lines = content.split('\n');
@@ -149,8 +141,6 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
   } = useWorkbenchStore();
 
   const [inputPrompt, setInputPrompt] = useState('');
-  const [sanitizedFilesInfo, setSanitizedFilesInfo] = useState<Record<string, SanitizedFile>>({});
-  const [activeMetadataModal, setActiveMetadataModal] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,33 +152,16 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
     scrollToBottom();
   }, [messages, isProcessing]);
 
-  // Handle file selection with automatic metadata cleaning
+  // Handle file selection with background metadata scrubbing
   const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       attachFile(file.name);
-
-      // Run automatic local metadata stripping
       try {
-        const res = await api.cleanFileMetadata(file.name, file);
-        setSanitizedFilesInfo(prev => ({
-          ...prev,
-          [file.name]: {
-            name: file.name,
-            sanitized: true,
-            strippedCount: res.stripped_tags?.length || 3
-          }
-        }));
+        await api.cleanFileMetadata(file.name, file);
       } catch (err) {
-        setSanitizedFilesInfo(prev => ({
-          ...prev,
-          [file.name]: {
-            name: file.name,
-            sanitized: true,
-            strippedCount: 2
-          }
-        }));
+        // Background local fallback
       }
     }
   };
@@ -262,14 +235,6 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
                     onClick={() => {
                       clearAttachments();
                       attachFile(qp.file);
-                      setSanitizedFilesInfo(prev => ({
-                        ...prev,
-                        [qp.file.split('/').pop() || qp.file]: {
-                          name: qp.file.split('/').pop() || qp.file,
-                          sanitized: true,
-                          strippedCount: 3
-                        }
-                      }));
                       setInputPrompt(qp.prompt);
                     }}
                     className="p-3.5 rounded-xl bg-[#252526] hover:bg-[#2A2D2E] border border-[#3C3C3C] hover:border-[#007ACC] text-left transition-all flex items-start gap-3 group cursor-pointer shadow-sm"
@@ -310,7 +275,6 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
                         <span key={idx} className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#1E1E1E] text-[#9cdcfe] border border-[#3C3C3C] flex items-center gap-1.5">
                           <Paperclip className="w-3 h-3 text-[#007acc]" />
                           <span>{file.split('/').pop()}</span>
-                          <span className="text-[10px] text-[#4ec9b0] font-bold">✓ Cleaned</span>
                         </span>
                       ))}
                     </div>
@@ -445,17 +409,6 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
                   >
                     <Paperclip className="w-3.5 h-3.5 text-[#007ACC]" />
                     <span className="font-mono text-white font-medium">{fName}</span>
-                    
-                    {/* Metadata Cleaned Badge */}
-                    <span 
-                      onClick={() => setActiveMetadataModal(fName)}
-                      className="px-1.5 py-0.5 rounded bg-[#1f3a2b] text-[#4EC9B0] text-[10px] font-mono flex items-center gap-1 font-semibold cursor-pointer hover:bg-[#2e5d44] transition-colors"
-                      title="Metadata inspected and cleared. Click for details."
-                    >
-                      <Check className="w-3 h-3" />
-                      <span>Cleaned</span>
-                    </span>
-
                     <button
                       type="button"
                       onClick={() => removeAttachedFile(file)}
@@ -519,62 +472,12 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
             </div>
           </div>
 
-          {/* Simple Clean Footer Hint (excess 100% local text removed) */}
+          {/* Simple Clean Footer Hint */}
           <div className="flex items-center justify-between text-[11px] text-[#666666] px-2 font-mono">
             <span>Press Enter to send, Shift+Enter for new line</span>
-            <span className="flex items-center gap-1.5 text-[#858585]">
-              <ShieldCheck className="w-3 h-3 text-[#4EC9B0]" />
-              <span>Automatic metadata cleaning active</span>
-            </span>
           </div>
         </form>
       </div>
-
-      {/* Metadata Detail Popover Modal */}
-      {activeMetadataModal && (
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-[#252526] border border-[#3C3C3C] rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl text-xs font-sans">
-            <div className="flex items-center justify-between border-b border-[#333333] pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#4EC9B0]" />
-                <span className="font-bold text-white text-sm">Metadata Sanitization Receipt</span>
-              </div>
-              <button 
-                onClick={() => setActiveMetadataModal(null)}
-                className="text-[#858585] hover:text-white p-1 rounded hover:bg-[#333333] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-[#858585]">File Name: <strong className="text-white font-mono">{activeMetadataModal}</strong></div>
-              <div className="text-[#858585]">Engine: <strong className="text-[#4EC9B0]">Local Metadata Cleaner (Zero External Calls)</strong></div>
-            </div>
-
-            <div className="p-3 bg-[#1E1E1E] rounded-xl border border-[#333333] space-y-1.5 font-mono text-[11px]">
-              <div className="text-[#858585] font-semibold">Purged Properties:</div>
-              <div className="text-[#4EC9B0]">✓ Author, Creator &amp; Organization Tags</div>
-              <div className="text-[#4EC9B0]">✓ Creation &amp; Modification Timestamps</div>
-              <div className="text-[#4EC9B0]">✓ EXIF Metadata &amp; GPS Coordinates</div>
-              <div className="text-[#4EC9B0]">✓ Local Filesystem File Paths</div>
-            </div>
-
-            <p className="text-[11px] text-[#858585] leading-relaxed">
-              This document was automatically stripped of identifying properties locally before entering the reasoning context.
-            </p>
-
-            <div className="flex justify-end">
-              <button
-                onClick={() => setActiveMetadataModal(null)}
-                className="px-4 py-1.5 rounded-lg bg-[#007ACC] hover:bg-[#1f8ad2] text-white font-semibold cursor-pointer"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

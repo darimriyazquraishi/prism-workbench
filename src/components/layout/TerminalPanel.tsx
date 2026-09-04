@@ -3,23 +3,43 @@ import {
   Plus, 
   Trash2, 
   X, 
-  ChevronUp, 
   ChevronDown, 
+  ChevronRight,
   MoreHorizontal, 
   Columns,
   Terminal as TerminalIcon,
   CheckCircle2,
-  AlertCircle
+  Check,
+  Clock,
+  Circle,
+  Cpu,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
 
-type TabType = 'problems' | 'output' | 'debug' | 'terminal' | 'ports';
+type TabType = 'terminal' | 'steps' | 'problems' | 'output' | 'debug' | 'ports';
 
 export const TerminalPanel: React.FC = () => {
-  const { isBottomPanelOpen, setBottomPanelOpen } = useWorkbenchStore();
+  const { 
+    isBottomPanelOpen, 
+    setBottomPanelOpen, 
+    activeTask,
+    activeBottomTab,
+    setActiveBottomTab
+  } = useWorkbenchStore();
+
   const [activeTab, setActiveTab] = useState<TabType>('terminal');
   const [isMaximized, setIsMaximized] = useState(false);
   const [currentShell, setCurrentShell] = useState<'node' | 'pwsh' | 'bash'>('node');
+  const [expandedStepId, setExpandedStepId] = useState<number | null>(null);
+
+  // Sync external tab triggers (e.g. from chat execution inspection)
+  useEffect(() => {
+    if (activeBottomTab === 'activity') {
+      setActiveTab('steps');
+    }
+  }, [activeBottomTab]);
 
   // Terminal Lines State (styled exactly like real VS Code terminal in Image 2)
   const [terminalHistory, setTerminalHistory] = useState<Array<{ text: string; color?: string; type?: 'cmd' | 'output' | 'info' | 'highlight' | 'warning' }>>([
@@ -71,9 +91,8 @@ export const TerminalPanel: React.FC = () => {
         { text: 'Available commands:', color: '#4ec9b0', type: 'info' },
         { text: '  help            - List all available terminal commands', color: '#cccccc' },
         { text: '  clear / cls     - Clear the terminal screen', color: '#cccccc' },
-        { text: '  models          - Inspect resident 5 local open-weight neural models', color: '#cccccc' },
-        { text: '  clean-meta      - Run local metadata scrubber on demo files', color: '#cccccc' },
-        { text: '  status          - Print local server status & air-gap verification', color: '#cccccc' },
+        { text: '  models          - Inspect resident 5 local neural models', color: '#cccccc' },
+        { text: '  status          - Print local server status & ports', color: '#cccccc' },
         { text: '  ls / dir        - List files in workspace', color: '#cccccc' }
       );
     } else if (lower === 'models') {
@@ -81,26 +100,17 @@ export const TerminalPanel: React.FC = () => {
         { text: 'Resident Local Neural Models:', color: '#4ec9b0', type: 'highlight' },
         { text: '  1. Qwen3-14B (Q4_K_M GGUF)            [9.00 GB]  - Main Reasoning Agent', color: '#9cdcfe' },
         { text: '  2. Qwen2.5-Coder-7B (Q4_K_M GGUF)     [5.44 GB]  - Coding & Python Sandbox', color: '#9cdcfe' },
-        { text: '  3. Qwen3-VL-8B (Q4_K_M + F16 MMPROJ)  [6.19 GB]  - Multimodal Vision & OCR', color: '#9cdcfe' },
-        { text: '  4. Qwen3-Embedding-0.6B (Safetensors) [1.19 GB]  - Local Dense Embeddings', color: '#9cdcfe' },
-        { text: '  5. Qwen3-Reranker-0.6B (Safetensors)  [1.19 GB]  - Context Scoring & Rerank', color: '#9cdcfe' },
+        { text: '  3. Qwen3-VL-8B (Q4_K_M + F16 MMPROJ)  [6.19 GB]  - Vision & OCR', color: '#9cdcfe' },
+        { text: '  4. Qwen3-Embedding-0.6B (Safetensors) [1.19 GB]  - Local Embeddings', color: '#9cdcfe' },
+        { text: '  5. Qwen3-Reranker-0.6B (Safetensors)  [1.19 GB]  - Context Scoring', color: '#9cdcfe' },
         { text: 'VRAM Allocation: 22.8 GB / 24.0 GB (Hardware Acceleration: CUDA 12)', color: '#4ec9b0' }
-      );
-    } else if (lower === 'clean-meta') {
-      newLines.push(
-        { text: '[Metadata Scrubber] Scanning demo documents for EXIF & author headers...', color: '#cca700', type: 'warning' },
-        { text: '  ✓ meeting_notes_quarterly_review.md : Purged 2 author tags', color: '#4ec9b0' },
-        { text: '  ✓ sales_leads_q3.csv                : Stripped file timestamp & user markers', color: '#4ec9b0' },
-        { text: '  ✓ research_summary.txt              : Sanitized local file paths', color: '#4ec9b0' },
-        { text: 'All files validated clean by local engine.', color: '#4ec9b0' }
       );
     } else if (lower === 'status') {
       newLines.push(
-        { text: 'System Status: 100% OPERATIONAL (All services local)', color: '#4ec9b0' },
+        { text: 'System Status: 100% OPERATIONAL', color: '#4ec9b0' },
         { text: '  Frontend : Astro v5.2.10 (http://localhost:4321)', color: '#cccccc' },
         { text: '  Backend  : FastAPI v0.115 (http://localhost:8000)', color: '#cccccc' },
-        { text: '  Engine   : llama.cpp with CUDA 12 GPU acceleration', color: '#cccccc' },
-        { text: '  Network  : External traffic 0 bytes (Isolated)', color: '#4ec9b0' }
+        { text: '  Engine   : llama.cpp with CUDA 12 GPU acceleration', color: '#cccccc' }
       );
     } else if (lower === 'ls' || lower === 'dir') {
       newLines.push(
@@ -124,42 +134,65 @@ export const TerminalPanel: React.FC = () => {
     setInputVal('');
   };
 
+  // If closed, return null so zero screen real estate is taken
   if (!isBottomPanelOpen) {
-    return (
-      <div 
-        className="h-6 bg-[#1e1e1e] border-t border-[#2d2d2d] flex items-center justify-between px-3 text-xs select-none cursor-pointer hover:bg-[#252526] transition-colors"
-        onClick={() => setBottomPanelOpen(true)}
-      >
-        <div className="flex items-center gap-3 text-[#858585] text-[11px] font-mono">
-          <span className="flex items-center gap-1.5 hover:text-white transition-colors">
-            <TerminalIcon className="w-3 h-3 text-[#007acc]" />
-            <span>Terminal</span>
-          </span>
-          <span className="text-[#666666]">|</span>
-          <span className="hover:text-white transition-colors">Problems (0)</span>
-          <span className="hover:text-white transition-colors">Output</span>
-          <span className="hover:text-white transition-colors">Ports</span>
-        </div>
-        <span className="text-[10px] text-[#858585] font-mono">Click or press Ctrl+` to toggle</span>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div 
-      className={`bg-[#1e1e1e] border-t border-[#2d2d2d] flex flex-col font-mono text-xs select-none flex-shrink-0 transition-all ${
-        isMaximized ? 'h-96' : 'h-60'
+    <aside 
+      className={`h-full bg-[#1e1e1e] border-l border-[#2d2d2d] flex flex-col font-mono text-xs select-none flex-shrink-0 transition-all z-20 ${
+        isMaximized ? 'w-[720px] max-w-[50vw]' : 'w-[480px] xl:w-[540px]'
       }`}
     >
-      {/* 1. VS Code Native Panel Header Bar (Matches Image 2) */}
-      <div className="h-8 bg-[#1e1e1e] border-b border-[#2d2d2d] flex items-center justify-between px-3 flex-shrink-0 text-xs">
-        {/* Left Side: Standard VS Code Tabs */}
-        <div className="flex items-center gap-4 h-full">
+      {/* 1. VS Code Right Panel Header Bar (Matches Image 2 styling) */}
+      <div className="h-9 bg-[#1e1e1e] border-b border-[#2d2d2d] flex items-center justify-between px-3 flex-shrink-0 text-xs">
+        {/* Left Side: Panel Tabs */}
+        <div className="flex items-center gap-3.5 h-full overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('terminal')}
+            className={`h-full flex items-center gap-1 text-[11px] transition-colors cursor-pointer border-b-2 ${
+              activeTab === 'terminal'
+                ? 'text-white border-white font-semibold'
+                : 'text-[#858585] border-transparent hover:text-[#cccccc]'
+            }`}
+          >
+            <TerminalIcon className="w-3 h-3 text-[#4ec9b0]" />
+            <span>Terminal</span>
+          </button>
+
+          {activeTask && (
+            <button
+              onClick={() => setActiveTab('steps')}
+              className={`h-full flex items-center gap-1.5 text-[11px] transition-colors cursor-pointer border-b-2 ${
+                activeTab === 'steps'
+                  ? 'text-white border-white font-semibold'
+                  : 'text-[#858585] border-transparent hover:text-[#cccccc]'
+              }`}
+            >
+              <span>Task Steps</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-[#007ACC] text-[10px] text-white font-bold">
+                {activeTask.plan.length}
+              </span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setActiveTab('output')}
+            className={`h-full flex items-center gap-1 text-[11px] transition-colors cursor-pointer border-b-2 ${
+              activeTab === 'output'
+                ? 'text-white border-white font-semibold'
+                : 'text-[#858585] border-transparent hover:text-[#cccccc]'
+            }`}
+          >
+            <span>Output</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('problems')}
             className={`h-full flex items-center gap-1.5 text-[11px] transition-colors cursor-pointer border-b-2 ${
               activeTab === 'problems'
-                ? 'text-white border-white font-medium'
+                ? 'text-white border-white font-semibold'
                 : 'text-[#858585] border-transparent hover:text-[#cccccc]'
             }`}
           >
@@ -168,43 +201,21 @@ export const TerminalPanel: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('output')}
-            className={`h-full flex items-center gap-1.5 text-[11px] transition-colors cursor-pointer border-b-2 ${
-              activeTab === 'output'
-                ? 'text-white border-white font-medium'
-                : 'text-[#858585] border-transparent hover:text-[#cccccc]'
-            }`}
-          >
-            <span>Output</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('debug')}
-            className={`h-full flex items-center gap-1.5 text-[11px] transition-colors cursor-pointer border-b-2 ${
+            className={`h-full flex items-center gap-1 text-[11px] transition-colors cursor-pointer border-b-2 ${
               activeTab === 'debug'
-                ? 'text-white border-white font-medium'
+                ? 'text-white border-white font-semibold'
                 : 'text-[#858585] border-transparent hover:text-[#cccccc]'
             }`}
           >
-            <span>Debug Console</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('terminal')}
-            className={`h-full flex items-center gap-1.5 text-[11px] transition-colors cursor-pointer border-b-2 ${
-              activeTab === 'terminal'
-                ? 'text-white border-white font-medium'
-                : 'text-[#858585] border-transparent hover:text-[#cccccc]'
-            }`}
-          >
-            <span>Terminal</span>
+            <span>Debug</span>
           </button>
 
           <button
             onClick={() => setActiveTab('ports')}
-            className={`h-full flex items-center gap-1.5 text-[11px] transition-colors cursor-pointer border-b-2 ${
+            className={`h-full flex items-center gap-1 text-[11px] transition-colors cursor-pointer border-b-2 ${
               activeTab === 'ports'
-                ? 'text-white border-white font-medium'
+                ? 'text-white border-white font-semibold'
                 : 'text-[#858585] border-transparent hover:text-[#cccccc]'
             }`}
           >
@@ -212,10 +223,10 @@ export const TerminalPanel: React.FC = () => {
           </button>
         </div>
 
-        {/* Right Side: Shell Selector + VS Code Terminal Icons (Matches Image 2) */}
-        <div className="flex items-center gap-1.5 text-[#858585]">
+        {/* Right Side: Shell Selector + Action Icons */}
+        <div className="flex items-center gap-1 text-[#858585]">
           {/* Shell Dropdown Indicator */}
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#252526] border border-[#333333] text-[11px] text-[#cccccc] cursor-pointer hover:bg-[#2a2a2b]">
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#252526] border border-[#333333] text-[11px] text-[#cccccc] cursor-pointer hover:bg-[#2a2a2b]">
             <TerminalIcon className="w-3 h-3 text-[#4ec9b0]" />
             <span>{currentShell}</span>
             <ChevronDown className="w-3 h-3 text-[#858585]" />
@@ -226,7 +237,7 @@ export const TerminalPanel: React.FC = () => {
             onClick={() => {
               setTerminalHistory(prev => [
                 ...prev,
-                { text: 'New terminal session created (node 2).', color: '#858585', type: 'info' },
+                { text: 'New terminal session created.', color: '#858585', type: 'info' },
                 { text: 'PS F:\\corewithin>', color: '#cccccc', type: 'cmd' }
               ]);
             }}
@@ -254,31 +265,23 @@ export const TerminalPanel: React.FC = () => {
           <button 
             onClick={() => {
               setTerminalHistory([
-                { text: 'Terminal process terminated.', color: '#ce9178', type: 'warning' },
+                { text: 'Terminal session cleared.', color: '#858585', type: 'info' },
                 { text: 'PS F:\\corewithin>', color: '#cccccc', type: 'cmd' }
               ]);
             }}
-            title="Kill Terminal" 
+            title="Clear / Kill Terminal" 
             className="p-1 hover:text-white hover:bg-[#2d2d2d] rounded transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
 
-          {/* More Actions (...) */}
-          <button 
-            title="More Actions" 
-            className="p-1 hover:text-white hover:bg-[#2d2d2d] rounded transition-colors cursor-pointer"
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Toggle Size (^) */}
+          {/* Maximize / Restore Width */}
           <button 
             onClick={() => setIsMaximized(!isMaximized)}
-            title={isMaximized ? "Restore Panel Size" : "Maximize Panel Size"} 
+            title={isMaximized ? "Restore Panel Width" : "Maximize Panel Width"} 
             className="p-1 hover:text-white hover:bg-[#2d2d2d] rounded transition-colors cursor-pointer"
           >
-            {isMaximized ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
 
           {/* Close Panel (X) */}
@@ -307,18 +310,118 @@ export const TerminalPanel: React.FC = () => {
             </div>
 
             {/* Interactive Terminal Input Line */}
-            <form onSubmit={handleRunCommand} className="flex items-center gap-1.5 mt-2 font-mono text-[11.5px] select-text">
+            <form onSubmit={handleRunCommand} className="flex items-center gap-1.5 mt-3 font-mono text-[11.5px] select-text">
               <span className="text-[#cccccc] select-none">PS F:\corewithin&gt;</span>
               <input
                 ref={inputRef}
                 type="text"
                 value={inputVal}
                 onChange={(e) => setInputVal(e.target.value)}
-                placeholder="Type 'help', 'models', 'clean-meta', or commands..."
+                placeholder="Type 'help', 'models', 'status', 'ls'..."
                 className="flex-1 bg-transparent border-none outline-none text-white font-mono text-[11.5px] p-0 focus:ring-0 placeholder-[#555555]"
                 autoFocus
               />
             </form>
+          </div>
+        )}
+
+        {/* Task Steps Tab Content (Unified from TaskActivityPanel) */}
+        {activeTab === 'steps' && (
+          <div className="space-y-3 font-sans">
+            {activeTask ? (
+              <>
+                {/* Auto Model Selected Card */}
+                <div className="bg-[#252526] border border-[#333333] rounded-xl p-3 space-y-1.5 font-mono text-xs">
+                  <div className="flex items-center justify-between text-[#858585]">
+                    <span className="text-[10px] font-bold">MODEL AUTO-SELECTED:</span>
+                    <span className="text-[#4EC9B0] font-bold">LOCAL</span>
+                  </div>
+                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Cpu className="w-4 h-4 text-[#007ACC]" />
+                    <span>{activeTask.selected_model_id}</span>
+                  </div>
+                  <p className="text-xs text-[#858585] font-sans leading-relaxed">
+                    {activeTask.routing_reason}
+                  </p>
+                </div>
+
+                {/* Stepper Progress */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-mono uppercase text-[#858585] font-bold block px-1">
+                    Autonomous Execution Plan ({activeTask.plan.length} Steps):
+                  </span>
+
+                  <div className="space-y-1.5 font-mono text-xs">
+                    {activeTask.plan.map((step) => {
+                      const isCompleted = step.status === 'completed';
+                      const isRunning = step.status === 'running';
+                      const isExpanded = expandedStepId === step.step_id;
+
+                      return (
+                        <div
+                          key={step.step_id}
+                          className={`rounded-xl border transition-all overflow-hidden ${
+                            isRunning
+                              ? 'bg-[#252526] border-[#007ACC]'
+                              : isCompleted
+                              ? 'bg-[#252526] border-[#333333]'
+                              : 'bg-[#1E1E1E] border-[#2D2D2D] opacity-60'
+                          }`}
+                        >
+                          <button
+                            onClick={() => setExpandedStepId(isExpanded ? null : step.step_id)}
+                            className="w-full p-2.5 flex items-start justify-between text-left cursor-pointer hover:bg-[#2A2D2E] transition-colors"
+                          >
+                            <div className="flex items-start gap-2">
+                              {isCompleted ? (
+                                <Check className="w-3.5 h-3.5 text-[#4EC9B0] flex-shrink-0 mt-0.5" />
+                              ) : isRunning ? (
+                                <Clock className="w-3.5 h-3.5 text-[#007ACC] animate-spin flex-shrink-0 mt-0.5" />
+                              ) : (
+                                <Circle className="w-3.5 h-3.5 text-[#666666] flex-shrink-0 mt-0.5" />
+                              )}
+                              <div>
+                                <div className="text-xs font-semibold text-white">
+                                  {step.title}
+                                </div>
+                                <div className="text-[11px] text-[#858585] font-sans mt-0.5 leading-snug">
+                                  {step.description}
+                                </div>
+                              </div>
+                            </div>
+
+                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-[#858585]" /> : <ChevronRight className="w-3.5 h-3.5 text-[#858585]" />}
+                          </button>
+
+                          {isExpanded && (
+                            <div className="p-2.5 bg-[#1E1E1E] border-t border-[#333333] text-[11px] text-[#858585] space-y-1.5">
+                              {step.tool_name && (
+                                <div>
+                                  <span className="text-[#666666]">TOOL:</span>{' '}
+                                  <span className="text-[#007ACC] font-bold">{step.tool_name}</span>
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-[#666666]">DURATION:</span>{' '}
+                                <span className="text-white">{step.duration_ms} ms</span>
+                              </div>
+                              <div>
+                                <span className="text-[#666666]">STATUS:</span>{' '}
+                                <span className="text-[#4EC9B0] font-semibold uppercase">{step.status}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="py-12 text-center text-[#858585] text-xs font-sans">
+                No active execution steps. Run a prompt in the chat to view autonomous execution traces.
+              </div>
+            )}
           </div>
         )}
 
@@ -353,7 +456,7 @@ export const TerminalPanel: React.FC = () => {
               <div>Debug Console</div>
               <div>Connected to local Python sandbox and Astro dev server runtime.</div>
             </div>
-            <div className="flex items-center gap-2 text-[#cccccc]">
+            <div className="flex items-center gap-2 text-[#cccccc] pt-4">
               <span>&gt;</span>
               <span className="text-[#666666]">Ready for debug evaluation...</span>
             </div>
@@ -396,6 +499,6 @@ export const TerminalPanel: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </aside>
   );
 };
