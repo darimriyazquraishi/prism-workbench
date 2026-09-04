@@ -1,5 +1,5 @@
-# build output
-dist/
+# build output (root only)
+/dist/
 
 # generated types
 .astro/
@@ -26,15 +26,20 @@ models/**
 !models/README.md
 !models/**/README.md
 !models/**/.gitkeep
+LUMI_Desktop/models/**
+!LUMI_Desktop/models/
+!LUMI_Desktop/models/**/
+!LUMI_Desktop/models/README.md
+!LUMI_Desktop/models/**/README.md
+!LUMI_Desktop/models/**/.gitkeep
 llama/
 
-# Compiled Binaries & Executables
-*.dll
-*.exe
+# Compiled Binaries (loose root binaries ignored; LUMI_Desktop distribution included)
+/*.dll
+/*.exe
 *.so
 *.dylib
 lib/
-LUMI_Desktop/
 
 # Caches and runtime
 .cache/

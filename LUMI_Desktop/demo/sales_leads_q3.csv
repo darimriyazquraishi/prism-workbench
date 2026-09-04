@@ -1,0 +1,9 @@
+lead_id,company_name,industry,contact_name,deal_size_usd,lead_score,status,close_date,notes
+LD-1001,Acuity Technologies,Cloud Software,Marcus Vance,45000,92,Won,2026-08-14,Signed enterprise tier agreement with annual commitment
+LD-1002,Apex Logistics,Supply Chain,Elena Rostova,28000,78,In Progress,2026-09-20,Evaluating document parsing and automated reporting tools
+LD-1003,Starlight Media,Entertainment,Julian Chen,15000,65,In Progress,2026-09-30,Reviewing team permissions and data retention policies
+LD-1004,BlueWave Financial,Fintech,Priya Sharma,62000,95,Won,2026-07-28,Security audit passed; fully on-premise local setup required
+LD-1005,Cascade Health,Healthcare,Dr. Aaron Miller,38000,84,In Progress,2026-10-15,Need automated metadata cleaning on patient medical forms
+LD-1006,Vanguard Retail,E-Commerce,Sophia Williams,19500,52,Lost,2026-08-02,Postponed modernization budget to next fiscal year
+LD-1007,Horizon Energy,Clean Energy,David O'Connor,54000,88,Won,2026-08-25,Multi-seat workstation license deployed across engineering team
+LD-1008,Nexus Analytics,Consulting,Rachel Green,22500,74,In Progress,2026-09-18,Requested custom Python script execution demo for data reports

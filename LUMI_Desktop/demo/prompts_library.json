@@ -1,0 +1,34 @@
+[
+  {
+    "id": "prompt-summarize",
+    "category": "Document Analysis",
+    "title": "Summarize Meeting Notes & Action Items",
+    "description": "Extract the key takeaways, executive milestones, roadblocks, and assigned action items from the meeting notes.",
+    "prompt": "Analyze the attached quarterly review notes (meeting_notes_quarterly_review.md). Provide an executive summary of key achievements, highlight the primary challenges, and list all assigned action items formatted in a clean priority table.",
+    "suggested_file": "demo/meeting_notes_quarterly_review.md"
+  },
+  {
+    "id": "prompt-sales-analysis",
+    "category": "Data & Spreadsheets",
+    "title": "Analyze Sales Pipeline & Revenue Metrics",
+    "description": "Calculate win rates, average deal sizes, identify high-value opportunities, and summarize conversion status.",
+    "prompt": "Inspect the attached dataset (sales_leads_q3.csv). Calculate the overall win rate, total pipeline value, won revenue, and list the top 3 highest-value strategic accounts currently in progress.",
+    "suggested_file": "demo/sales_leads_q3.csv"
+  },
+  {
+    "id": "prompt-code-review",
+    "category": "Code & Development",
+    "title": "Review Python Script & Optimize Logic",
+    "description": "Inspect sample_code_analysis.py, identify potential edge cases, and suggest performance optimizations.",
+    "prompt": "Review the attached Python script (sample_code_analysis.py). Explain the statistical methodology for outlier detection, identify any potential division-by-zero edge cases, and suggest improvements for handling large datasets.",
+    "suggested_file": "demo/sample_code_analysis.py"
+  },
+  {
+    "id": "prompt-feedback-sentiment",
+    "category": "Customer Intelligence",
+    "title": "Synthesize User Feedback & Sentiment",
+    "description": "Group user feedback comments by sentiment and category, and formulate top product recommendations.",
+    "prompt": "Examine customer_feedback.json. Group the feedback comments into key categories (Security, UX, Analysis), summarize overall sentiment, and extract the top actionable recommendations for the next product release.",
+    "suggested_file": "demo/customer_feedback.json"
+  }
+]

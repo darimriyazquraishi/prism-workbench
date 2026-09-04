@@ -137,6 +137,22 @@ namespace LUMI.Desktop
                     {
                         targetFilePath = candidate;
                     }
+                    else
+                    {
+                        try
+                        {
+                            var parent = Directory.GetParent(_baseDir);
+                            if (parent != null)
+                            {
+                                string parentCandidate = Path.Combine(parent.FullName, rel);
+                                if (File.Exists(parentCandidate))
+                                {
+                                    targetFilePath = parentCandidate;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
                 }
 
                 // 3. Lookup in dist/

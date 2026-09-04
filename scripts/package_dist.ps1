@@ -24,8 +24,17 @@ Copy-Item "F:\corewithin\dist" -Destination $DestinationPath -Recurse
 # 4. Demo Notes & Datasets (demo)
 Copy-Item "F:\corewithin\demo" -Destination $DestinationPath -Recurse
 
-# 5. Local Models Directory (models)
-Copy-Item "F:\corewithin\models" -Destination $DestinationPath -Recurse
+# 5. Local Models Directory (models) - folder structure & documentation only (exclude large weights)
+New-Item -ItemType Directory -Path "$DestinationPath\models" -Force | Out-Null
+if (Test-Path "F:\corewithin\models\README.md") {
+    Copy-Item "F:\corewithin\models\README.md" -Destination "$DestinationPath\models\"
+}
+$modelDirs = @("qwen3-14b", "qwen2.5-coder-7b", "qwen3-vl-8b", "qwen3-embedding-0.6b", "qwen3-reranker-0.6b")
+foreach ($dir in $modelDirs) {
+    $targetDir = "$DestinationPath\models\$dir"
+    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+    Set-Content -Path "$targetDir\.gitkeep" -Value "# Placeholder for $dir model weights. Download model files here." -Encoding UTF8
+}
 
 # 6. Public Assets & Icons (public)
 Copy-Item "F:\corewithin\public" -Destination $DestinationPath -Recurse
