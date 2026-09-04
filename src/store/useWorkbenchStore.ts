@@ -74,7 +74,8 @@ interface WorkbenchStore {
   addTerminalLog: (entry: Omit<TerminalLogEntry, 'id' | 'timestamp'>) => void;
   clearTerminalLogs: () => void;
 
-  clearTerminalLogs: () => void;
+  // New Chat
+  clearMessages: () => void;
 }
 
 const defaultTabs: WorkspaceTab[] = [
@@ -175,5 +176,6 @@ export const useWorkbenchStore = create<WorkbenchStore>((set, get) => ({
     set((state) => ({ terminalLogs: [...state.terminalLogs, log] }));
   },
   clearTerminalLogs: () => set({ terminalLogs: [] }),
+  clearMessages: () => set({ messages: [], activeTask: null, attachedFiles: [] }),
 }));
 

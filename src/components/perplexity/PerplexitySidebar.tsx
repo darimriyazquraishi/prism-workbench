@@ -1,0 +1,355 @@
+import React, { useState } from 'react';
+import { 
+  Plus, 
+  Terminal as TerminalIcon, 
+  Folder, 
+  FolderPlus, 
+  Settings, 
+  Clock, 
+  ChevronDown, 
+  ChevronRight,
+  Search, 
+  Bell, 
+  PanelLeftClose, 
+  PanelLeftOpen,
+  LayoutGrid,
+  FileText,
+  Sparkles,
+  ArrowUpRight
+} from 'lucide-react';
+import { useWorkbenchStore } from '../../store/useWorkbenchStore';
+
+interface PerplexitySidebarProps {
+  onSelectPrompt: (prompt: string, file?: string) => void;
+  onNewChat: () => void;
+}
+
+// Perplexity Iconic Asterisk SVG
+export const PerplexityLogo: React.FC<{ className?: string }> = ({ className = "w-5 h-5 text-white" }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="12" y1="2" x2="12" y2="22" />
+    <line x1="12" y1="12" x2="20.66" y2="7" />
+    <line x1="12" y1="12" x2="3.34" y2="17" />
+    <line x1="12" y1="12" x2="20.66" y2="17" />
+    <line x1="12" y1="12" x2="3.34" y2="7" />
+    <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+  </svg>
+);
+
+export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPrompt, onNewChat }) => {
+  const { 
+    isSidebarOpen, 
+    toggleSidebar, 
+    isBottomPanelOpen, 
+    setBottomPanelOpen,
+    setSecurityModalOpen,
+    setCommandPaletteOpen
+  } = useWorkbenchStore();
+
+  const [projectsExpanded, setProjectsExpanded] = useState(true);
+  const [sessionsExpanded, setSessionsExpanded] = useState(true);
+
+  const sampleSessions = [
+    {
+      title: 'Sovereign Industrial AI Workbench (SIH)',
+      prompt: 'I am preparing a solution for Smart India Hackathon (SIH) based on the following problem statement:\n\nTitle: Sovereign On-Premise Agentic AI Workbench using Open-Weight Multimodal LLMs for Confidential Industrial Work\n\nProvide an executive recommendation and technical architecture.',
+      time: 'Just now'
+    },
+    {
+      title: 'Quarterly review & action plan',
+      prompt: 'Analyze the attached quarterly review notes (demo/meeting_notes_quarterly_review.md). Provide a clear executive summary of achievements, primary roadblocks, and format the assigned action items into a clean priority table.',
+      file: 'demo/meeting_notes_quarterly_review.md',
+      time: '2h ago'
+    },
+    {
+      title: 'Sales leads & pipeline evaluation',
+      prompt: 'Inspect the attached sales dataset (demo/sales_leads_q3.csv). Calculate the overall win rate, total pipeline volume, won revenue, and list the top 3 highest-value strategic opportunities in progress.',
+      file: 'demo/sales_leads_q3.csv',
+      time: '1d ago'
+    },
+    {
+      title: 'Python outlier detection & MTBF logic',
+      prompt: 'Review the attached Python script (demo/sample_code_analysis.py). Explain the statistical outlier methodology, identify any edge cases, and suggest performance optimizations.',
+      file: 'demo/sample_code_analysis.py',
+      time: '3d ago'
+    }
+  ];
+
+  // ==========================================
+  // 1. COLLAPSED VIEW (Slim Icon Rail ~56px)
+  // Matching WhatsApp Image 2026-09-04 at 8.53.45 PM.jpeg
+  // ==========================================
+  if (!isSidebarOpen) {
+    return (
+      <aside className="w-14 bg-[#141515] border-r border-[#242627] flex flex-col items-center justify-between py-3 select-none flex-shrink-0 z-30 transition-all">
+        {/* Top Icons */}
+        <div className="flex flex-col items-center space-y-3 w-full">
+          {/* Logo & Expand Toggle */}
+          <button 
+            onClick={toggleSidebar} 
+            title="Expand Sidebar"
+            className="p-2 rounded-xl hover:bg-[#202222] text-[#A2A8AB] hover:text-white transition-colors cursor-pointer"
+          >
+            <PerplexityLogo className="w-5 h-5 text-white" />
+          </button>
+
+          {/* New Chat Button */}
+          <button
+            onClick={onNewChat}
+            title="New Thread"
+            className="w-9 h-9 rounded-xl bg-[#202222] hover:bg-[#282A2C] border border-[#2E3133] flex items-center justify-center text-white transition-all cursor-pointer shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+
+          {/* Computer / Terminal Mode */}
+          <button
+            onClick={() => setBottomPanelOpen(!isBottomPanelOpen)}
+            title="Computer Mode (Terminal)"
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+              isBottomPanelOpen 
+                ? 'bg-[#202222] text-[#20B8CD] border border-[#20B8CD]/40' 
+                : 'text-[#858A8E] hover:text-white hover:bg-[#202222]'
+            }`}
+          >
+            <TerminalIcon className="w-4 h-4" />
+          </button>
+
+          {/* Artefacts */}
+          <button
+            onClick={() => onSelectPrompt('Inspect the generated project deliverables and output files.')}
+            title="Artefacts"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-[#858A8E] hover:text-white hover:bg-[#202222] transition-colors cursor-pointer"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+
+          {/* Customise / Settings */}
+          <button
+            onClick={() => setSecurityModalOpen(true)}
+            title="Customise & Settings"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-[#858A8E] hover:text-white hover:bg-[#202222] transition-colors cursor-pointer"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+
+          {/* Projects / Folder */}
+          <button
+            onClick={toggleSidebar}
+            title="Projects"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-[#858A8E] hover:text-white hover:bg-[#202222] transition-colors cursor-pointer"
+          >
+            <Folder className="w-4 h-4" />
+          </button>
+
+          {/* Sessions / History */}
+          <button
+            onClick={toggleSidebar}
+            title="Sessions History"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-[#858A8E] hover:text-white hover:bg-[#202222] transition-colors cursor-pointer"
+          >
+            <Clock className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Bottom Icons */}
+        <div className="flex flex-col items-center space-y-3 w-full">
+          <button
+            onClick={() => setSecurityModalOpen(true)}
+            title="Local Engine · 100% Offline"
+            className="w-8 h-8 rounded-full bg-[#202222] border border-[#2E3133] flex items-center justify-center text-[#858A8E] hover:text-white transition-colors cursor-pointer"
+          >
+            <ArrowUpRight className="w-3.5 h-3.5 text-[#20B8CD]" />
+          </button>
+
+          <button
+            onClick={() => setSecurityModalOpen(true)}
+            title="User Profile"
+            className="w-8 h-8 rounded-full bg-[#2E3133] border border-[#3C4043] flex items-center justify-center text-xs font-semibold text-white cursor-pointer"
+          >
+            S
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  // ==========================================
+  // 2. EXPANDED VIEW (240px Perplexity Sidebar)
+  // Matching WhatsApp Image 2026-09-04 at 8.50.46 PM.jpeg
+  // ==========================================
+  return (
+    <aside className="w-64 bg-[#141515] border-r border-[#242627] flex flex-col font-sans select-none flex-shrink-0 z-30 transition-all text-xs text-[#858A8E]">
+      {/* Top Header: Logo, Search, Collapse button */}
+      <div className="h-12 px-4 flex items-center justify-between border-b border-transparent">
+        <div className="flex items-center gap-2.5">
+          <PerplexityLogo className="w-5 h-5 text-white" />
+          <span className="font-semibold text-white tracking-tight text-sm font-sans">
+            LUMI
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            title="Search (Ctrl+K)"
+            className="p-1.5 rounded-lg hover:bg-[#202222] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={toggleSidebar}
+            title="Collapse Sidebar"
+            className="p-1.5 rounded-lg hover:bg-[#202222] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Nav Items */}
+      <div className="px-3 pt-2 pb-3 space-y-1">
+        {/* + New Thread Pill */}
+        <button
+          onClick={onNewChat}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#202222] hover:bg-[#282A2C] border border-[#2E3133] text-white font-medium text-xs transition-all cursor-pointer shadow-sm group"
+        >
+          <div className="flex items-center gap-2">
+            <Plus className="w-4 h-4 text-[#20B8CD]" />
+            <span>New</span>
+          </div>
+          <span className="text-[10px] text-[#5F6467] font-mono group-hover:text-[#858A8E]">^I</span>
+        </button>
+
+        {/* Computer (Terminal Sandbox) */}
+        <button
+          onClick={() => setBottomPanelOpen(!isBottomPanelOpen)}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-medium transition-colors cursor-pointer ${
+            isBottomPanelOpen 
+              ? 'bg-[#202222] text-white border border-[#20B8CD]/30' 
+              : 'text-[#858A8E] hover:text-white hover:bg-[#1C1D1E]'
+          }`}
+        >
+          <TerminalIcon className="w-4 h-4 text-[#20B8CD]" />
+          <span>Computer</span>
+        </button>
+
+        {/* Artefacts */}
+        <button
+          onClick={() => onSelectPrompt('Display all generated artifacts, deliverables, and reports created in this workspace.')}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#858A8E] hover:text-white hover:bg-[#1C1D1E] font-medium transition-colors cursor-pointer"
+        >
+          <LayoutGrid className="w-4 h-4" />
+          <span>Artefacts</span>
+        </button>
+
+        {/* Customise */}
+        <button
+          onClick={() => setSecurityModalOpen(true)}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#858A8E] hover:text-white hover:bg-[#1C1D1E] font-medium transition-colors cursor-pointer"
+        >
+          <Settings className="w-4 h-4" />
+          <span>Customise</span>
+        </button>
+      </div>
+
+      {/* Middle Scrollable Section: Projects & Sessions */}
+      <div className="flex-1 overflow-y-auto px-3 space-y-4 pt-1">
+        {/* Projects Section */}
+        <div>
+          <button
+            onClick={() => setProjectsExpanded(!projectsExpanded)}
+            className="w-full flex items-center justify-between px-1 py-1 text-[11px] font-semibold text-[#858A8E] hover:text-white cursor-pointer"
+          >
+            <span>Projects</span>
+            {projectsExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          </button>
+
+          {projectsExpanded && (
+            <div className="mt-1.5 p-3 rounded-xl bg-[#1C1D1E] border border-[#27292A] space-y-2.5">
+              <div>
+                <div className="font-semibold text-white text-[11.5px] leading-tight">
+                  Organise and share your work
+                </div>
+                <div className="text-[11px] text-[#858A8E] mt-1 leading-snug">
+                  Keep files, memory, and context together across sessions.
+                </div>
+              </div>
+              <button
+                onClick={() => onSelectPrompt('Load the general demo project files from demo/ directory and summarize available datasets.')}
+                className="w-full py-1.5 px-2 rounded-lg bg-[#252829] hover:bg-[#2E3234] border border-[#323638] text-white text-[11px] font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-[#20B8CD]" />
+                <span>Create project</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Sessions Section */}
+        <div>
+          <button
+            onClick={() => setSessionsExpanded(!sessionsExpanded)}
+            className="w-full flex items-center justify-between px-1 py-1 text-[11px] font-semibold text-[#858A8E] hover:text-white cursor-pointer"
+          >
+            <span>Sessions</span>
+            {sessionsExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          </button>
+
+          {sessionsExpanded && (
+            <div className="space-y-1 mt-1">
+              {sampleSessions.map((session, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onSelectPrompt(session.prompt, session.file)}
+                  className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-[#1C1D1E] text-[#A2A8AB] hover:text-white transition-colors cursor-pointer truncate group"
+                >
+                  <div className="truncate font-medium text-[11.5px] group-hover:text-white">
+                    {session.title}
+                  </div>
+                  <div className="text-[10px] text-[#5F6467] mt-0.5 font-mono">
+                    {session.time}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer Section: Plan & User Profile */}
+      <div className="p-3 border-t border-[#242627] space-y-2">
+        {/* Upgrade / Plan pill */}
+        <div className="p-2 rounded-xl bg-[#1C1D1E] border border-[#27292A] flex items-center justify-between text-[11px]">
+          <div className="flex items-center gap-1.5 text-white font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#20B8CD]"></span>
+            <span>Local Engine</span>
+          </div>
+          <span className="text-[#858A8E] text-[10px] font-mono">Offline</span>
+        </div>
+
+        {/* User Account Row */}
+        <div className="flex items-center justify-between pt-1 px-1">
+          <div className="flex items-center gap-2 truncate">
+            <div className="w-7 h-7 rounded-full bg-[#282A2C] border border-[#363A3D] flex items-center justify-center font-bold text-xs text-white flex-shrink-0">
+              S
+            </div>
+            <div className="truncate">
+              <div className="text-xs font-semibold text-white truncate">sangyansahu</div>
+              <div className="text-[10px] text-[#5F6467] leading-tight">Free plan</div>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setSecurityModalOpen(true)}
+            className="p-1 rounded-lg hover:bg-[#202222] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
+            title="Notifications & Security"
+          >
+            <Bell className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+};

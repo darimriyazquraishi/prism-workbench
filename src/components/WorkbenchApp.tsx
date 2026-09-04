@@ -1,11 +1,10 @@
-import React, { useEffect } from 'react';
-import { TopBar } from './layout/TopBar';
-import { ActivityBar } from './layout/ActivityBar';
-import { SecondarySidebar } from './layout/SecondarySidebar';
-import { DocumentTabsBar } from './layout/DocumentTabsBar';
-import { StatusBar } from './layout/StatusBar';
-import { TerminalPanel } from './layout/TerminalPanel';
+import React, { useState, useEffect } from 'react';
+import { PerplexitySidebar } from './perplexity/PerplexitySidebar';
+import { PerplexityHeader } from './perplexity/PerplexityHeader';
+import { PerplexityLinksView } from './perplexity/PerplexityLinksView';
+import { PerplexityImagesView } from './perplexity/PerplexityImagesView';
 import { ChatWorkbench } from './chat/ChatWorkbench';
+import { TerminalPanel } from './layout/TerminalPanel';
 import { CommandPalette } from './modals/CommandPalette';
 import { SecurityStatusModal } from './modals/SecurityStatusModal';
 
@@ -32,11 +31,13 @@ export const WorkbenchApp: React.FC = () => {
     setModels,
     openTab,
     attachFile,
-    isSidebarOpen,
-    toggleSidebar
+    toggleSidebar,
+    clearMessages
   } = useWorkbenchStore();
 
-  // Keyboard shortcut: Ctrl/Cmd+B toggles the left sidebar (Activity Bar + Workspace)
+  const [headerView, setHeaderView] = useState<'answer' | 'links' | 'images'>('answer');
+
+  // Keyboard shortcut: Ctrl/Cmd+B toggles the left Perplexity sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
@@ -61,7 +62,7 @@ export const WorkbenchApp: React.FC = () => {
       }
     };
     loadInitData();
-  }, []);
+  }, [setSovereignty, setModels]);
 
   const handleExecutePrompt = async (prompt: string, files: string[]) => {
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -79,7 +80,7 @@ export const WorkbenchApp: React.FC = () => {
 
     try {
       // 2. Call local agent API
-      const primaryFile = files[0] || 'demo/synthetic/Inspection_Report_001.pdf';
+      const primaryFile = files[0] || 'demo/meeting_notes_quarterly_review.md';
       const taskResult = await api.runAgentWorkflow(prompt, primaryFile);
       setActiveTask(taskResult);
 
@@ -95,8 +96,10 @@ export const WorkbenchApp: React.FC = () => {
         assistantText = `I reviewed **sample_code_analysis.py**. Here is the code inspection and optimization review:\n\n### 🔍 Methodology & Logic\n• **Outlier Detection:** Uses standard deviation thresholding (\`avg_deal + 1.5 * std_dev\`) to flag strategic enterprise deals.\n• **Win Rate Calculation:** Computes ratio of won deals against total valid records.\n\n### ⚠️ Potential Edge Cases & Improvements\n1. **Zero Division Guard:** \`total_deals == 0\` is correctly checked, but \`deal_values\` length should also be guarded before calling \`statistics.stdev\` (requires 2 or more values).\n2. **Type Robustness:** Ensure float conversion on \`deal_size_usd\` in case string formats (e.g. \`"$45,000"\`) are ingested.\n3. **Vectorization:** For large datasets, replace sequential loops with vectorized operations for significantly faster execution.`;
       } else if (pLower.includes('feedback') || pLower.includes('sentiment') || pLower.includes('customer')) {
         assistantText = `I synthesized the feedback entries from **customer_feedback.json**:\n\n### 💬 Sentiment Breakdown\n• **Positive (75%):** Users strongly value on-premise local execution and sandboxed Python report generation.\n• **Constructive / Neutral (25%):** Feedback highlighted that the initial interface felt too complicated with too many diagnostics visible simultaneously.\n\n### 💡 Key Actionable Recommendations\n1. **Keep the UI simple and clean:** Emphasize the core conversational canvas and hide complex agent execution steps unless explicitly requested.\n2. **Automatic Metadata Scrubbing:** High-demand feature to ensure zero leakage of author tags and device timestamps.`;
+      } else if (pLower.includes('sih') || pLower.includes('industrial') || pLower.includes('sovereign') || pLower.includes('hackathon')) {
+        assistantText = `Here is the strategic solution proposal for the **Smart India Hackathon (SIH)** problem statement:\n\n### 🎯 Problem Context & Objectives\nIndustrial manufacturing, defence PSU units, and government institutions face critical challenges processing sensitive internal diagrams, operational telemetry, and board presentations through cloud LLMs. The **Sovereign On-Premise Agentic AI Workbench** delivers complete operational isolation with zero telemetry leakage.\n\n### 🛡️ Core Architectural Pillars\n1. **Physical Air-Gap Isolation:** Host-only network bindings ensure zero data packets escape the perimeter.\n2. **Local Multi-Modal Model Hierarchy:**\n   • **Qwen3-14B (Q4_K_M GGUF):** Strategic agentic planning, synthesis & RAG orchestration.\n   • **Qwen2.5-Coder-7B:** Automated sandboxed code generation & validation.\n   • **Qwen3-VL-8B:** Computer vision for P&ID schematics and scanned engineering drawings.\n3. **Automated Document De-Identification:** Client-side metadata stripping removes camera EXIF, author tags, and system UUIDs prior to embedding.\n\n### 📊 Measurable Impact\n• **100% On-Premise Compliance** (Meets Ministry of Defence / PSU security guidelines).\n• **Zero Cloud Token Costs** with predictable on-premise inference latency.\n• **Audit Verification:** Cryptographically signed local SQLite trail for all autonomous tool executions.`;
       } else {
-        assistantText = `I processed your request using local model **Qwen3-14B**:\n\n${prompt}\n\nAll tasks completed cleanly on-premise.`;
+        assistantText = `I processed your request using local model **Qwen3-14B**:\n\n${prompt}\n\nAll tasks completed cleanly on-premise with verified local inference.`;
       }
 
       // 3. Add assistant response message
@@ -123,53 +126,169 @@ export const WorkbenchApp: React.FC = () => {
     }
   };
 
-  const handleSelectScenario = (prompt: string, file: string) => {
+  const handleSelectScenario = (prompt: string, file?: string) => {
     openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false });
-    attachFile(file);
-    handleExecutePrompt(prompt, [file]);
+    setHeaderView('answer');
+    if (file) {
+      attachFile(file);
+    }
+    handleExecutePrompt(prompt, file ? [file] : []);
+  };
+
+  const handleNewChat = () => {
+    clearMessages();
+    openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false });
+    setHeaderView('answer');
   };
 
   const currentTab = tabs.find(t => t.id === activeTabId);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#1E1E1E] text-[#CCCCCC] overflow-hidden select-none">
-      {/* 1. Top Bar */}
-      <TopBar />
+    <div className="h-screen w-screen flex bg-[#191A1A] text-[#F3F3EE] overflow-hidden select-none font-sans">
+      {/* 1. Left Perplexity Sidebar (collapsible between 240px and 56px slim rail) */}
+      <PerplexitySidebar 
+        onSelectPrompt={handleSelectScenario}
+        onNewChat={handleNewChat}
+      />
 
-      {/* 2. Middle Row: Activity Bar + Secondary Sidebar + Workspace + Task Panel */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Far-Left 48px Activity Bar (always visible) */}
-        <ActivityBar />
+      {/* 2. Main Middle Canvas Area */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#191A1A] overflow-hidden relative">
+        {/* Top Header: Answer, Links, Images, Share & Dropdown Menu */}
+        <PerplexityHeader 
+          activeView={headerView}
+          onViewChange={setHeaderView}
+          title={currentTab?.title || 'Sovereign Industrial AI Workbench'}
+        />
 
-        {/* Collapsible Workspace Sidebar */}
-        {isSidebarOpen && <SecondarySidebar onSelectScenario={handleSelectScenario} />}
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-hidden relative">
+          {headerView === 'links' ? (
+            <PerplexityLinksView />
+          ) : headerView === 'images' ? (
+            <PerplexityImagesView />
+          ) : (
+            <>
+              {(!currentTab || currentTab.type === 'chat') && (
+                <ChatWorkbench 
+                  onExecutePrompt={handleExecutePrompt}
+                  activeView={headerView}
+                />
+              )}
 
-        {/* Main Working Canvas */}
-        <main className="flex-1 flex flex-col min-w-0 bg-[#1E1E1E] overflow-hidden">
-          {/* Document Tabs Bar */}
-          <DocumentTabsBar />
+              {/* Specialized Workspaces (Accessible if opened via Artefacts / Customise) */}
+              {currentTab?.type === 'document' && (
+                <div className="h-full p-4 overflow-auto">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#242627]">
+                    <span className="text-xs font-mono text-[#20B8CD]">Workspace: Document Intelligence</span>
+                    <button 
+                      onClick={() => openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false })}
+                      className="text-xs text-[#858A8E] hover:text-white cursor-pointer"
+                    >
+                      &larr; Back to Search
+                    </button>
+                  </div>
+                  <DocumentIntelligenceView />
+                </div>
+              )}
 
-          {/* Active Tab Workspace View */}
-          <div className="flex-1 overflow-hidden">
-            {(!currentTab || currentTab.type === 'chat') && (
-              <ChatWorkbench onExecutePrompt={handleExecutePrompt} />
-            )}
-            {currentTab?.type === 'document' && <div className="h-full p-2"><DocumentIntelligenceView /></div>}
-            {currentTab?.type === 'drawing' && <PIDDrawingView />}
-            {currentTab?.type === 'knowledge' && <div className="h-full p-2"><KnowledgeRAGView /></div>}
-            {currentTab?.type === 'artifacts' && <div className="h-full p-2"><DeliverablesView /></div>}
-            {currentTab?.type === 'models' && <div className="h-full p-2"><ModelRegistryView /></div>}
-            {currentTab?.type === 'audit' && <div className="h-full p-2"><AuditLogView /></div>}
-            {currentTab?.type === 'security' && <div className="h-full p-2"><SystemDiagnosticsView /></div>}
-          </div>
+              {currentTab?.type === 'drawing' && (
+                <div className="h-full flex flex-col">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-[#242627] bg-[#191A1A]">
+                    <span className="text-xs font-mono text-[#20B8CD]">Workspace: P&amp;ID Schematic Canvas</span>
+                    <button 
+                      onClick={() => openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false })}
+                      className="text-xs text-[#858A8E] hover:text-white cursor-pointer"
+                    >
+                      &larr; Back to Search
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <PIDDrawingView />
+                  </div>
+                </div>
+              )}
+
+              {currentTab?.type === 'knowledge' && (
+                <div className="h-full p-4 overflow-auto">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#242627]">
+                    <span className="text-xs font-mono text-[#20B8CD]">Workspace: Knowledge Base RAG</span>
+                    <button 
+                      onClick={() => openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false })}
+                      className="text-xs text-[#858A8E] hover:text-white cursor-pointer"
+                    >
+                      &larr; Back to Search
+                    </button>
+                  </div>
+                  <KnowledgeRAGView />
+                </div>
+              )}
+
+              {currentTab?.type === 'artifacts' && (
+                <div className="h-full p-4 overflow-auto">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#242627]">
+                    <span className="text-xs font-mono text-[#20B8CD]">Workspace: Deliverables &amp; Artefacts</span>
+                    <button 
+                      onClick={() => openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false })}
+                      className="text-xs text-[#858A8E] hover:text-white cursor-pointer"
+                    >
+                      &larr; Back to Search
+                    </button>
+                  </div>
+                  <DeliverablesView />
+                </div>
+              )}
+
+              {currentTab?.type === 'models' && (
+                <div className="h-full p-4 overflow-auto">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#242627]">
+                    <span className="text-xs font-mono text-[#20B8CD]">Workspace: Model Registry</span>
+                    <button 
+                      onClick={() => openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false })}
+                      className="text-xs text-[#858A8E] hover:text-white cursor-pointer"
+                    >
+                      &larr; Back to Search
+                    </button>
+                  </div>
+                  <ModelRegistryView />
+                </div>
+              )}
+
+              {currentTab?.type === 'audit' && (
+                <div className="h-full p-4 overflow-auto">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#242627]">
+                    <span className="text-xs font-mono text-[#20B8CD]">Workspace: Audit Log</span>
+                    <button 
+                      onClick={() => openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false })}
+                      className="text-xs text-[#858A8E] hover:text-white cursor-pointer"
+                    >
+                      &larr; Back to Search
+                    </button>
+                  </div>
+                  <AuditLogView />
+                </div>
+              )}
+
+              {currentTab?.type === 'security' && (
+                <div className="h-full p-4 overflow-auto">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#242627]">
+                    <span className="text-xs font-mono text-[#20B8CD]">Workspace: System Diagnostics</span>
+                    <button 
+                      onClick={() => openTab({ id: 'tab-chat', title: 'Workbench Chat', type: 'chat', isClosable: false })}
+                      className="text-xs text-[#858A8E] hover:text-white cursor-pointer"
+                    >
+                      &larr; Back to Search
+                    </button>
+                  </div>
+                  <SystemDiagnosticsView />
+                </div>
+              )}
+            </>
+          )}
         </main>
-
-        {/* Right-Side Terminal & Execution Panel */}
-        <TerminalPanel />
       </div>
 
-      {/* 3. Bottom Status Bar */}
-      <StatusBar />
+      {/* 3. Right-Side Computer Mode / Terminal Panel */}
+      <TerminalPanel />
 
       {/* 4. Global Modals */}
       <CommandPalette onRunScenario={handleSelectScenario} />

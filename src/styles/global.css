@@ -2,29 +2,31 @@
 
 @layer base {
   :root {
-    --vscode-editor-bg: #1e1e1e;
-    --vscode-sidebar-bg: #252526;
-    --vscode-activitybar-bg: #333333;
-    --vscode-header-bg: #323233;
-    --vscode-input-bg: #3c3c3c;
-    --vscode-border: #2d2d2d;
-    --vscode-border-light: #3c3c3c;
-    --vscode-accent: #007acc;
-    --vscode-text: #cccccc;
-    --vscode-text-bright: #ffffff;
-    --vscode-text-muted: #858585;
-    --vscode-success: #4ec9b0;
-    --vscode-warn: #cca700;
-    --vscode-error: #f14c4c;
+    --per-bg: #191A1A;
+    --per-sidebar: #141515;
+    --per-card: #202222;
+    --per-card-hover: #26292A;
+    --per-border: #2E3133;
+    --per-border-subtle: #242627;
+    --per-accent: #20B8CD;
+    --per-accent-subtle: rgba(32, 184, 205, 0.12);
+    --per-text-title: #F3F3EE;
+    --per-text-body: #D1D5DB;
+    --per-text-muted: #858A8E;
+    --per-text-subtle: #5F6467;
   }
 
   body {
-    background-color: #1e1e1e;
-    color: #cccccc;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
+    background-color: var(--per-bg);
+    color: var(--per-text-body);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+  }
+
+  .font-serif {
+    font-family: 'Newsreader', Georgia, Cambria, "Times New Roman", Times, serif;
   }
 
   code, pre, .font-mono {
@@ -32,21 +34,21 @@
   }
 }
 
-/* Crisp neutral VS Code scrollbars */
+/* Crisp dark Perplexity scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e1e1e;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #424242;
-  border-radius: 4px;
+  background: #333638;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4f4f4f;
+  background: #45494C;
 }

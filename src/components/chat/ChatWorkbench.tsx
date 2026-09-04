@@ -1,26 +1,39 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Bot, 
+  Plus, 
   Send, 
   Paperclip, 
   Sparkles, 
   FileText, 
   Download, 
-  CheckCircle2, 
+  ChevronDown, 
+  ChevronRight, 
   ExternalLink, 
   FileSpreadsheet, 
-  X,
-  MessageSquare,
-  FileCode
+  X, 
+  MessageSquare, 
+  FileCode,
+  Globe,
+  Mic,
+  ArrowUp,
+  Cpu,
+  Terminal as TerminalIcon,
+  CheckCircle2,
+  Check,
+  Clock,
+  Circle,
+  HelpCircle,
+  Info
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
 import { api } from '../../services/api';
 import type { ChatMessage } from '../../types';
+import { SourcesPane } from '../perplexity/SourcesPane';
 
 interface ChatWorkbenchProps {
   onExecutePrompt: (prompt: string, files: string[]) => void;
+  activeView?: 'answer' | 'links' | 'images';
 }
-
 
 const renderFormattedMessage = (content: string) => {
   const lines = content.split('\n');
@@ -30,13 +43,25 @@ const renderFormattedMessage = (content: string) => {
   let tableHeaders: string[] = [];
 
   const renderInline = (text: string): React.ReactNode => {
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+    // Check for inline citation pattern like [1], [2], [cert-in.org], etc.
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[\d+\])/g);
     return parts.map((part, idx) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return <strong key={idx} className="text-white font-semibold">{part.slice(2, -2)}</strong>;
       }
       if (part.startsWith('`') && part.endsWith('`')) {
-        return <code key={idx} className="px-1.5 py-0.5 rounded bg-[#181818] text-[#4EC9B0] font-mono text-[11px] border border-[#333333]">{part.slice(1, -1)}</code>;
+        return (
+          <code key={idx} className="px-1.5 py-0.5 rounded bg-[#202222] text-[#20B8CD] font-mono text-[11.5px] border border-[#2E3133]">
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+      if (/^\[\d+\]$/.test(part)) {
+        return (
+          <span key={idx} className="inline-flex items-center justify-center text-[10px] font-mono font-bold text-[#20B8CD] bg-[#20B8CD]/10 border border-[#20B8CD]/30 rounded-full px-1.5 py-0.2 mx-0.5 align-super cursor-pointer hover:bg-[#20B8CD]/20">
+            {part.slice(1, -1)}
+          </span>
+        );
       }
       return part;
     });
@@ -45,22 +70,22 @@ const renderFormattedMessage = (content: string) => {
   const flushTable = (keyIdx: number) => {
     if (tableHeaders.length > 0 || tableRows.length > 0) {
       elements.push(
-        <div key={`tbl-${keyIdx}`} className="overflow-x-auto my-3 border border-[#3C3C3C] rounded-xl bg-[#1E1E1E] shadow-sm">
-          <table className="w-full text-left text-xs font-mono">
+        <div key={`tbl-${keyIdx}`} className="overflow-x-auto my-4 border border-[#27292A] rounded-2xl bg-[#1C1D1E] shadow-sm">
+          <table className="w-full text-left text-xs font-sans">
             {tableHeaders.length > 0 && (
-              <thead className="bg-[#252526] border-b border-[#3C3C3C] text-white font-semibold">
+              <thead className="bg-[#202222] border-b border-[#27292A] text-white font-semibold">
                 <tr>
                   {tableHeaders.map((h, i) => (
-                    <th key={i} className="p-2.5">{renderInline(h)}</th>
+                    <th key={i} className="p-3 text-[#E6E6E6] font-medium">{renderInline(h)}</th>
                   ))}
                 </tr>
               </thead>
             )}
-            <tbody className="divide-y divide-[#2D2D2D] text-[#CCCCCC]">
+            <tbody className="divide-y divide-[#242627] text-[#D1D5DB]">
               {tableRows.map((r, rIdx) => (
-                <tr key={rIdx} className="hover:bg-[#252526]/60 transition-colors">
+                <tr key={rIdx} className="hover:bg-[#202222]/50 transition-colors">
                   {r.map((c, cIdx) => (
-                    <td key={cIdx} className="p-2.5">{renderInline(c)}</td>
+                    <td key={cIdx} className="p-3">{renderInline(c)}</td>
                   ))}
                 </tr>
               ))}
@@ -68,8 +93,8 @@ const renderFormattedMessage = (content: string) => {
           </table>
         </div>
       );
-      tableHeaders = [];
       tableRows = [];
+      tableHeaders = [];
       inTable = false;
     }
   };
@@ -78,15 +103,15 @@ const renderFormattedMessage = (content: string) => {
     const line = lines[i].trim();
 
     if (line.startsWith('|') && line.endsWith('|')) {
-      const cols = line.slice(1, -1).split('|').map(c => c.trim());
-      if (cols.every(c => c.match(/^[-:]+$/))) {
+      const cells = line.split('|').slice(1, -1).map(c => c.trim());
+      if (line.includes('---')) {
         inTable = true;
         continue;
       }
       if (!inTable && tableHeaders.length === 0) {
-        tableHeaders = cols;
+        tableHeaders = cells;
       } else {
-        tableRows.push(cols);
+        tableRows.push(cells);
       }
       continue;
     } else if (inTable || tableHeaders.length > 0) {
@@ -95,26 +120,33 @@ const renderFormattedMessage = (content: string) => {
 
     if (line.startsWith('### ')) {
       elements.push(
-        <h3 key={i} className="text-sm font-bold text-white tracking-tight pt-2 pb-0.5">
+        <h3 key={i} className="text-base font-semibold text-white tracking-tight pt-3 pb-1 font-serif">
           {renderInline(line.slice(4))}
         </h3>
       );
     } else if (line.startsWith('## ')) {
       elements.push(
-        <h2 key={i} className="text-base font-bold text-white tracking-tight pt-3 pb-1 border-b border-[#333333]">
+        <h2 key={i} className="text-xl font-medium text-white tracking-tight pt-4 pb-1 font-serif border-b border-[#27292A]">
           {renderInline(line.slice(3))}
         </h2>
       );
     } else if (line.startsWith('• ') || line.startsWith('- ')) {
       elements.push(
-        <div key={i} className="flex items-start gap-2 pl-2">
-          <span className="text-[#007ACC] mt-0.5">•</span>
-          <span className="flex-1">{renderInline(line.slice(2))}</span>
+        <div key={i} className="flex items-start gap-2.5 pl-2 leading-relaxed">
+          <span className="text-[#20B8CD] mt-1 text-xs">•</span>
+          <span className="flex-1 text-[#DCDEDD]">{renderInline(line.slice(2))}</span>
+        </div>
+      );
+    } else if (/^\d+\.\s/.test(line)) {
+      elements.push(
+        <div key={i} className="flex items-start gap-2.5 pl-2 leading-relaxed">
+          <span className="text-[#20B8CD] font-mono text-xs mt-0.5">{line.match(/^\d+\./)?.[0]}</span>
+          <span className="flex-1 text-[#DCDEDD]">{renderInline(line.replace(/^\d+\.\s/, ''))}</span>
         </div>
       );
     } else if (line.length > 0) {
       elements.push(
-        <p key={i} className="leading-relaxed">
+        <p key={i} className="leading-relaxed text-[#DCDEDD] text-[14.5px]">
           {renderInline(line)}
         </p>
       );
@@ -128,7 +160,10 @@ const renderFormattedMessage = (content: string) => {
   return elements;
 };
 
-export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt }) => {
+export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ 
+  onExecutePrompt,
+  activeView = 'answer'
+}) => {
   const { 
     messages, 
     isProcessing, 
@@ -136,11 +171,19 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
     attachFile, 
     removeAttachedFile, 
     clearAttachments,
-    openTab,
-    toggleTaskPanel
+    activeTask,
+    isBottomPanelOpen,
+    setBottomPanelOpen
   } = useWorkbenchStore();
 
   const [inputPrompt, setInputPrompt] = useState('');
+  const [selectedFocus, setSelectedFocus] = useState('All');
+  const [selectedModel, setSelectedModel] = useState('Qwen3-14B');
+  const [isFocusOpen, setIsFocusOpen] = useState(false);
+  const [isModelOpen, setIsModelOpen] = useState(false);
+  const [isStepsExpanded, setIsStepsExpanded] = useState(false);
+  const [expandedUserMessage, setExpandedUserMessage] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -152,7 +195,7 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
     scrollToBottom();
   }, [messages, isProcessing]);
 
-  // Handle file selection with background metadata scrubbing
+  // Handle file selection with automatic background scrubbing
   const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
     for (let i = 0; i < files.length; i++) {
@@ -161,7 +204,7 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
       try {
         await api.cleanFileMetadata(file.name, file);
       } catch (err) {
-        // Background local fallback
+        // Silent local fallback
       }
     }
   };
@@ -176,7 +219,7 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
     onExecutePrompt(promptToSend, filesToSend);
   };
 
-  // General-purpose demo prompts library
+  // General-purpose demo prompts library (Matching Perplexity cards)
   const quickPrompts = [
     {
       title: 'Summarize Meeting Notes',
@@ -205,28 +248,193 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
   ];
 
   return (
-    <div className="h-full flex flex-col bg-[#1E1E1E] font-sans text-sm overflow-hidden relative">
-      {/* 1. CHAT MESSAGES STREAM (Full-width scroll container so scrollbar is on right-most edge) */}
+    <div className="h-full flex flex-col bg-[#191A1A] font-sans text-sm overflow-hidden relative">
+      {/* 1. CHAT MESSAGES STREAM (Full width scroll container, scrollbar on right-most edge) */}
       <div className="flex-1 overflow-y-auto w-full">
-        <div className="max-w-4xl w-full mx-auto px-4 py-6 space-y-6">
-        {/* Simple & Clean Empty State Landing */}
-        {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4 space-y-6">
-            <div className="w-12 h-12 rounded-2xl bg-[#252526] border border-[#3C3C3C] flex items-center justify-center text-[#007ACC] shadow-sm">
-              <Bot className="w-7 h-7" />
-            </div>
-
-            <div className="space-y-2 max-w-md">
-              <h1 className="text-xl font-bold text-white tracking-tight">
-                How can I help you today?
+        {/* =======================================================
+            A. EMPTY STATE / LANDING PAGE 
+            Matching WhatsApp Image 2026-09-04 at 8.50.46 PM.jpeg
+            ======================================================= */}
+        {messages.length === 0 ? (
+          <div className="min-h-[85vh] flex flex-col items-center justify-center px-4 max-w-3xl w-full mx-auto space-y-7 py-12">
+            {/* Title Block */}
+            <div className="text-center space-y-2 select-none">
+              <span className="text-xs font-semibold uppercase tracking-widest text-[#858A8E]">
+                Search
+              </span>
+              <h1 className="text-3xl sm:text-4xl text-[#F3F3EE] font-serif font-normal tracking-tight">
+                What do you want to know?
               </h1>
-              <p className="text-xs text-[#858585] leading-relaxed">
-                Ask a question, analyze documents, process spreadsheets, or run Python scripts. All operations execute privately on your machine.
-              </p>
             </div>
 
-            {/* Clean Prompt Starter Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl w-full pt-2">
+            {/* The Iconic Perplexity Search Box Card */}
+            <div className="w-full bg-[#202222] border border-[#2E3133] rounded-2xl p-3.5 shadow-2xl space-y-3 transition-all focus-within:border-[#3D4143]">
+              {/* Attached file pills inside search card */}
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 px-1 pb-1">
+                  {attachedFiles.map((file, idx) => (
+                    <div 
+                      key={idx} 
+                      className="px-2.5 py-1 rounded-lg bg-[#27292A] border border-[#323638] flex items-center gap-1.5 text-xs text-[#CCCCCC]"
+                    >
+                      <Paperclip className="w-3.5 h-3.5 text-[#20B8CD]" />
+                      <span className="font-mono text-white text-[11.5px]">{file.split('/').pop()}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => removeAttachedFile(file)}
+                        className="text-[#858A8E] hover:text-white p-0.5 rounded cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Main Input Field */}
+              <textarea
+                value={inputPrompt}
+                onChange={(e) => setInputPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+                placeholder="Type / for search modes"
+                rows={3}
+                className="w-full bg-transparent px-2 text-[15px] text-[#F3F3EE] placeholder-[#5F6467] outline-none resize-none leading-relaxed"
+                autoFocus
+              />
+
+              {/* Bottom Search Controls Row */}
+              <div className="flex items-center justify-between pt-1 border-t border-[#27292A] text-xs">
+                {/* Left Controls: Attach (+), Search Focus pill, Computer pill */}
+                <div className="flex items-center gap-2">
+                  {/* File Upload Button (+) */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handleFileSelect(e.target.files)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Attach files or datasets"
+                    className="p-1.5 rounded-lg hover:bg-[#282A2C] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+
+                  {/* Search Focus Pill (e.g. Search v) */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsFocusOpen(!isFocusOpen)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1C1D1E] hover:bg-[#262829] border border-[#2E3133] text-[#A2A8AB] hover:text-white font-medium text-xs transition-colors cursor-pointer"
+                    >
+                      <Globe className="w-3 h-3 text-[#20B8CD]" />
+                      <span>Search</span>
+                      <ChevronDown className="w-3 h-3 text-[#858A8E]" />
+                    </button>
+
+                    {isFocusOpen && (
+                      <div className="absolute left-0 mt-1.5 w-44 bg-[#1C1D1E] border border-[#2E3133] rounded-xl p-1.5 shadow-2xl z-40 text-xs space-y-0.5">
+                        {['All', 'Academic', 'Writing', 'Computational'].map((f) => (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => {
+                              setSelectedFocus(f);
+                              setIsFocusOpen(false);
+                            }}
+                            className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#262829] text-[#A2A8AB] hover:text-white transition-colors"
+                          >
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Computer Pill (Terminal Execution) */}
+                  <button
+                    type="button"
+                    onClick={() => setBottomPanelOpen(!isBottomPanelOpen)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer border ${
+                      isBottomPanelOpen
+                        ? 'bg-[#20B8CD]/15 border-[#20B8CD] text-[#20B8CD]'
+                        : 'bg-[#1C1D1E] hover:bg-[#262829] border-[#2E3133] text-[#A2A8AB] hover:text-white'
+                    }`}
+                  >
+                    <TerminalIcon className="w-3 h-3" />
+                    <span>Computer</span>
+                  </button>
+                </div>
+
+                {/* Right Controls: Model dropdown, Mic, Submit Button */}
+                <div className="flex items-center gap-2">
+                  {/* Model Selector Dropdown */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsModelOpen(!isModelOpen)}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-[#262829] text-[#858A8E] hover:text-white transition-colors cursor-pointer text-xs"
+                    >
+                      <span>{selectedModel}</span>
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+
+                    {isModelOpen && (
+                      <div className="absolute right-0 bottom-8 w-48 bg-[#1C1D1E] border border-[#2E3133] rounded-xl p-1.5 shadow-2xl z-40 text-xs space-y-0.5 font-mono">
+                        {['Qwen3-14B', 'Qwen2.5-Coder-7B', 'Qwen3-VL-8B'].map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => {
+                              setSelectedModel(m);
+                              setIsModelOpen(false);
+                            }}
+                            className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#262829] text-[#A2A8AB] hover:text-white transition-colors flex items-center justify-between"
+                          >
+                            <span>{m}</span>
+                            {selectedModel === m && <Check className="w-3 h-3 text-[#20B8CD]" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Microphone Icon */}
+                  <button
+                    type="button"
+                    title="Voice input"
+                    className="p-1.5 rounded-lg hover:bg-[#282A2C] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Mic className="w-4 h-4" />
+                  </button>
+
+                  {/* Circular Send Button (Perplexity Audio Wave / Submit Pill) */}
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isProcessing || !inputPrompt.trim()}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow ${
+                      inputPrompt.trim() && !isProcessing
+                        ? 'bg-white text-black hover:bg-[#E0E0E0]'
+                        : 'bg-[#2E3133] text-[#5F6467] cursor-not-allowed'
+                    }`}
+                  >
+                    <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Demo Starters Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full pt-2">
               {quickPrompts.map((qp, idx) => {
                 const Icon = qp.icon;
                 return (
@@ -237,14 +445,14 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
                       attachFile(qp.file);
                       setInputPrompt(qp.prompt);
                     }}
-                    className="p-3.5 rounded-xl bg-[#252526] hover:bg-[#2A2D2E] border border-[#3C3C3C] hover:border-[#007ACC] text-left transition-all flex items-start gap-3 group cursor-pointer shadow-sm"
+                    className="p-3.5 rounded-2xl bg-[#1C1D1E] hover:bg-[#222425] border border-[#27292A] hover:border-[#323638] text-left transition-all flex items-start gap-3 group cursor-pointer shadow-sm"
                   >
-                    <Icon className="w-4 h-4 text-[#007ACC] flex-shrink-0 mt-0.5" />
+                    <Icon className="w-4 h-4 text-[#20B8CD] flex-shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-[#CCCCCC] group-hover:text-white leading-snug">
+                      <div className="text-xs font-semibold text-[#D1D5DB] group-hover:text-white leading-snug">
                         {qp.title}
                       </div>
-                      <div className="text-[11px] text-[#666666] mt-1 truncate font-mono">
+                      <div className="text-[11px] text-[#5F6467] mt-1 truncate font-mono">
                         📎 {qp.file.split('/').pop()}
                       </div>
                     </div>
@@ -253,231 +461,272 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt })
               })}
             </div>
           </div>
-        )}
-
-        {/* Render Chat Messages */}
-        {messages.map((msg) => (
-          <div key={msg.id} className="space-y-3">
-            {/* User Message */}
-            {msg.sender === 'user' ? (
-              <div className="flex justify-end">
-                <div className="max-w-2xl bg-[#2A2D2E] border border-[#3C3C3C] rounded-2xl p-4 text-[#CCCCCC] space-y-2 shadow-sm">
-                  <div className="text-[11px] text-[#858585] flex items-center justify-between font-mono">
-                    <span className="font-semibold text-[#CCCCCC]">You</span>
-                    <span>{msg.timestamp}</span>
-                  </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-white">{msg.text}</p>
-                  
-                  {/* Attached files badge */}
-                  {msg.attachedFiles && msg.attachedFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {msg.attachedFiles.map((file, idx) => (
-                        <span key={idx} className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#1E1E1E] text-[#9cdcfe] border border-[#3C3C3C] flex items-center gap-1.5">
-                          <Paperclip className="w-3 h-3 text-[#007acc]" />
-                          <span>{file.split('/').pop()}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Assistant Message (NO LUMI icon or brand label on answer, clean & simple) */
-              <div className="flex justify-start">
-                <div className="max-w-3xl w-full bg-[#252526] border border-[#3C3C3C] rounded-2xl p-5 text-[#CCCCCC] space-y-4 shadow-sm">
-                  <div className="flex items-center justify-between border-b border-[#333333] pb-2 text-xs text-[#858585] font-mono">
-                    <span>Assistant</span>
-                    <span>{msg.timestamp}</span>
-                  </div>
-
-                  {/* Main Response Text with Markdown & Table Rendering */}
-                  <div className="text-sm leading-relaxed space-y-3 text-[#CCCCCC] select-text">
-                    {renderFormattedMessage(msg.text)}
-                  </div>
-
-                  {/* Inline Grounded Sources / Citations */}
-                  {msg.citations && msg.citations.length > 0 && (
-                    <div className="pt-2 border-t border-[#333333] space-y-2">
-                      <span className="text-xs font-mono uppercase text-[#858585] font-semibold block">
-                        Sources &amp; References:
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        {msg.citations.map((c, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              openTab({
-                                id: `tab-citation-${idx}`,
-                                title: `${c.source_file} (p.${c.page_number || 1})`,
-                                type: 'document',
-                                file: c.source_file,
-                                isClosable: true
-                              });
-                            }}
-                            className="px-2.5 py-1 rounded bg-[#1e1e1e] hover:bg-[#2A2D2E] border border-[#3C3C3C] hover:border-[#007ACC] text-xs font-mono text-[#007ACC] flex items-center gap-1.5 transition-all cursor-pointer"
+        ) : (
+          /* =======================================================
+             B. ACTIVE ANSWER & CONVERSATION VIEW 
+             Matching 1image.png and image.png
+             ======================================================= */
+          <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+            {messages.map((msg) => (
+              <div key={msg.id} className="space-y-4">
+                {/* 1. USER QUERY CARD (Rounded dark box with Read More) */}
+                {msg.sender === 'user' ? (
+                  <div className="max-w-3xl bg-[#202222] border border-[#2E3133] rounded-2xl p-4 sm:p-5 text-[#E6E6E6] space-y-2 shadow-sm">
+                    {/* Attached files strip */}
+                    {msg.attachedFiles && msg.attachedFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pb-1">
+                        {msg.attachedFiles.map((file, idx) => (
+                          <span 
+                            key={idx} 
+                            className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#191A1A] text-[#20B8CD] border border-[#2E3133] flex items-center gap-1.5"
                           >
-                            <span>[{c.source_file} · p{c.page_number || 1}]</span>
-                            <ExternalLink className="w-3 h-3" />
+                            <Paperclip className="w-3 h-3" />
+                            <span>{file.split('/').pop()}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Query text with optional read more */}
+                    <div className="text-[14.5px] leading-relaxed text-[#F3F3EE] whitespace-pre-wrap">
+                      {msg.text.length > 300 && !expandedUserMessage ? (
+                        <>
+                          {msg.text.slice(0, 280)}...
+                          <button 
+                            onClick={() => setExpandedUserMessage(true)}
+                            className="block text-xs text-[#858A8E] hover:text-white mt-1 cursor-pointer font-medium"
+                          >
+                            Read more &or;
                           </button>
-                        ))}
-                      </div>
+                        </>
+                      ) : (
+                        msg.text
+                      )}
                     </div>
-                  )}
+                  </div>
+                ) : (
+                  /* 2. ASSISTANT ANSWER WITH TWO-COLUMN SOURCES LAYOUT */
+                  <div className="flex flex-col lg:flex-row gap-6 items-start">
+                    {/* Main Content Column */}
+                    <div className="flex-1 min-w-0 space-y-5">
+                      {/* Collapsible Steps Disclosure: "Finished 3 steps >" */}
+                      {msg.task && (
+                        <div className="border-b border-[#242627] pb-3">
+                          <button
+                            onClick={() => setIsStepsExpanded(!isStepsExpanded)}
+                            className="flex items-center gap-1.5 text-xs text-[#858A8E] hover:text-white transition-colors cursor-pointer font-medium"
+                          >
+                            <span>Finished {msg.task.plan.length} steps</span>
+                            {isStepsExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                          </button>
 
-                  {/* Inline Generated Artifacts */}
-                  {msg.artifacts && msg.artifacts.length > 0 && (
-                    <div className="pt-2 border-t border-[#333333] space-y-2">
-                      <span className="text-xs font-mono uppercase text-[#4EC9B0] font-semibold block">
-                        Generated Deliverables:
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {msg.artifacts.map((art) => (
-                          <div key={art.artifact_id} className="p-3 rounded-xl bg-[#1e1e1e] border border-[#3C3C3C] flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2.5 truncate">
-                              <div className="w-7 h-7 rounded-lg bg-[#1f3a2b] border border-[#2e5d44] flex items-center justify-center font-bold text-[#4EC9B0] text-[10px] uppercase font-mono">
-                                {art.file_type}
-                              </div>
-                              <div className="truncate">
-                                <div className="text-xs font-semibold text-white truncate">{art.file_name}</div>
-                                <div className="text-[10px] text-[#858585] font-mono">{(art.size_bytes / 1024).toFixed(1)} KB</div>
-                              </div>
+                          {/* Expanded Step Traces */}
+                          {isStepsExpanded && (
+                            <div className="mt-2.5 p-3 rounded-xl bg-[#1C1D1E] border border-[#27292A] space-y-2 text-xs font-mono">
+                              {msg.task.plan.map((step) => (
+                                <div key={step.step_id} className="flex items-center justify-between text-[#858A8E] text-[11px]">
+                                  <div className="flex items-center gap-2">
+                                    <Check className="w-3 h-3 text-[#20B8CD]" />
+                                    <span className="text-white">{step.title}</span>
+                                  </div>
+                                  <span className="text-[#5F6467]">{step.duration_ms}ms</span>
+                                </div>
+                              ))}
                             </div>
+                          )}
+                        </div>
+                      )}
 
-                            <a
-                              href={art.file_path}
-                              download
-                              className="px-3 py-1.5 rounded-lg bg-[#007ACC] hover:bg-[#1f8ad2] text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all flex-shrink-0"
-                            >
-                              <Download className="w-3 h-3" />
-                              <span>Download</span>
-                            </a>
-                          </div>
-                        ))}
+                      {/* Assistant Headline in Editorial Serif Typography */}
+                      <div className="font-serif text-2xl sm:text-3xl font-normal text-[#F3F3EE] tracking-tight leading-snug">
+                        {activeTask?.task_type || 'Sovereign Industrial AI Workbench'}
                       </div>
-                    </div>
-                  )}
 
-                  {/* Clean Execution Footer with optional Step Inspection */}
-                  {msg.task && (
-                    <div className="pt-2 border-t border-[#333333] flex items-center justify-between text-xs text-[#858585]">
-                      <span className="flex items-center gap-1.5 text-[#4EC9B0] font-mono">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Completed in {(msg.task.tool_calls.reduce((acc, t) => acc + t.execution_time_ms, 0) / 1000).toFixed(2)}s
-                      </span>
+                      {/* Main Response Text with Markdown Rendering */}
+                      <div className="space-y-4 text-[14.5px] leading-relaxed text-[#D1D5DB] select-text">
+                        {renderFormattedMessage(msg.text)}
+                      </div>
 
-                      <button
-                        onClick={toggleTaskPanel}
-                        className="text-xs text-[#007ACC] hover:underline cursor-pointer font-sans"
-                      >
-                        Inspect execution steps &rarr;
-                      </button>
+                      {/* Pro Preview Banner (Matching 1image.png) */}
+                      <div className="p-3 rounded-xl bg-[#1C1D1E] border border-[#27292A] flex items-center justify-between text-xs text-[#A2A8AB]">
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded bg-[#20B8CD]/15 text-[#20B8CD] font-bold text-[10px] uppercase font-mono">
+                            Local
+                          </span>
+                          <span>Air-gapped on-premise inference active. All weights resident in RAM.</span>
+                        </div>
+                        <button 
+                          onClick={() => setBottomPanelOpen(true)}
+                          className="px-2.5 py-1 rounded-lg bg-[#252829] hover:bg-[#2F3335] text-white text-xs font-medium cursor-pointer"
+                        >
+                          Inspect terminal
+                        </button>
+                      </div>
+
+                      {/* Inline Generated Deliverables */}
+                      {msg.artifacts && msg.artifacts.length > 0 && (
+                        <div className="pt-2 border-t border-[#242627] space-y-2">
+                          <span className="text-xs font-mono uppercase text-[#20B8CD] font-semibold block">
+                            Generated Deliverables:
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {msg.artifacts.map((art) => (
+                              <div key={art.artifact_id} className="p-3 rounded-xl bg-[#1C1D1E] border border-[#27292A] flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5 truncate">
+                                  <div className="w-7 h-7 rounded-lg bg-[#20B8CD]/10 border border-[#20B8CD]/30 flex items-center justify-center font-bold text-[#20B8CD] text-[10px] uppercase font-mono">
+                                    {art.file_type}
+                                  </div>
+                                  <div className="truncate">
+                                    <div className="text-xs font-semibold text-white truncate">{art.file_name}</div>
+                                    <div className="text-[10px] text-[#858A8E] font-mono">{(art.size_bytes / 1024).toFixed(1)} KB</div>
+                                  </div>
+                                </div>
+
+                                <a
+                                  href={art.file_path}
+                                  download
+                                  className="px-3 py-1.5 rounded-lg bg-[#252829] hover:bg-[#2E3234] border border-[#3A3E40] text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all flex-shrink-0"
+                                >
+                                  <Download className="w-3 h-3" />
+                                  <span>Download</span>
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+
+                    {/* Right-Side Sources Pane (Matching 1image.png) */}
+                    <SourcesPane 
+                      sources={msg.citations?.map((c, i) => ({
+                        id: `cite-${i}`,
+                        source_file: c.source_file,
+                        domain: c.source_file.split('.').slice(0, -1).join('.'),
+                        page_number: c.page_number,
+                        snippet: c.snippet,
+                        relevance_score: c.relevance_score
+                      }))}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Processing Indicator */}
+            {isProcessing && (
+              <div className="max-w-md bg-[#202222] border border-[#2E3133] rounded-2xl p-4 flex items-center gap-3 text-xs text-[#CCCCCC] shadow-sm">
+                <div className="w-4 h-4 border-2 border-[#20B8CD] border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                <span className="font-serif">Searching local knowledge &amp; synthesizing answer...</span>
               </div>
             )}
-          </div>
-        ))}
 
-        {/* Processing Indicator */}
-        {isProcessing && (
-          <div className="flex justify-start">
-            <div className="max-w-md bg-[#252526] border border-[#3C3C3C] rounded-2xl p-4 flex items-center gap-3 text-xs text-[#CCCCCC] shadow-sm">
-              <div className="w-4 h-4 border-2 border-[#007ACC] border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-              <span>Processing request using local models...</span>
-            </div>
+            <div ref={messagesEndRef} className="h-24" />
           </div>
         )}
-
-          <div ref={messagesEndRef} />
-        </div>
       </div>
 
-      {/* 2. CHAT COMPOSER DOCK */}
-      <div className="p-4 bg-[#1E1E1E] border-t border-[#2D2D2D] flex-shrink-0">
-        <form onSubmit={handleSubmit} className="max-w-4xl w-full mx-auto space-y-2">
-          {/* Attached Files Strip with Cleaned Metadata Badges */}
-          {attachedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-1">
-              {attachedFiles.map((file, idx) => {
-                const fName = file.split('/').pop() || file;
-                const info = sanitizedFilesInfo[fName];
-                return (
-                  <div 
-                    key={idx} 
-                    className="px-2.5 py-1 rounded-lg bg-[#252526] border border-[#3C3C3C] flex items-center gap-2 text-xs text-[#CCCCCC] shadow-sm"
-                  >
-                    <Paperclip className="w-3.5 h-3.5 text-[#007ACC]" />
-                    <span className="font-mono text-white font-medium">{fName}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeAttachedFile(file)}
-                      className="text-[#858585] hover:text-white p-0.5 rounded hover:bg-[#3C3C3C] transition-colors cursor-pointer"
+      {/* =======================================================
+          C. BOTTOM FLOATING COMPOSER DOCK
+          Matching 1image.png and image.png
+          ======================================================= */}
+      {messages.length > 0 && (
+        <div className="p-4 bg-gradient-to-t from-[#191A1A] via-[#191A1A]/95 to-transparent flex-shrink-0 z-10">
+          <form onSubmit={handleSubmit} className="max-w-3xl w-full mx-auto">
+            <div className="bg-[#202222] border border-[#2E3133] rounded-2xl p-2.5 shadow-2xl space-y-2 focus-within:border-[#3D4143] transition-all">
+              {/* Attached file chips above follow-up input */}
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 px-1">
+                  {attachedFiles.map((file, idx) => (
+                    <div 
+                      key={idx} 
+                      className="px-2.5 py-1 rounded-lg bg-[#27292A] border border-[#323638] flex items-center gap-1.5 text-xs text-[#CCCCCC]"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                      <Paperclip className="w-3 h-3 text-[#20B8CD]" />
+                      <span className="font-mono text-white text-[11px]">{file.split('/').pop()}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => removeAttachedFile(file)}
+                        className="text-[#858A8E] hover:text-white p-0.5 rounded cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-          {/* Main Input Field */}
-          <div className="relative rounded-2xl bg-[#252526] border border-[#3C3C3C] focus-within:border-[#007ACC] transition-all shadow-md">
-            <textarea
-              value={inputPrompt}
-              onChange={(e) => setInputPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-              placeholder="Ask anything, describe a task, or analyze attached files..."
-              rows={2}
-              className="w-full bg-transparent p-3.5 pr-24 text-sm text-white placeholder-[#666666] outline-none resize-none"
-            />
-
-            {/* Composer Action Buttons */}
-            <div className="absolute right-3 bottom-2.5 flex items-center gap-2">
-              {/* File Upload Trigger */}
+              {/* Follow-up input row */}
               <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(e) => handleFileSelect(e.target.files)}
+                type="text"
+                value={inputPrompt}
+                onChange={(e) => setInputPrompt(e.target.value)}
+                placeholder="Ask a follow-up"
+                className="w-full bg-transparent px-2 py-1 text-sm text-[#F3F3EE] placeholder-[#5F6467] outline-none"
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                title="Attach file (metadata will be automatically stripped)"
-                className="p-2 hover:bg-[#333333] rounded-xl text-[#858585] hover:text-white transition-colors cursor-pointer"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isProcessing || !inputPrompt.trim()}
-                className={`p-2 rounded-xl text-white font-semibold flex items-center justify-center transition-all ${
-                  isProcessing || !inputPrompt.trim()
-                    ? 'bg-[#333333] text-[#666666] cursor-not-allowed'
-                    : 'bg-[#007ACC] hover:bg-[#1f8ad2] text-white shadow cursor-pointer'
-                }`}
-              >
-                <Send className="w-4 h-4" />
-              </button>
+              {/* Controls bar inside follow-up card */}
+              <div className="flex items-center justify-between pt-1 border-t border-[#27292A] text-xs">
+                <div className="flex items-center gap-2">
+                  {/* File attach (+) */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Attach files"
+                    className="p-1 rounded-lg hover:bg-[#282A2C] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+
+                  {/* Search pill */}
+                  <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#1C1D1E] border border-[#2E3133] text-[#A2A8AB] text-[11px]">
+                    <Globe className="w-3 h-3 text-[#20B8CD]" />
+                    <span>Search</span>
+                  </div>
+
+                  {/* Computer pill */}
+                  <button
+                    type="button"
+                    onClick={() => setBottomPanelOpen(!isBottomPanelOpen)}
+                    className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] transition-colors cursor-pointer border ${
+                      isBottomPanelOpen
+                        ? 'bg-[#20B8CD]/15 border-[#20B8CD] text-[#20B8CD]'
+                        : 'bg-[#1C1D1E] hover:bg-[#262829] border-[#2E3133] text-[#A2A8AB]'
+                    }`}
+                  >
+                    <TerminalIcon className="w-3 h-3" />
+                    <span>Computer</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[#858A8E] font-mono">Model: {selectedModel}</span>
+
+                  <button
+                    type="button"
+                    title="Voice input"
+                    className="p-1 text-[#858A8E] hover:text-white transition-colors"
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isProcessing || !inputPrompt.trim()}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shadow ${
+                      inputPrompt.trim() && !isProcessing
+                        ? 'bg-white text-black hover:bg-[#E0E0E0]'
+                        : 'bg-[#2E3133] text-[#5F6467] cursor-not-allowed'
+                    }`}
+                  >
+                    <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          {/* Simple Clean Footer Hint */}
-          <div className="flex items-center justify-between text-[11px] text-[#666666] px-2 font-mono">
-            <span>Press Enter to send, Shift+Enter for new line</span>
-          </div>
-        </form>
-      </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
