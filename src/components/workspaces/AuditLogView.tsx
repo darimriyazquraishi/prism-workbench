@@ -84,27 +84,27 @@ export const AuditLogView: React.FC = () => {
   return (
     <div className="h-full flex flex-col space-y-4 font-sans text-sm overflow-hidden">
       {/* 1. TOP TOOLBAR */}
-      <div className="bg-[#252526] border border-[#333333] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 select-none flex-shrink-0">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 select-none flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 font-mono font-bold text-white text-sm">
-            <ShieldCheck className="w-5 h-5 text-[#4ec9b0]" />
+          <div className="flex items-center gap-2 font-mono font-bold text-[var(--text-primary)] text-sm">
+            <ShieldCheck className="w-5 h-5 text-[var(--status-healthy)]" />
             <span>Immutable Audit Trail:</span>
             <span className="text-[#9cdcfe]">SQLite Storage</span>
           </div>
-          <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-[#1e1e1e] text-[#4ec9b0] border border-[#3c3c3c]">
+          <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-[var(--bg-primary)] text-[var(--status-healthy)] border border-[var(--border-subtle)]">
             Zero-Leak Guaranteed
           </span>
         </div>
 
         {/* Filter Input */}
-        <div className="flex items-center gap-2 bg-[#1e1e1e] border border-[#3c3c3c] rounded px-3 py-1 font-mono text-xs">
-          <Search className="w-4 h-4 text-[#858585]" />
+        <div className="flex items-center gap-2 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded px-3 py-1 font-mono text-xs">
+          <Search className="w-4 h-4 text-[var(--text-secondary)]" />
           <input
             type="text"
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             placeholder="Filter audit events..."
-            className="bg-transparent border-none text-xs text-[#cccccc] placeholder-[#666666] focus:outline-none w-48 font-sans"
+            className="bg-transparent border-none text-xs text-[var(--text-primary)] placeholder-[#666666] focus:outline-none w-48 font-sans"
           />
         </div>
       </div>
@@ -112,15 +112,15 @@ export const AuditLogView: React.FC = () => {
       {/* 2. MAIN 2-PANE AUDIT WORKSPACE */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
         {/* Left: Audit Grid (8 Cols) */}
-        <div className="lg:col-span-8 bg-[#252526] border border-[#333333] rounded-lg flex flex-col overflow-hidden shadow-sm">
-          <div className="h-9 bg-[#1e1e1e] border-b border-[#333333] px-4 flex items-center justify-between font-mono text-xs text-[#999999] flex-shrink-0">
+        <div className="lg:col-span-8 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg flex flex-col overflow-hidden shadow-sm">
+          <div className="h-9 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-4 flex items-center justify-between font-mono text-xs text-[var(--text-secondary)] flex-shrink-0">
             <span>EVENT TIMELINE ({filteredEvents.length} RECORDS)</span>
             <span>STORAGE: /data/audit/audit_log.db</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             <table className="w-full text-left font-mono text-xs">
-              <thead className="bg-[#1e1e1e] text-xs uppercase text-[#858585] border-b border-[#333333]">
+              <thead className="bg-[var(--bg-primary)] text-xs uppercase text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
                 <tr>
                   <th className="py-3 px-4">Event ID</th>
                   <th className="py-3 px-4">Timestamp (UTC)</th>
@@ -141,11 +141,11 @@ export const AuditLogView: React.FC = () => {
                       }`}
                     >
                       <td className="py-3 px-4 font-bold text-[#569cd6] text-xs">{ev.event_id}</td>
-                      <td className="py-3 px-4 text-[#858585] text-xs">{ev.timestamp.replace('T', ' ').replace('Z', '')}</td>
-                      <td className="py-3 px-4 text-white text-xs font-semibold">{ev.event_type}</td>
-                      <td className="py-3 px-4 text-[#cccccc] text-xs">{ev.tool_used || ev.model_used || 'SYSTEM'}</td>
+                      <td className="py-3 px-4 text-[var(--text-secondary)] text-xs">{ev.timestamp.replace('T', ' ').replace('Z', '')}</td>
+                      <td className="py-3 px-4 text-[var(--text-primary)] text-xs font-semibold">{ev.event_type}</td>
+                      <td className="py-3 px-4 text-[var(--text-primary)] text-xs">{ev.tool_used || ev.model_used || 'SYSTEM'}</td>
                       <td className="py-3 px-4">
-                        <span className="text-xs px-2.5 py-0.5 rounded bg-[#1f3a2b] text-[#4ec9b0] border border-[#2e5d44] font-bold">
+                        <span className="text-xs px-2.5 py-0.5 rounded bg-[#1f3a2b] text-[var(--status-healthy)] border border-[#2e5d44] font-bold">
                           {ev.status}
                         </span>
                       </td>
@@ -158,33 +158,33 @@ export const AuditLogView: React.FC = () => {
         </div>
 
         {/* Right: Record Inspector (4 Cols) */}
-        <div className="lg:col-span-4 bg-[#252526] border border-[#333333] rounded-lg p-5 flex flex-col space-y-4 overflow-y-auto font-mono text-xs shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#333333] pb-2 text-sm uppercase font-bold text-white">
+        <div className="lg:col-span-4 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-5 flex flex-col space-y-4 overflow-y-auto font-mono text-xs shadow-sm">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 text-sm uppercase font-bold text-[var(--text-primary)]">
             <span className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-[#4ec9b0]" />
+              <Lock className="w-4 h-4 text-[var(--status-healthy)]" />
               Event Inspector
             </span>
             <span className="text-[#569cd6] font-bold text-xs">{selectedEvent.event_id}</span>
           </div>
 
-          <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg p-3.5 space-y-1.5 text-xs">
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-3.5 space-y-1.5 text-xs">
             <div>
-              <span className="text-[10px] text-[#858585] uppercase block">EVENT TYPE:</span>
-              <span className="text-white font-bold">{selectedEvent.event_type}</span>
+              <span className="text-[10px] text-[var(--text-secondary)] uppercase block">EVENT TYPE:</span>
+              <span className="text-[var(--text-primary)] font-bold">{selectedEvent.event_type}</span>
             </div>
             <div>
-              <span className="text-[10px] text-[#858585] uppercase block">USER / OPERATOR:</span>
-              <span className="text-[#cccccc]">{selectedEvent.user}</span>
+              <span className="text-[10px] text-[var(--text-secondary)] uppercase block">USER / OPERATOR:</span>
+              <span className="text-[var(--text-primary)]">{selectedEvent.user}</span>
             </div>
             {selectedEvent.task_id && (
               <div>
-                <span className="text-[10px] text-[#858585] uppercase block">ASSOCIATED TASK ID:</span>
+                <span className="text-[10px] text-[var(--text-secondary)] uppercase block">ASSOCIATED TASK ID:</span>
                 <span className="text-[#569cd6]">{selectedEvent.task_id}</span>
               </div>
             )}
             {selectedEvent.tool_used && (
               <div>
-                <span className="text-[10px] text-[#858585] uppercase block">TOOL INVOKED:</span>
+                <span className="text-[10px] text-[var(--text-secondary)] uppercase block">TOOL INVOKED:</span>
                 <span className="text-[#cca700] font-bold">{selectedEvent.tool_used}</span>
               </div>
             )}
@@ -192,10 +192,10 @@ export const AuditLogView: React.FC = () => {
 
           {/* Details Payload */}
           <div className="space-y-1.5">
-            <span className="text-xs text-[#858585] uppercase font-bold block">
+            <span className="text-xs text-[var(--text-secondary)] uppercase font-bold block">
               Execution Payload:
             </span>
-            <div className="p-3 bg-[#181818] border border-[#3c3c3c] rounded-lg text-xs text-[#4ec9b0] overflow-x-auto">
+            <div className="p-3 bg-[#181818] border border-[var(--border-subtle)] rounded-lg text-xs text-[var(--status-healthy)] overflow-x-auto">
               <pre>{JSON.stringify(selectedEvent.details, null, 2)}</pre>
             </div>
           </div>

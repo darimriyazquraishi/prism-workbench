@@ -1,11 +1,133 @@
+export type DocumentSourceType = 'USER_UPLOAD' | 'KNOWLEDGE_BASE';
+
+export type TaskType = 
+  | 'presentation_generation'
+  | 'document_summary'
+  | 'code_generation'
+  | 'inspection_analysis'
+  | 'general_reasoning';
+
+export type DeliverableFormat = 'pptx' | 'docx' | 'xlsx' | 'py' | 'json' | 'markdown';
+
+export type RoutingIntent = 'DIRECT_QA' | 'AMBIGUOUS_TASK' | 'WORKFLOW';
+
+export interface IntentRoutingResult {
+  intent: RoutingIntent;
+  requires_workflow: boolean;
+  requires_vision: boolean;
+  requires_rag: boolean;
+  requires_python: boolean;
+  requires_document_generation: boolean;
+  input_files: string[];
+  output_format: DeliverableFormat | null;
+  deliverable: string | null;
+  clarifying_question?: string;
+  reason?: string;
+}
+
+export interface OutputContract {
+  task_type: TaskType;
+  requested_output_type: DeliverableFormat | null;
+  primary_inputs: string[];
+  knowledge_requirements: string[];
+  rag_needed: boolean;
+  rag_query?: string;
+  expected_artifact_type?: DeliverableFormat | null;
+  expected_filename?: string | null;
+  deliverable_name: string | null;
+  validation_rules: {
+    must_match_output_type: boolean;
+    must_use_user_upload: boolean;
+    must_apply_kb_guidance: boolean;
+  };
+}
+
+export interface ContractValidationResult {
+  passed: boolean;
+  requested_type: DeliverableFormat;
+  generated_type: DeliverableFormat;
+  user_files_used: string[];
+  kb_guidance_used: string[];
+  embedding_model_used: string;
+  validation_errors: string[];
+}
+
+export interface KbChunk {
+  chunk_id: string;
+  doc_id: string;
+  doc_title: string;
+  source_type: 'KNOWLEDGE_BASE';
+  content: string;
+  embedding: number[];
+  metadata: {
+    document_type?: string;
+    category?: string;
+    chunk_index: number;
+    total_chunks: number;
+  };
+}
+
 export type StepType = 
   | 'user_input' 
+  | 'chatbot_routing'
   | 'thought' 
+  | 'plan_proposed'
+  | 'rejection_feedback'
   | 'tool_call' 
   | 'tool_result' 
   | 'response' 
   | 'human_approval' 
   | 'artifact_created';
+
+export interface ProposedStepItem {
+  id: string;
+  stepNumber: number;
+  toolName: string;
+  description: string;
+  targetModel: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+export interface KbGuidanceRef {
+  id: string;
+  title: string;
+  document_type?: string;
+  category?: string;
+  snippet: string;
+  relevanceScore?: number;
+}
+
+export interface ProposedExecutionPlan {
+  id: string;
+  classifiedTaskType: TaskType | 'document_vision' | 'code_generation' | 'general_reasoning' | 'spreadsheet_work';
+  outputContract?: OutputContract;
+  primaryModel: string;
+  secondaryModel?: string;
+  steps: ProposedStepItem[];
+  expectedDeliverables: string[];
+  userDecision: 'pending' | 'approved' | 'rejected' | 'edited';
+  userFeedback?: string;
+  revisionCount?: number;
+  intentSummary?: string;
+  targetFileNames?: string[];
+  userUploadFiles?: string[];
+  relevantKbGuidance?: KbGuidanceRef[];
+  noKbGuidanceFound?: boolean;
+  kbConflictDetected?: boolean;
+  kbConflictSummary?: string;
+}
+
+export interface NetworkAuditLog {
+  id: string;
+  timestamp: string;
+  source: string;
+  destination: string;
+  protocol: 'HTTP' | 'SOCKET' | 'IPC' | 'SANDBOX_ISOLATED';
+  bytesSent: number;
+  bytesReceived: number;
+  isExternal: boolean;
+  modelOrTool: string;
+}
 
 export interface TrajectoryStep {
   id: string;
@@ -20,6 +142,7 @@ export interface TrajectoryStep {
   timestamp: string;
   citations?: { source: string; page?: number; snippet: string }[];
   artifacts?: ArtifactItem[];
+  proposedPlan?: ProposedExecutionPlan;
   isExpanded?: boolean;
 }
 
@@ -33,6 +156,8 @@ export interface ArtifactItem {
   createdAt: string;
   previewUrl?: string;
   approvalStatus?: 'draft' | 'approved';
+  slideCount?: number;
+  slides?: { title: string; bullets: string[]; layout?: string }[];
 }
 
 export interface SkillItem {
@@ -49,6 +174,15 @@ export interface KnowledgeItem {
   summary: string;
   path: string;
   totalChunks: number;
+  source_type: 'KNOWLEDGE_BASE';
+  document_type?: 'guideline' | 'sop' | 'template' | 'rule' | 'other';
+  category?: string;
+  department?: string;
+  version?: string;
+  content?: string;
+  chunks?: KbChunk[];
+  conflictWithDocId?: string;
+  conflictDetails?: string;
 }
 
 export interface AntigravitySession {
@@ -60,4 +194,6 @@ export interface AntigravitySession {
   steps: TrajectoryStep[];
   attachedFiles: string[];
   status: 'idle' | 'running' | 'waiting_approval' | 'completed' | 'failed';
+  activeProposedPlan?: ProposedExecutionPlan;
 }
+

@@ -92,39 +92,39 @@ export const PIDDrawingView: React.FC = () => {
   return (
     <div className="h-full flex flex-col space-y-4 font-sans text-sm overflow-hidden">
       {/* 1. TOP DRAWING CONTROL TOOLBAR */}
-      <div className="bg-[#252526] border border-[#333333] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 select-none flex-shrink-0">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 select-none flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 font-mono font-bold text-white text-sm">
+          <div className="flex items-center gap-2 font-mono font-bold text-[var(--text-primary)] text-sm">
             <Compass className="w-5 h-5 text-[#569cd6]" />
             <span>P&amp;ID Schematic:</span>
             <span className="text-[#9cdcfe]">MRPL-CDU5-PID-04-102 (Rev. C)</span>
           </div>
-          <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-[#1e1e1e] text-[#4ec9b0] border border-[#3c3c3c]">
+          <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-[var(--bg-primary)] text-[var(--status-healthy)] border border-[var(--border-subtle)]">
             Vision Model: Qwen2.5-VL Local
           </span>
         </div>
 
         {/* Viewport Zoom & Overlays */}
         <div className="flex items-center gap-3 font-mono text-xs">
-          <div className="flex items-center gap-1 bg-[#1e1e1e] border border-[#3c3c3c] rounded p-1">
+          <div className="flex items-center gap-1 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded p-1">
             <button
               onClick={() => setZoom(Math.max(50, zoom - 15))}
-              className="p-1.5 hover:bg-[#333333] rounded text-[#cccccc]"
+              className="p-1.5 hover:bg-[var(--border-subtle)] rounded text-[var(--text-primary)]"
               title="Zoom Out"
             >
               <ZoomOut className="w-4 h-4" />
             </button>
-            <span className="px-2 text-white font-bold min-w-[50px] text-center">{zoom}%</span>
+            <span className="px-2 text-[var(--text-primary)] font-bold min-w-[50px] text-center">{zoom}%</span>
             <button
               onClick={() => setZoom(Math.min(200, zoom + 15))}
-              className="p-1.5 hover:bg-[#333333] rounded text-[#cccccc]"
+              className="p-1.5 hover:bg-[var(--border-subtle)] rounded text-[var(--text-primary)]"
               title="Zoom In"
             >
               <ZoomIn className="w-4 h-4" />
             </button>
             <button
               onClick={() => setZoom(100)}
-              className="p-1.5 hover:bg-[#333333] rounded text-[#cccccc] border-l border-[#3c3c3c]"
+              className="p-1.5 hover:bg-[var(--border-subtle)] rounded text-[var(--text-primary)] border-l border-[var(--border-subtle)]"
               title="Reset Zoom"
             >
               <RotateCcw className="w-4 h-4" />
@@ -135,8 +135,8 @@ export const PIDDrawingView: React.FC = () => {
             onClick={() => setShowOverlays(!showOverlays)}
             className={`px-3 py-1.5 rounded-md border font-semibold flex items-center gap-1.5 transition-all ${
               showOverlays
-                ? 'bg-[#007acc] text-white border-[#007acc]'
-                : 'bg-[#1e1e1e] text-[#858585] border-[#3c3c3c]'
+                ? 'bg-[var(--accent-fuchsia)] text-[var(--text-primary)] border-[var(--accent-fuchsia)]'
+                : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
             }`}
           >
             <Eye className="w-4 h-4" />
@@ -148,26 +148,26 @@ export const PIDDrawingView: React.FC = () => {
       {/* 2. MAIN 2-PANE WORKSPACE */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
         {/* Dominant Schematic Canvas (8 Cols) */}
-        <div className="lg:col-span-8 bg-[#181818] border border-[#333333] rounded-lg relative overflow-hidden flex flex-col shadow-sm">
-          <div className="h-8 bg-[#252526] border-b border-[#333333] px-4 flex items-center justify-between font-mono text-xs text-[#999999] flex-shrink-0">
+        <div className="lg:col-span-8 bg-[#181818] border border-[var(--border-subtle)] rounded-lg relative overflow-hidden flex flex-col shadow-sm">
+          <div className="h-8 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] px-4 flex items-center justify-between font-mono text-xs text-[var(--text-secondary)] flex-shrink-0">
             <span>DRAWING: 04-CR-102-PID (CAD Blueprint)</span>
-            <span className="text-[#4ec9b0] font-semibold">5 Detected Assets (Click to Inspect)</span>
+            <span className="text-[var(--status-healthy)] font-semibold">5 Detected Assets (Click to Inspect)</span>
           </div>
 
           <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-[#141414] select-none relative">
             <div 
               style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center center' }}
-              className="transition-transform duration-100 ease-out relative w-[760px] h-[480px] bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg p-6 shadow-2xl flex flex-col justify-between"
+              className="transition-transform duration-100 ease-out relative w-[760px] h-[480px] bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-6 shadow-2xl flex flex-col justify-between"
             >
               {/* CAD Blueprint Title Block */}
-              <div className="flex items-center justify-between border-b border-[#333333] pb-2 text-xs font-mono">
+              <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 text-xs font-mono">
                 <div>
                   <span className="text-[#569cd6] font-bold block text-sm">MRPL REFINERY OPERATIONS</span>
-                  <span className="text-[#cccccc]">CRUDE DISTILLATION UNIT (CDU-5) PIPING SCHEMATIC</span>
+                  <span className="text-[var(--text-primary)]">CRUDE DISTILLATION UNIT (CDU-5) PIPING SCHEMATIC</span>
                 </div>
-                <div className="text-right text-[#858585]">
+                <div className="text-right text-[var(--text-secondary)]">
                   <span>SCALE: NONE (SCHEMATIC)</span>
-                  <span className="block text-[#4ec9b0] font-semibold">STATUS: IN-SERVICE</span>
+                  <span className="block text-[var(--status-healthy)] font-semibold">STATUS: IN-SERVICE</span>
                 </div>
               </div>
 
@@ -180,8 +180,8 @@ export const PIDDrawingView: React.FC = () => {
                   <path d="M 520 100 L 620 100 L 620 60" stroke="#cca700" strokeWidth="2" />
                 </svg>
 
-                <div className="absolute left-24 top-[210px] text-[#999999] font-mono text-xs font-semibold">&gt; CRUDE IN</div>
-                <div className="absolute right-12 top-[210px] text-[#999999] font-mono text-xs font-semibold">TO HEATER &gt;</div>
+                <div className="absolute left-24 top-[210px] text-[var(--text-secondary)] font-mono text-xs font-semibold">&gt; CRUDE IN</div>
+                <div className="absolute right-12 top-[210px] text-[var(--text-secondary)] font-mono text-xs font-semibold">TO HEATER &gt;</div>
 
                 {/* Overlays */}
                 {showOverlays && detectedComponents.map((comp) => {
@@ -200,20 +200,20 @@ export const PIDDrawingView: React.FC = () => {
                       }}
                       className={`absolute cursor-pointer rounded-md transition-all flex flex-col items-center justify-center p-1.5 font-mono text-xs ${
                         isSelected
-                          ? 'bg-[#264f78] border-2 border-[#007acc] text-white shadow-xl scale-105 z-20 font-bold'
+                          ? 'bg-[#264f78] border-2 border-[var(--accent-fuchsia)] text-[var(--text-primary)] shadow-xl scale-105 z-20 font-bold'
                           : isDegraded
                           ? 'bg-[#332a00] border-2 border-[#cca700] text-[#ffeb80] animate-pulse z-10 font-bold'
-                          : 'bg-[#252526] border border-[#3c3c3c] text-[#cccccc] hover:border-[#007acc] z-10'
+                          : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-fuchsia)] z-10'
                       }`}
                     >
                       <span>{comp.tag}</span>
-                      <span className="text-[10px] text-[#999999] uppercase">{comp.type}</span>
+                      <span className="text-[10px] text-[var(--text-secondary)] uppercase">{comp.type}</span>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="flex items-center justify-between border-t border-[#333333] pt-2 text-xs font-mono text-[#858585]">
+              <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-2 text-xs font-mono text-[var(--text-secondary)]">
                 <span>CONFIDENTIAL — PROPRIETARY ENGINEERING SCHEMATIC</span>
                 <span>AIR-GAP VERIFIED INFERENCE</span>
               </div>
@@ -222,8 +222,8 @@ export const PIDDrawingView: React.FC = () => {
         </div>
 
         {/* Right Asset Inspector (4 Cols) */}
-        <div className="lg:col-span-4 bg-[#252526] border border-[#333333] rounded-lg p-5 flex flex-col space-y-4 overflow-y-auto font-mono text-xs shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#333333] pb-3 text-sm uppercase font-bold text-white">
+        <div className="lg:col-span-4 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-5 flex flex-col space-y-4 overflow-y-auto font-mono text-xs shadow-sm">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 text-sm uppercase font-bold text-[var(--text-primary)]">
             <span className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-[#569cd6]" />
               Asset Properties
@@ -231,56 +231,56 @@ export const PIDDrawingView: React.FC = () => {
             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
               selectedTag.status === 'Degraded' 
                 ? 'bg-[#332a00] text-[#cca700] border border-[#cca700]' 
-                : 'bg-[#1f3a2b] text-[#4ec9b0] border border-[#2e5d44]'
+                : 'bg-[#1f3a2b] text-[var(--status-healthy)] border border-[#2e5d44]'
             }`}>
               {selectedTag.status}
             </span>
           </div>
 
-          <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg p-3.5 space-y-1.5">
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-3.5 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-base font-bold text-[#9cdcfe]">{selectedTag.tag}</span>
-              <span className="text-xs text-[#858585]">{selectedTag.type}</span>
+              <span className="text-xs text-[var(--text-secondary)]">{selectedTag.type}</span>
             </div>
-            <div className="text-xs text-[#e0e0e0] font-sans leading-relaxed">{selectedTag.spec}</div>
+            <div className="text-xs text-[var(--text-primary)] font-sans leading-relaxed">{selectedTag.spec}</div>
           </div>
 
           <div className="space-y-1.5 font-mono text-xs">
-            <span className="text-[#858585] uppercase font-bold">Design Parameters:</span>
-            <div className="grid grid-cols-2 gap-2 bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg p-3 text-[#cccccc]">
+            <span className="text-[var(--text-secondary)] uppercase font-bold">Design Parameters:</span>
+            <div className="grid grid-cols-2 gap-2 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-3 text-[var(--text-primary)]">
               <div>
-                <span className="text-[#858585] block text-[10px]">DESIGN PRESSURE:</span>
-                <span className="font-semibold text-white">{selectedTag.designPressure}</span>
+                <span className="text-[var(--text-secondary)] block text-[10px]">DESIGN PRESSURE:</span>
+                <span className="font-semibold text-[var(--text-primary)]">{selectedTag.designPressure}</span>
               </div>
               <div>
-                <span className="text-[#858585] block text-[10px]">OPERATING TEMP:</span>
-                <span className="font-semibold text-white">{selectedTag.operatingTemp}</span>
+                <span className="text-[var(--text-secondary)] block text-[10px]">OPERATING TEMP:</span>
+                <span className="font-semibold text-[var(--text-primary)]">{selectedTag.operatingTemp}</span>
               </div>
               <div>
-                <span className="text-[#858585] block text-[10px]">NOMINAL THICKNESS:</span>
-                <span className="font-semibold text-white">{selectedTag.nominalThickness}</span>
+                <span className="text-[var(--text-secondary)] block text-[10px]">NOMINAL THICKNESS:</span>
+                <span className="font-semibold text-[var(--text-primary)]">{selectedTag.nominalThickness}</span>
               </div>
               <div>
-                <span className="text-[#858585] block text-[10px]">LAST SURVEY:</span>
-                <span className="font-semibold text-white">{selectedTag.lastInspection}</span>
+                <span className="text-[var(--text-secondary)] block text-[10px]">LAST SURVEY:</span>
+                <span className="font-semibold text-[var(--text-primary)]">{selectedTag.lastInspection}</span>
               </div>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <span className="text-xs text-[#858585] uppercase font-bold">
+            <span className="text-xs text-[var(--text-secondary)] uppercase font-bold">
               AI Vision Model Findings (Qwen2.5-VL):
             </span>
             <div className={`p-3 rounded-lg font-sans text-xs leading-relaxed border ${
               selectedTag.status === 'Degraded'
                 ? 'bg-[#332a00] border-[#cca700] text-[#ffeb80]'
-                : 'bg-[#1e1e1e] border-[#3c3c3c] text-[#cccccc]'
+                : 'bg-[var(--bg-primary)] border-[var(--border-subtle)] text-[var(--text-primary)]'
             }`}>
               {selectedTag.aiObservation}
             </div>
           </div>
 
-          <div className="mt-auto pt-3 border-t border-[#333333] text-[11px] text-[#858585] font-sans">
+          <div className="mt-auto pt-3 border-t border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] font-sans">
             * ASME P&amp;ID standards compliant. Field engineering stamp mandatory before turnaround modifications.
           </div>
         </div>

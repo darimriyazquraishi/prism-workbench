@@ -1,170 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Plus, 
+  Bot, 
   Send, 
   Paperclip, 
   Sparkles, 
   FileText, 
   Download, 
-  ChevronDown, 
-  ChevronRight, 
+  CheckCircle2, 
   ExternalLink, 
+  AlertTriangle, 
+  Clock, 
+  Cpu, 
   FileSpreadsheet, 
-  X, 
-  MessageSquare, 
-  FileCode,
-  Globe,
-  Mic,
-  ArrowUp,
-  Cpu,
-  Terminal as TerminalIcon,
-  CheckCircle2,
-  Check,
-  Clock,
-  Circle,
-  HelpCircle,
-  Info,
-  AlertCircle
+  X,
+  ArrowRight,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
-import { api } from '../../services/api';
-import type { ChatMessage } from '../../types';
-import { SourcesPane } from '../perplexity/SourcesPane';
+import type { ChatMessage, ArtifactRecord, Citation } from '../../types';
 
 interface ChatWorkbenchProps {
   onExecutePrompt: (prompt: string, files: string[]) => void;
-  activeView?: 'answer' | 'links' | 'images';
 }
 
-const renderFormattedMessage = (content: string) => {
-  const lines = content.split('\n');
-  const elements: React.ReactNode[] = [];
-  let inTable = false;
-  let tableRows: string[][] = [];
-  let tableHeaders: string[] = [];
-
-  const renderInline = (text: string): React.ReactNode => {
-    // Check for inline citation pattern like [1], [2], [cert-in.org], etc.
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[\d+\])/g);
-    return parts.map((part, idx) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={idx} className="text-white font-semibold">{part.slice(2, -2)}</strong>;
-      }
-      if (part.startsWith('`') && part.endsWith('`')) {
-        return (
-          <code key={idx} className="px-1.5 py-0.5 rounded bg-[#202222] text-[#20B8CD] font-mono text-[11.5px] border border-[#2E3133]">
-            {part.slice(1, -1)}
-          </code>
-        );
-      }
-      if (/^\[\d+\]$/.test(part)) {
-        return (
-          <span key={idx} className="inline-flex items-center justify-center text-[10px] font-mono font-bold text-[#20B8CD] bg-[#20B8CD]/10 border border-[#20B8CD]/30 rounded-full px-1.5 py-0.2 mx-0.5 align-super cursor-pointer hover:bg-[#20B8CD]/20">
-            {part.slice(1, -1)}
-          </span>
-        );
-      }
-      return part;
-    });
-  };
-
-  const flushTable = (keyIdx: number) => {
-    if (tableHeaders.length > 0 || tableRows.length > 0) {
-      elements.push(
-        <div key={`tbl-${keyIdx}`} className="overflow-x-auto my-4 border border-[#27292A] rounded-2xl bg-[#1C1D1E] shadow-sm">
-          <table className="w-full text-left text-xs font-sans">
-            {tableHeaders.length > 0 && (
-              <thead className="bg-[#202222] border-b border-[#27292A] text-white font-semibold">
-                <tr>
-                  {tableHeaders.map((h, i) => (
-                    <th key={i} className="p-3 text-[#E6E6E6] font-medium">{renderInline(h)}</th>
-                  ))}
-                </tr>
-              </thead>
-            )}
-            <tbody className="divide-y divide-[#242627] text-[#D1D5DB]">
-              {tableRows.map((r, rIdx) => (
-                <tr key={rIdx} className="hover:bg-[#202222]/50 transition-colors">
-                  {r.map((c, cIdx) => (
-                    <td key={cIdx} className="p-3">{renderInline(c)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-      tableRows = [];
-      tableHeaders = [];
-      inTable = false;
-    }
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    if (line.startsWith('|') && line.endsWith('|')) {
-      const cells = line.split('|').slice(1, -1).map(c => c.trim());
-      if (line.includes('---')) {
-        inTable = true;
-        continue;
-      }
-      if (!inTable && tableHeaders.length === 0) {
-        tableHeaders = cells;
-      } else {
-        tableRows.push(cells);
-      }
-      continue;
-    } else if (inTable || tableHeaders.length > 0) {
-      flushTable(i);
-    }
-
-    if (line.startsWith('### ')) {
-      elements.push(
-        <h3 key={i} className="text-base font-semibold text-white tracking-tight pt-3 pb-1 font-serif">
-          {renderInline(line.slice(4))}
-        </h3>
-      );
-    } else if (line.startsWith('## ')) {
-      elements.push(
-        <h2 key={i} className="text-xl font-medium text-white tracking-tight pt-4 pb-1 font-serif border-b border-[#27292A]">
-          {renderInline(line.slice(3))}
-        </h2>
-      );
-    } else if (line.startsWith('• ') || line.startsWith('- ')) {
-      elements.push(
-        <div key={i} className="flex items-start gap-2.5 pl-2 leading-relaxed">
-          <span className="text-[#20B8CD] mt-1 text-xs">•</span>
-          <span className="flex-1 text-[#DCDEDD]">{renderInline(line.slice(2))}</span>
-        </div>
-      );
-    } else if (/^\d+\.\s/.test(line)) {
-      elements.push(
-        <div key={i} className="flex items-start gap-2.5 pl-2 leading-relaxed">
-          <span className="text-[#20B8CD] font-mono text-xs mt-0.5">{line.match(/^\d+\./)?.[0]}</span>
-          <span className="flex-1 text-[#DCDEDD]">{renderInline(line.replace(/^\d+\.\s/, ''))}</span>
-        </div>
-      );
-    } else if (line.length > 0) {
-      elements.push(
-        <p key={i} className="leading-relaxed text-[#DCDEDD] text-[14.5px]">
-          {renderInline(line)}
-        </p>
-      );
-    }
-  }
-
-  if (tableHeaders.length > 0 || tableRows.length > 0) {
-    flushTable(lines.length);
-  }
-
-  return elements;
-};
-
-export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ 
-  onExecutePrompt,
-  activeView = 'answer'
-}) => {
+export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({ onExecutePrompt }) => {
   const { 
     messages, 
     isProcessing, 
@@ -172,24 +32,13 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
     attachFile, 
     removeAttachedFile, 
     clearAttachments,
-    activeTask,
-    isBottomPanelOpen,
-    setBottomPanelOpen,
-    selectedModel,
-    setSelectedModel,
-    setSettingsOpen,
-    setSettingsTab
+    openTab,
+    toggleTaskPanel,
+    setTaskPanelOpen
   } = useWorkbenchStore();
 
   const [inputPrompt, setInputPrompt] = useState('');
-  const [selectedFocus, setSelectedFocus] = useState('All');
-  const [isFocusOpen, setIsFocusOpen] = useState(false);
-  const [isModelOpen, setIsModelOpen] = useState(false);
-  const [isStepsExpanded, setIsStepsExpanded] = useState(false);
-  const [expandedUserMessage, setExpandedUserMessage] = useState(false);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -199,315 +48,77 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
     scrollToBottom();
   }, [messages, isProcessing]);
 
-  // Handle file selection with automatic background scrubbing
-  const handleFileSelect = async (files: FileList | null) => {
-    if (!files) return;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      attachFile(file.name);
-      try {
-        await api.cleanFileMetadata(file.name, file);
-      } catch (err) {
-        // Silent local fallback
-      }
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputPrompt.trim() || isProcessing) return;
-    
-    // If no model is selected, prompt user or open Settings
-    if (!selectedModel) {
-      setSettingsOpen(true);
-      setSettingsTab('models');
-      return;
-    }
-
     const promptToSend = inputPrompt;
-    const filesToSend = [...attachedFiles];
+    const filesToSend = attachedFiles.length > 0 ? [...attachedFiles] : ['demo/synthetic/Inspection_Report_001.pdf'];
     setInputPrompt('');
     clearAttachments();
     onExecutePrompt(promptToSend, filesToSend);
   };
 
-  // General-purpose productivity prompt cards
   const quickPrompts = [
     {
-      title: 'Analyze & Summarize Documents',
-      prompt: 'Analyze the attached document, extract all critical findings, summarize key takeaways, and format actionable next steps into a clean priority table.',
-      desc: 'Local text extraction & structured action plan',
+      title: 'Analyze inspection files & create approval note',
+      prompt: 'Analyze these inspection reports, compare them against our maintenance SOPs, identify critical issues, calculate the corrosion rate, and prepare an approval note in Word format.',
+      files: ['demo/synthetic/Inspection_Report_001.pdf'],
       icon: FileText
     },
     {
-      title: 'Code Sandbox & Analytics',
-      prompt: 'Write and execute a Python script inside the isolated local sandbox to compute summary statistics, analyze distributions, and report key insights.',
-      desc: 'Sandboxed Python execution with zero external network',
-      icon: FileCode
-    },
-    {
-      title: 'Vision & Engineering Diagrams',
-      prompt: 'Perform visual inspection on the provided technical drawing or schematic, identify component tags, and describe the piping/flow connections.',
-      desc: 'Multimodal vision for drawings and P&ID schematics',
+      title: 'Run Python failure analysis on equipment data',
+      prompt: 'Analyze Pump_Failure_Data.xlsx, write and execute Python code in the sandbox to calculate monthly MTBF statistics, and produce an Excel deliverable.',
+      files: ['demo/synthetic/Pump_Failure_Data.xlsx'],
       icon: FileSpreadsheet
     },
     {
-      title: 'Air-Gapped Knowledge Search',
-      prompt: 'Search the local indexed documentation and standard operating procedures to verify operational guidelines and safety thresholds.',
-      desc: 'Sub-millisecond local vector RAG search',
-      icon: Globe
+      title: 'Inspect P&ID drawing & extract equipment tags',
+      prompt: 'Perform vision analysis on P_and_ID_Example.png, identify all pumps, valves, and flow lines, and generate an executive summary briefing deck.',
+      files: ['demo/synthetic/P_and_ID_Example.png'],
+      icon: Sparkles
+    },
+    {
+      title: 'Search internal maintenance SOP standards',
+      prompt: 'Search our maintenance knowledge base for crude distillation piping retirement limits and statutory replacement procedures.',
+      files: ['demo/synthetic/Operations_SOP_014.pdf'],
+      icon: ShieldCheck
     }
   ];
 
   return (
-    <div className="h-full flex flex-col bg-[#191A1A] font-sans text-sm overflow-hidden relative">
-      {/* 1. CHAT MESSAGES STREAM (Full width scroll container, scrollbar on right-most edge) */}
-      <div className="flex-1 overflow-y-auto w-full">
-        {/* =======================================================
-            A. EMPTY STATE / LANDING PAGE 
-            Matching WhatsApp Image 2026-09-04 at 8.50.46 PM.jpeg
-            ======================================================= */}
-        {messages.length === 0 ? (
-          <div className="min-h-[85vh] flex flex-col items-center justify-center px-4 max-w-3xl w-full mx-auto space-y-7 py-12">
-            {/* Title Block */}
-            <div className="text-center space-y-2 select-none">
-              <span className="text-xs font-semibold uppercase tracking-widest text-[#858A8E]">
-                Search
-              </span>
-              <h1 className="text-3xl sm:text-4xl text-[#F3F3EE] font-serif font-normal tracking-tight">
-                What do you want to know?
+    <div className="h-full flex flex-col bg-[var(--bg-primary)] font-sans text-[var(--text-primary)] overflow-hidden relative transition-colors duration-200">
+      {/* 1. CHAT MESSAGES STREAM */}
+      <div className="flex-1 overflow-y-auto px-4 py-8 space-y-8 max-w-[760px] w-full mx-auto">
+        {/* Empty State / Initial Landing */}
+        {messages.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4 space-y-6">
+            <div className="space-y-3 max-w-md">
+              <h1 className="text-2xl font-semibold text-[var(--text-primary)] tracking-tight">
+                How can I assist?
               </h1>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-light">
+                Secure, isolated, on-premise execution.
+              </p>
             </div>
 
-            {/* The Iconic Perplexity Search Box Card */}
-            <div className="w-full bg-[#202222] border border-[#2E3133] rounded-2xl p-3.5 shadow-2xl space-y-3 transition-all focus-within:border-[#3D4143]">
-              {/* Attached file pills inside search card */}
-              {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-1 pb-1">
-                  {attachedFiles.map((file, idx) => (
-                    <div 
-                      key={idx} 
-                      className="px-2.5 py-1 rounded-lg bg-[#27292A] border border-[#323638] flex items-center gap-1.5 text-xs text-[#CCCCCC]"
-                    >
-                      <Paperclip className="w-3.5 h-3.5 text-[#20B8CD]" />
-                      <span className="font-mono text-white text-[11.5px]">{file.split('/').pop()}</span>
-                      <button 
-                        type="button" 
-                        onClick={() => removeAttachedFile(file)}
-                        className="text-[#858A8E] hover:text-white p-0.5 rounded cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Main Input Field */}
-              <textarea
-                value={inputPrompt}
-                onChange={(e) => setInputPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                  }
-                }}
-                placeholder="Type / for search modes"
-                rows={3}
-                className="w-full bg-transparent px-2 text-[15px] text-[#F3F3EE] placeholder-[#5F6467] outline-none resize-none leading-relaxed"
-                autoFocus
-              />
-
-              {/* Bottom Search Controls Row */}
-              <div className="flex items-center justify-between pt-1 border-t border-[#27292A] text-xs">
-                {/* Left Controls: Attach (+), Search Focus pill, Computer pill */}
-                <div className="flex items-center gap-2">
-                  {/* File Upload Button (+) */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => handleFileSelect(e.target.files)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    title="Attach files or datasets"
-                    className="p-1.5 rounded-lg hover:bg-[#282A2C] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-
-                  {/* Search Focus Pill (e.g. Search v) */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsFocusOpen(!isFocusOpen)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1C1D1E] hover:bg-[#262829] border border-[#2E3133] text-[#A2A8AB] hover:text-white font-medium text-xs transition-colors cursor-pointer"
-                    >
-                      <Globe className="w-3 h-3 text-[#20B8CD]" />
-                      <span>Search</span>
-                      <ChevronDown className="w-3 h-3 text-[#858A8E]" />
-                    </button>
-
-                    {isFocusOpen && (
-                      <div className="absolute left-0 mt-1.5 w-44 bg-[#1C1D1E] border border-[#2E3133] rounded-xl p-1.5 shadow-2xl z-40 text-xs space-y-0.5">
-                        {['All', 'Academic', 'Writing', 'Computational'].map((f) => (
-                          <button
-                            key={f}
-                            type="button"
-                            onClick={() => {
-                              setSelectedFocus(f);
-                              setIsFocusOpen(false);
-                            }}
-                            className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#262829] text-[#A2A8AB] hover:text-white transition-colors"
-                          >
-                            {f}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Computer Pill (Terminal Execution) */}
-                  <button
-                    type="button"
-                    onClick={() => setBottomPanelOpen(!isBottomPanelOpen)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer border ${
-                      isBottomPanelOpen
-                        ? 'bg-[#20B8CD]/15 border-[#20B8CD] text-[#20B8CD]'
-                        : 'bg-[#1C1D1E] hover:bg-[#262829] border-[#2E3133] text-[#A2A8AB] hover:text-white'
-                    }`}
-                  >
-                    <TerminalIcon className="w-3 h-3" />
-                    <span>Computer</span>
-                  </button>
-                </div>
-
-                {/* Right Controls: Model dropdown, Mic, Submit Button */}
-                <div className="flex items-center gap-2">
-                  {/* Model Selector Dropdown */}
-                  <div className="relative">
-                    {selectedModel ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsModelOpen(!isModelOpen)}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-[#262829] text-[#A2A8AB] hover:text-white transition-colors cursor-pointer text-xs font-mono"
-                      >
-                        <Cpu className="w-3 h-3 text-[#20B8CD]" />
-                        <span>{selectedModel}</span>
-                        <ChevronDown className="w-3 h-3" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSettingsOpen(true);
-                          setSettingsTab('models');
-                        }}
-                        title="No model selected - Click to select in Settings"
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[#E58888] bg-[#292020] hover:bg-[#352525] border border-[#522929] hover:border-[#7A3F3F] transition-colors cursor-pointer text-xs font-mono"
-                      >
-                        <AlertCircle className="w-3 h-3 text-[#E58888]" />
-                        <span>No model selected</span>
-                      </button>
-                    )}
-
-                    {isModelOpen && (
-                      <div className="absolute right-0 bottom-8 w-56 bg-[#1C1D1E] border border-[#2E3133] rounded-xl p-1.5 shadow-2xl z-40 text-xs space-y-0.5 font-mono">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedModel(null);
-                            setIsModelOpen(false);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#262829] text-[#E58888] hover:text-[#FFA0A0] transition-colors flex items-center justify-between"
-                        >
-                          <span>No model selected</span>
-                          {selectedModel === null && <Check className="w-3 h-3 text-[#E58888]" />}
-                        </button>
-
-                        <div className="h-px bg-[#262829] my-1" />
-
-                        {['Qwen3-14B', 'Qwen2.5-Coder-7B', 'Qwen3-VL-8B'].map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => {
-                              setSelectedModel(m);
-                              setIsModelOpen(false);
-                            }}
-                            className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#262829] text-[#A2A8AB] hover:text-white transition-colors flex items-center justify-between"
-                          >
-                            <span>{m}</span>
-                            {selectedModel === m && <Check className="w-3 h-3 text-[#20B8CD]" />}
-                          </button>
-                        ))}
-
-                        <div className="h-px bg-[#262829] my-1" />
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsModelOpen(false);
-                            setSettingsOpen(true);
-                            setSettingsTab('models');
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#262829] text-[#20B8CD] hover:text-white transition-colors text-[11px]"
-                        >
-                          Open Settings...
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Microphone Icon */}
-                  <button
-                    type="button"
-                    title="Voice input"
-                    className="p-1.5 rounded-lg hover:bg-[#282A2C] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
-                  >
-                    <Mic className="w-4 h-4" />
-                  </button>
-
-                  {/* Circular Send Button (Perplexity Audio Wave / Submit Pill) */}
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={isProcessing || !inputPrompt.trim()}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow ${
-                      inputPrompt.trim() && !isProcessing
-                        ? 'bg-white text-black hover:bg-[#E0E0E0]'
-                        : 'bg-[#2E3133] text-[#5F6467] cursor-not-allowed'
-                    }`}
-                  >
-                    <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Productivity Starters Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full pt-2">
+            {/* Quick Action Pills - Simplified */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full pt-4">
               {quickPrompts.map((qp, idx) => {
                 const Icon = qp.icon;
                 return (
                   <button
                     key={idx}
                     onClick={() => {
+                      clearAttachments();
+                      qp.files.forEach(f => attachFile(f));
                       setInputPrompt(qp.prompt);
                     }}
-                    className="p-3.5 rounded-2xl bg-[#1C1D1E] hover:bg-[#222425] border border-[#27292A] hover:border-[#323638] text-left transition-all flex items-start gap-3 group cursor-pointer shadow-sm"
+                    className="p-4 rounded-xl bg-[var(--bg-surface)] hover:border-[var(--accent-fuchsia-muted)] border border-[var(--border-subtle)] text-left transition-all duration-200 flex items-start gap-3 group cursor-pointer shadow-sm"
                   >
-                    <Icon className="w-4 h-4 text-[#20B8CD] flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-[#D1D5DB] group-hover:text-white leading-snug">
+                    <Icon className="w-5 h-5 text-[var(--text-secondary)] group-hover:text-[var(--accent-fuchsia)] transition-colors flex-shrink-0" />
+                    <div>
+                      <div className="text-sm font-medium text-[var(--text-primary)] leading-snug">
                         {qp.title}
-                      </div>
-                      <div className="text-[11px] text-[#5F6467] mt-1 line-clamp-1 leading-snug">
-                        {qp.desc}
                       </div>
                     </div>
                   </button>
@@ -515,286 +126,188 @@ export const ChatWorkbench: React.FC<ChatWorkbenchProps> = ({
               })}
             </div>
           </div>
-        ) : (
-          /* =======================================================
-             B. ACTIVE ANSWER & CONVERSATION VIEW 
-             Matching 1image.png and image.png
-             ======================================================= */
-          <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-            {messages.map((msg) => (
-              <div key={msg.id} className="space-y-4">
-                {/* 1. USER QUERY CARD (Rounded dark box with Read More) */}
-                {msg.sender === 'user' ? (
-                  <div className="max-w-3xl bg-[#202222] border border-[#2E3133] rounded-2xl p-4 sm:p-5 text-[#E6E6E6] space-y-2 shadow-sm">
-                    {/* Attached files strip */}
-                    {msg.attachedFiles && msg.attachedFiles.length > 0 && (
-                      <div className="flex flex-wrap gap-2 pb-1">
-                        {msg.attachedFiles.map((file, idx) => (
-                          <span 
-                            key={idx} 
-                            className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#191A1A] text-[#20B8CD] border border-[#2E3133] flex items-center gap-1.5"
-                          >
-                            <Paperclip className="w-3 h-3" />
-                            <span>{file.split('/').pop()}</span>
-                          </span>
+        )}
+
+        {/* Render Chat Messages */}
+        {messages.map((msg) => (
+          <div key={msg.id} className="space-y-3">
+            {/* User Message */}
+            {msg.sender === 'user' ? (
+              <div className="flex justify-end">
+                <div className="max-w-[85%] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl rounded-tr-sm p-4 text-[var(--text-primary)] space-y-2 shadow-sm">
+                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                  
+                  {/* Attached files badge */}
+                  {msg.attachedFiles && msg.attachedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-2">
+                      {msg.attachedFiles.map((file, idx) => (
+                        <span key={idx} className="text-[11px] font-mono px-2 py-1 rounded bg-[var(--bg-terminal)] text-[var(--text-secondary)] flex items-center gap-1">
+                          <Paperclip className="w-3 h-3" />
+                          <span>{file.split('/').pop()}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Assistant Message */
+              <div className="flex justify-start">
+                <div className="max-w-[95%] w-full rounded-2xl p-2 text-[var(--text-primary)] space-y-5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--accent-fuchsia)] font-bold text-[10px]">
+                      S
+                    </div>
+                    <span className="text-xs text-[var(--text-secondary)] font-medium">Sovereign AI</span>
+                  </div>
+
+                  {/* Main Plain-Language Response */}
+                  <div className="text-[15px] leading-[1.7] space-y-3 whitespace-pre-wrap font-light">
+                    {msg.text}
+                  </div>
+
+                  {/* Inline Generated Business Artifacts */}
+                  {msg.artifacts && msg.artifacts.length > 0 && (
+                    <div className="pt-3 space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {msg.artifacts.map((art) => (
+                          <div key={art.artifact_id} className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-between gap-3 shadow-sm hover:border-[var(--accent-fuchsia-muted)] transition-colors">
+                            <div className="flex items-center gap-3 truncate">
+                              <div className="w-8 h-8 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] font-medium text-xs uppercase">
+                                {art.file_type}
+                              </div>
+                              <div className="truncate">
+                                <div className="text-sm font-medium truncate">{art.file_name}</div>
+                                <div className="text-xs text-[var(--text-secondary)] font-mono">{(art.size_bytes / 1024).toFixed(1)} KB</div>
+                              </div>
+                            </div>
+                            <a
+                              href={art.file_path}
+                              download
+                              title="Download Artifact"
+                              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-primary)] border border-[var(--border-subtle)] hover:text-[var(--accent-fuchsia)] text-[var(--text-secondary)] transition-colors"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          </div>
                         ))}
                       </div>
-                    )}
-
-                    {/* Query text with optional read more */}
-                    <div className="text-[14.5px] leading-relaxed text-[#F3F3EE] whitespace-pre-wrap">
-                      {msg.text.length > 300 && !expandedUserMessage ? (
-                        <>
-                          {msg.text.slice(0, 280)}...
-                          <button 
-                            onClick={() => setExpandedUserMessage(true)}
-                            className="block text-xs text-[#858A8E] hover:text-white mt-1 cursor-pointer font-medium"
-                          >
-                            Read more &or;
-                          </button>
-                        </>
-                      ) : (
-                        msg.text
-                      )}
                     </div>
-                  </div>
-                ) : (
-                  /* 2. ASSISTANT ANSWER WITH TWO-COLUMN SOURCES LAYOUT */
-                  <div className="flex flex-col lg:flex-row gap-6 items-start">
-                    {/* Main Content Column */}
-                    <div className="flex-1 min-w-0 space-y-5">
-                      {/* Collapsible Steps Disclosure: "Finished 3 steps >" */}
-                      {msg.task && (
-                        <div className="border-b border-[#242627] pb-3">
-                          <button
-                            onClick={() => setIsStepsExpanded(!isStepsExpanded)}
-                            className="flex items-center gap-1.5 text-xs text-[#858A8E] hover:text-white transition-colors cursor-pointer font-medium"
-                          >
-                            <span>Finished {msg.task.plan.length} steps</span>
-                            {isStepsExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                          </button>
+                  )}
 
-                          {/* Expanded Step Traces */}
-                          {isStepsExpanded && (
-                            <div className="mt-2.5 p-3 rounded-xl bg-[#1C1D1E] border border-[#27292A] space-y-2 text-xs font-mono">
-                              {msg.task.plan.map((step) => (
-                                <div key={step.step_id} className="flex items-center justify-between text-[#858A8E] text-[11px]">
-                                  <div className="flex items-center gap-2">
-                                    <Check className="w-3 h-3 text-[#20B8CD]" />
-                                    <span className="text-white">{step.title}</span>
-                                  </div>
-                                  <span className="text-[#5F6467]">{step.duration_ms}ms</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Assistant Headline in Editorial Serif Typography */}
-                      <div className="font-serif text-2xl sm:text-3xl font-normal text-[#F3F3EE] tracking-tight leading-snug">
-                        {activeTask?.task_type || 'Sovereign Industrial AI Workbench'}
-                      </div>
-
-                      {/* Main Response Text with Markdown Rendering */}
-                      <div className="space-y-4 text-[14.5px] leading-relaxed text-[#D1D5DB] select-text">
-                        {renderFormattedMessage(msg.text)}
-                      </div>
-
-                      {/* Pro Preview Banner (Matching 1image.png) */}
-                      <div className="p-3 rounded-xl bg-[#1C1D1E] border border-[#27292A] flex items-center justify-between text-xs text-[#A2A8AB]">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded bg-[#20B8CD]/15 text-[#20B8CD] font-bold text-[10px] uppercase font-mono">
-                            Local
-                          </span>
-                          <span>Air-gapped on-premise inference active. All weights resident in RAM.</span>
-                        </div>
-                        <button 
-                          onClick={() => setBottomPanelOpen(true)}
-                          className="px-2.5 py-1 rounded-lg bg-[#252829] hover:bg-[#2F3335] text-white text-xs font-medium cursor-pointer"
-                        >
-                          Inspect terminal
-                        </button>
-                      </div>
-
-                      {/* Inline Generated Deliverables */}
-                      {msg.artifacts && msg.artifacts.length > 0 && (
-                        <div className="pt-2 border-t border-[#242627] space-y-2">
-                          <span className="text-xs font-mono uppercase text-[#20B8CD] font-semibold block">
-                            Generated Deliverables:
-                          </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {msg.artifacts.map((art) => (
-                              <div key={art.artifact_id} className="p-3 rounded-xl bg-[#1C1D1E] border border-[#27292A] flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5 truncate">
-                                  <div className="w-7 h-7 rounded-lg bg-[#20B8CD]/10 border border-[#20B8CD]/30 flex items-center justify-center font-bold text-[#20B8CD] text-[10px] uppercase font-mono">
-                                    {art.file_type}
-                                  </div>
-                                  <div className="truncate">
-                                    <div className="text-xs font-semibold text-white truncate">{art.file_name}</div>
-                                    <div className="text-[10px] text-[#858A8E] font-mono">{(art.size_bytes / 1024).toFixed(1)} KB</div>
-                                  </div>
-                                </div>
-
-                                <a
-                                  href={art.file_path}
-                                  download
-                                  className="px-3 py-1.5 rounded-lg bg-[#252829] hover:bg-[#2E3234] border border-[#3A3E40] text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all flex-shrink-0"
-                                >
-                                  <Download className="w-3 h-3" />
-                                  <span>Download</span>
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right-Side Sources Pane (Matching 1image.png) */}
-                    <SourcesPane 
-                      sources={msg.citations?.map((c, i) => ({
-                        id: `cite-${i}`,
-                        source_file: c?.source_file || 'Document',
-                        domain: (c?.source_file || 'source').split('/').pop()?.split('.').slice(0, -1).join('.') || 'source',
-                        page_number: c?.page_number,
-                        snippet: c?.snippet || '',
-                        relevance_score: c?.relevance_score || 1.0
-                      }))}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Processing Indicator */}
-            {isProcessing && (
-              <div className="max-w-md bg-[#202222] border border-[#2E3133] rounded-2xl p-4 flex items-center gap-3 text-xs text-[#CCCCCC] shadow-sm">
-                <div className="w-4 h-4 border-2 border-[#20B8CD] border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                <span className="font-serif">Searching local knowledge &amp; synthesizing answer...</span>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} className="h-24" />
-          </div>
-        )}
-      </div>
-
-      {/* =======================================================
-          C. BOTTOM FLOATING COMPOSER DOCK
-          Matching 1image.png and image.png
-          ======================================================= */}
-      {messages.length > 0 && (
-        <div className="p-4 bg-gradient-to-t from-[#191A1A] via-[#191A1A]/95 to-transparent flex-shrink-0 z-10">
-          <form onSubmit={handleSubmit} className="max-w-3xl w-full mx-auto">
-            <div className="bg-[#202222] border border-[#2E3133] rounded-2xl p-2.5 shadow-2xl space-y-2 focus-within:border-[#3D4143] transition-all">
-              {/* Attached file chips above follow-up input */}
-              {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-1">
-                  {attachedFiles.map((file, idx) => (
-                    <div 
-                      key={idx} 
-                      className="px-2.5 py-1 rounded-lg bg-[#27292A] border border-[#323638] flex items-center gap-1.5 text-xs text-[#CCCCCC]"
-                    >
-                      <Paperclip className="w-3 h-3 text-[#20B8CD]" />
-                      <span className="font-mono text-white text-[11px]">{file.split('/').pop()}</span>
-                      <button 
-                        type="button" 
-                        onClick={() => removeAttachedFile(file)}
-                        className="text-[#858A8E] hover:text-white p-0.5 rounded cursor-pointer"
+                  {/* Inline Execution Summary Button */}
+                  {msg.task && (
+                    <div className="pt-3 flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+                      <span className="flex items-center gap-1.5 text-[var(--status-healthy)] font-mono">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {(msg.task.tool_calls.reduce((acc, t) => acc + t.execution_time_ms, 0) / 1000).toFixed(2)}s
+                      </span>
+                      <span className="opacity-40">•</span>
+                      <button
+                        onClick={() => setTaskPanelOpen(true)}
+                        className="hover:text-[var(--accent-fuchsia)] font-medium transition-colors cursor-pointer"
                       >
-                        <X className="w-3 h-3" />
+                        View task details
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Follow-up input row */}
-              <input
-                type="text"
-                value={inputPrompt}
-                onChange={(e) => setInputPrompt(e.target.value)}
-                placeholder="Ask a follow-up"
-                className="w-full bg-transparent px-2 py-1 text-sm text-[#F3F3EE] placeholder-[#5F6467] outline-none"
-              />
-
-              {/* Controls bar inside follow-up card */}
-              <div className="flex items-center justify-between pt-1 border-t border-[#27292A] text-xs">
-                <div className="flex items-center gap-2">
-                  {/* File attach (+) */}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    title="Attach files"
-                    className="p-1 rounded-lg hover:bg-[#282A2C] text-[#858A8E] hover:text-white transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-
-                  {/* Search pill */}
-                  <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#1C1D1E] border border-[#2E3133] text-[#A2A8AB] text-[11px]">
-                    <Globe className="w-3 h-3 text-[#20B8CD]" />
-                    <span>Search</span>
-                  </div>
-
-                  {/* Computer pill */}
-                  <button
-                    type="button"
-                    onClick={() => setBottomPanelOpen(!isBottomPanelOpen)}
-                    className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] transition-colors cursor-pointer border ${
-                      isBottomPanelOpen
-                        ? 'bg-[#20B8CD]/15 border-[#20B8CD] text-[#20B8CD]'
-                        : 'bg-[#1C1D1E] hover:bg-[#262829] border-[#2E3133] text-[#A2A8AB]'
-                    }`}
-                  >
-                    <TerminalIcon className="w-3 h-3" />
-                    <span>Computer</span>
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSettingsOpen(true);
-                      setSettingsTab('models');
-                    }}
-                    title="Click to configure model in Settings"
-                    className={`text-[11px] font-mono px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
-                      selectedModel 
-                        ? 'text-[#858A8E] hover:text-white border-[#2A2C2E] bg-[#1C1D1E]' 
-                        : 'text-[#E58888] border-[#522929] bg-[#292020]'
-                    }`}
-                  >
-                    Model: {selectedModel || 'No model selected'}
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Voice input"
-                    className="p-1 text-[#858A8E] hover:text-white transition-colors"
-                  >
-                    <Mic className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isProcessing || !inputPrompt.trim()}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shadow ${
-                      inputPrompt.trim() && !isProcessing
-                        ? 'bg-white text-black hover:bg-[#E0E0E0]'
-                        : 'bg-[#2E3133] text-[#5F6467] cursor-not-allowed'
-                    }`}
-                  >
-                    <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                  </button>
+                  )}
                 </div>
               </div>
+            )}
+          </div>
+        ))}
+
+        {/* Live Processing Indicator */}
+        {isProcessing && (
+          <div className="flex justify-start">
+            <div className="flex items-center gap-3 text-[var(--text-secondary)] p-2">
+              <div className="w-5 h-5 rounded-full border-2 border-[var(--border-subtle)] border-t-[var(--accent-fuchsia)] animate-spin"></div>
+              <span className="text-sm font-medium">Executing local task...</span>
             </div>
-          </form>
-        </div>
-      )}
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* 2. BOTTOM CHAT COMPOSER */}
+      <div className="p-6 flex-shrink-0 flex justify-center">
+        <form onSubmit={handleSubmit} className="w-full max-w-[760px] space-y-2">
+          {/* Attached files bar */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pb-2">
+              {attachedFiles.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-mono text-[var(--text-primary)]">
+                  <Paperclip className="w-3 h-3 text-[var(--text-secondary)]" />
+                  <span>{file.split('/').pop()}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachedFile(file)}
+                    className="text-[var(--text-secondary)] hover:text-[var(--accent-fuchsia)] ml-1 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="relative flex items-end bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--accent-fuchsia-muted)] rounded-2xl transition-all duration-200 shadow-sm p-1.5">
+            
+            {/* File Tree / Explorer Toggle */}
+            <button
+              type="button"
+              title="Toggle Project Explorer"
+              className="p-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer rounded-xl hover:bg-[var(--bg-primary)] mb-0.5"
+            >
+              <FileText className="w-5 h-5" />
+            </button>
+
+            <textarea
+              value={inputPrompt}
+              onChange={(e) => setInputPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+              placeholder="Ask Sovereign AI..."
+              rows={1}
+              className="w-full bg-transparent border-none py-3 px-2 text-[15px] text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none resize-none font-sans min-h-[44px] max-h-[200px]"
+            />
+
+            <div className="flex items-center gap-1 pr-1 mb-1">
+              <button
+                type="button"
+                onClick={() => attachFile('demo/synthetic/Inspection_Report_001.pdf')}
+                title="Attach file"
+                className="p-2.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)] rounded-xl transition-colors cursor-pointer"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+
+              <button
+                type="submit"
+                disabled={isProcessing || !inputPrompt.trim()}
+                className={`p-2.5 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                  isProcessing || !inputPrompt.trim()
+                    ? 'text-[var(--border-subtle)] cursor-not-allowed'
+                    : 'bg-[var(--accent-fuchsia)] hover:opacity-90 text-[var(--text-primary)] shadow-md cursor-pointer'
+                }`}
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="px-3 pt-1">
+            <span className="text-[11px] text-[var(--text-secondary)] font-medium tracking-wide">
+              Routed to Qwen2.5-VL (Local Vision)
+            </span>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

@@ -8,7 +8,6 @@ import {
   FileCheck
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
-import logo from '../../assets/logo.jpg';
 
 interface WorkstationHeaderProps {
   onLaunchDemo: (prompt: string, file: string) => void;
@@ -48,11 +47,13 @@ export const WorkstationHeader: React.FC<WorkstationHeaderProps> = ({ onLaunchDe
     <header className="h-12 bg-[#323233] border-b border-[#2d2d2d] px-4 flex items-center justify-between select-none flex-shrink-0 z-20">
       {/* Left: Organization & Project Title */}
       <div className="flex items-center gap-3">
-        <img src={logo.src} alt="LUMI" className="w-6 h-6 rounded object-cover shadow-sm" />
+        <div className="w-6 h-6 rounded bg-[var(--accent-fuchsia)] flex items-center justify-center font-bold text-[var(--text-primary)] text-xs shadow-sm">
+          S
+        </div>
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-white text-sm tracking-tight">LUMI</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#1e1e1e] text-[#4ec9b0] border border-[#3c3c3c] font-medium">
+            <span className="font-semibold text-[var(--text-primary)] text-sm tracking-tight">SovereignAI Workbench</span>
+            <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--bg-primary)] text-[var(--status-healthy)] border border-[var(--border-subtle)] font-medium">
               MRPL CDU-5
             </span>
           </div>
@@ -61,18 +62,18 @@ export const WorkstationHeader: React.FC<WorkstationHeaderProps> = ({ onLaunchDe
         <div className="h-4 w-[1px] bg-[#454545] mx-1 hidden sm:block"></div>
 
         {/* Air-Gap Guarantee */}
-        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#1e1e1e] border border-[#3c3c3c] text-xs font-mono text-[#4ec9b0]">
-          <WifiOff className="w-3.5 h-3.5 text-[#4ec9b0]" />
+        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-xs font-mono text-[var(--status-healthy)]">
+          <WifiOff className="w-3.5 h-3.5 text-[var(--status-healthy)]" />
           <span className="font-semibold">Air-Gapped Sovereign</span>
-          <span className="text-[#858585] border-l border-[#3c3c3c] pl-2 font-bold text-[#4ec9b0]">
+          <span className="text-[var(--text-secondary)] border-l border-[var(--border-subtle)] pl-2 font-bold text-[var(--status-healthy)]">
             0 Cloud Calls
           </span>
         </div>
       </div>
 
       {/* Center: Quick 1-Click Golden Demos */}
-      <div className="hidden lg:flex items-center gap-1.5 bg-[#252526] p-1 rounded border border-[#3c3c3c]">
-        <span className="text-xs font-mono uppercase text-[#858585] px-2 font-semibold flex items-center gap-1">
+      <div className="hidden lg:flex items-center gap-1.5 bg-[var(--bg-surface)] p-1 rounded border border-[var(--border-subtle)]">
+        <span className="text-xs font-mono uppercase text-[var(--text-secondary)] px-2 font-semibold flex items-center gap-1">
           <Play className="w-3 h-3 text-[#569cd6] fill-[#569cd6]" />
           Quick Demos:
         </span>
@@ -82,7 +83,7 @@ export const WorkstationHeader: React.FC<WorkstationHeaderProps> = ({ onLaunchDe
             onClick={() => onLaunchDemo(demo.prompt, demo.file)}
             disabled={isProcessing}
             title={demo.title}
-            className="px-3 py-1 rounded text-xs font-medium bg-[#333333] hover:bg-[#007acc] text-[#e0e0e0] hover:text-white border border-[#3c3c3c] hover:border-[#007acc] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1 rounded text-xs font-medium bg-[var(--border-subtle)] hover:bg-[var(--accent-fuchsia)] text-[var(--text-primary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-fuchsia)] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>{demo.shortTitle}</span>
           </button>
@@ -91,12 +92,12 @@ export const WorkstationHeader: React.FC<WorkstationHeaderProps> = ({ onLaunchDe
 
       {/* Right: Resident Local Model Badge */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#252526] border border-[#3c3c3c] text-xs font-mono text-[#cccccc]">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-mono text-[var(--text-primary)]">
           <Cpu className="w-3.5 h-3.5 text-[#569cd6]" />
           <span className="font-medium">{activeTask ? activeTask.selected_model_id : 'Qwen3-8B Local'}</span>
         </div>
 
-        <div className="flex items-center gap-1 px-2 py-1 rounded bg-[#1e1e1e] border border-[#3c3c3c] text-[#4ec9b0] text-xs font-mono font-bold">
+        <div className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--status-healthy)] text-xs font-mono font-bold">
           <ShieldCheck className="w-3.5 h-3.5" />
           <span>ON-PREMISE</span>
         </div>

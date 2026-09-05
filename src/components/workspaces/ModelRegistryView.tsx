@@ -64,28 +64,28 @@ export const ModelRegistryView: React.FC = () => {
   return (
     <div className="h-full flex flex-col space-y-4 font-sans text-sm overflow-hidden">
       {/* 1. TOP TOOLBAR & VRAM ALLOCATION GAUGE */}
-      <div className="bg-[#252526] border border-[#333333] rounded-lg p-4 space-y-3 flex-shrink-0 select-none shadow-sm">
-        <div className="flex items-center justify-between border-b border-[#333333] pb-2">
-          <div className="flex items-center gap-2 font-mono font-bold text-white text-sm">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-4 space-y-3 flex-shrink-0 select-none shadow-sm">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
+          <div className="flex items-center gap-2 font-mono font-bold text-[var(--text-primary)] text-sm">
             <Cpu className="w-5 h-5 text-[#569cd6]" />
             <span>Open-Weight Local Model Registry:</span>
             <span className="text-[#9cdcfe]">100% On-Premise</span>
           </div>
-          <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-[#1e1e1e] text-[#4ec9b0] border border-[#3c3c3c]">
+          <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-[var(--bg-primary)] text-[var(--status-healthy)] border border-[var(--border-subtle)]">
             Ollama Daemon: http://localhost:11434 (Online)
           </span>
         </div>
 
         {/* VRAM Memory Allocation Bar */}
         <div className="space-y-1.5 font-mono text-xs">
-          <div className="flex items-center justify-between text-[#858585]">
+          <div className="flex items-center justify-between text-[var(--text-secondary)]">
             <span>VRAM ALLOCATION: {(activeResidentVramMb / 1024).toFixed(1)} GB / {(totalVramMb / 1024).toFixed(0)} GB LOAD</span>
-            <span className="text-[#4ec9b0] font-bold">10.2 GB AVAILABLE FOR BURST</span>
+            <span className="text-[var(--status-healthy)] font-bold">10.2 GB AVAILABLE FOR BURST</span>
           </div>
 
-          <div className="h-2 bg-[#1e1e1e] border border-[#3c3c3c] rounded-full overflow-hidden flex">
-            <div style={{ width: '37.5%' }} className="bg-[#007acc] h-full" title="Resident LLM (Qwen3 8B)"></div>
-            <div style={{ width: '10%' }} className="bg-[#4ec9b0] h-full" title="Embedding Model (Nomic)"></div>
+          <div className="h-2 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-full overflow-hidden flex">
+            <div style={{ width: '37.5%' }} className="bg-[var(--accent-fuchsia)] h-full" title="Resident LLM (Qwen3 8B)"></div>
+            <div style={{ width: '10%' }} className="bg-[var(--status-healthy)] h-full" title="Embedding Model (Nomic)"></div>
           </div>
         </div>
       </div>
@@ -93,39 +93,39 @@ export const ModelRegistryView: React.FC = () => {
       {/* 2. MODEL CARDS GRID */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto pr-1">
         {models.map((m) => (
-          <div key={m.id} className="bg-[#252526] border border-[#333333] rounded-lg p-5 flex flex-col justify-between space-y-3 shadow-sm">
+          <div key={m.id} className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-5 flex flex-col justify-between space-y-3 shadow-sm">
             <div className="space-y-2">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-base font-bold text-white font-mono">{m.id}</div>
+                  <div className="text-base font-bold text-[var(--text-primary)] font-mono">{m.id}</div>
                   <div className="text-xs font-mono text-[#569cd6]">{m.ollama_name}</div>
                 </div>
-                <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#1f3a2b] text-[#4ec9b0] border border-[#2e5d44] font-bold">
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#1f3a2b] text-[var(--status-healthy)] border border-[#2e5d44] font-bold">
                   LOCAL RESIDENT
                 </span>
               </div>
 
-              <div className="text-xs font-mono text-[#858585] px-2.5 py-1 rounded bg-[#1e1e1e] border border-[#3c3c3c]">
-                TYPE: <span className="text-white font-semibold">{m.type}</span> • CTX: {m.context_window} TOKENS
+              <div className="text-xs font-mono text-[var(--text-secondary)] px-2.5 py-1 rounded bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                TYPE: <span className="text-[var(--text-primary)] font-semibold">{m.type}</span> • CTX: {m.context_window} TOKENS
               </div>
 
-              <p className="text-xs text-[#cccccc] leading-relaxed">
+              <p className="text-xs text-[var(--text-primary)] leading-relaxed">
                 {m.description}
               </p>
             </div>
 
-            <div className="space-y-2 pt-2 border-t border-[#333333]">
+            <div className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
               <div className="flex flex-wrap gap-1.5">
                 {m.capabilities.map((cap, idx) => (
-                  <span key={idx} className="text-xs font-mono px-2 py-0.5 rounded bg-[#1e1e1e] text-[#9cdcfe] border border-[#3c3c3c]">
+                  <span key={idx} className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--bg-primary)] text-[#9cdcfe] border border-[var(--border-subtle)]">
                     {cap}
                   </span>
                 ))}
               </div>
 
-              <div className="flex items-center justify-between text-xs font-mono text-[#858585] pt-1">
+              <div className="flex items-center justify-between text-xs font-mono text-[var(--text-secondary)] pt-1">
                 <span>VRAM Footprint: ~{(m.vram_mb / 1024).toFixed(1)} GB</span>
-                <span className="text-[#4ec9b0] flex items-center gap-1 font-semibold">
+                <span className="text-[var(--status-healthy)] flex items-center gap-1 font-semibold">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   Verified Local
                 </span>

@@ -5,7 +5,7 @@ interface Props {
 	title?: string;
 }
 
-const { title = "LUMI — MRPL On-Premise AI (SIH26117)" } = Astro.props;
+const { title = "SovereignAI Workbench — MRPL On-Premise AI (SIH26117)" } = Astro.props;
 ---
 
 <!doctype html>
@@ -19,12 +19,9 @@ const { title = "LUMI — MRPL On-Premise AI (SIH26117)" } = Astro.props;
 		<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 		<link rel="manifest" href="/site.webmanifest" />
 		<meta name="generator" content={Astro.generator} />
-		<link rel="preconnect" href="https://fonts.googleapis.com">
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap" rel="stylesheet">
 		<title>{title}</title>
 	</head>
-	<body class="bg-[#191A1A] text-[#D1D5DB] font-sans antialiased selection:bg-[#20B8CD]/30 selection:text-white">
+	<body class="bg-[var(--bg-base)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-primary)] selection:text-[var(--bg-base)]">
 		<slot />
 	</body>
 </html>

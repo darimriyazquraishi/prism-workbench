@@ -15,7 +15,7 @@ export const Header: React.FC = () => {
       <div className="flex items-center gap-4">
         <div>
           <h1 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-            MRPL LUMI Agentic AI Workbench
+            MRPL Sovereign Agentic AI Workbench
             <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1">
               <WifiOff className="w-3 h-3" />
               Air-Gapped Sovereign

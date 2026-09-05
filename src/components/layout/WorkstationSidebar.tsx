@@ -34,13 +34,13 @@ export const WorkstationSidebar: React.FC = () => {
   const { activeTab, setActiveTab, activeTask } = useWorkbenchStore();
 
   return (
-    <aside className="w-64 bg-[#252526] border-r border-[#333333] flex flex-col font-sans select-none flex-shrink-0">
+    <aside className="w-64 bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] flex flex-col font-sans select-none flex-shrink-0">
       {/* Sidebar Header */}
-      <div className="h-12 px-4 flex items-center justify-between border-b border-[#333333]">
-        <span className="text-xs font-bold uppercase tracking-wider text-[#999999]">
+      <div className="h-12 px-4 flex items-center justify-between border-b border-[var(--border-subtle)]">
+        <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
           Workstations
         </span>
-        <span className="text-xs font-mono text-[#858585]">MRPL CDU-5</span>
+        <span className="text-xs font-mono text-[var(--text-secondary)]">MRPL CDU-5</span>
       </div>
 
       {/* Navigation List */}
@@ -55,23 +55,23 @@ export const WorkstationSidebar: React.FC = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`w-full flex items-center justify-between p-3 rounded-md transition-all text-left ${
                 isActive
-                  ? 'bg-[#37373d] text-white font-medium border-l-4 border-[#007acc] shadow-sm'
-                  : 'text-[#cccccc] hover:bg-[#2a2d2e] hover:text-white border-l-4 border-transparent'
+                  ? 'bg-[#37373d] text-[var(--text-primary)] font-medium border-l-4 border-[var(--accent-fuchsia)] shadow-sm'
+                  : 'text-[var(--text-primary)] hover:bg-[#2a2d2e] hover:text-[var(--text-primary)] border-l-4 border-transparent'
               }`}
             >
               <div className="flex items-center gap-3 truncate">
-                <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-[#569cd6]' : 'text-[#858585]'}`} />
+                <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-[#569cd6]' : 'text-[var(--text-secondary)]'}`} />
                 <div className="truncate">
                   <div className="text-sm font-semibold truncate leading-tight">{tab.name}</div>
-                  <div className="text-xs text-[#858585] truncate mt-0.5">{tab.description}</div>
+                  <div className="text-xs text-[var(--text-secondary)] truncate mt-0.5">{tab.description}</div>
                 </div>
               </div>
 
               {tab.badge && (
                 <span className={`text-xs font-mono px-2 py-0.5 rounded border flex-shrink-0 ml-2 ${
                   isActive 
-                    ? 'bg-[#1e1e1e] text-[#9cdcfe] border-[#007acc]' 
-                    : 'bg-[#1e1e1e] text-[#858585] border-[#3c3c3c]'
+                    ? 'bg-[var(--bg-primary)] text-[#9cdcfe] border-[var(--accent-fuchsia)]' 
+                    : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
                 }`}>
                   {tab.badge}
                 </span>
@@ -82,15 +82,15 @@ export const WorkstationSidebar: React.FC = () => {
       </nav>
 
       {/* Status Card at bottom */}
-      <div className="p-3 border-t border-[#333333] bg-[#1e1e1e]">
+      <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-primary)]">
         <div className="flex items-center justify-between text-xs font-mono">
-          <span className="flex items-center gap-1.5 text-[#4ec9b0] font-semibold">
-            <span className="w-2 h-2 rounded-full bg-[#4ec9b0] animate-pulse"></span>
+          <span className="flex items-center gap-1.5 text-[var(--status-healthy)] font-semibold">
+            <span className="w-2 h-2 rounded-full bg-[var(--status-healthy)] animate-pulse"></span>
             ISOLATED WORKSTATION
           </span>
-          <span className="text-[#858585]">127.0.0.1</span>
+          <span className="text-[var(--text-secondary)]">127.0.0.1</span>
         </div>
-        <div className="text-xs text-[#858585] mt-1 font-mono truncate">
+        <div className="text-xs text-[var(--text-secondary)] mt-1 font-mono truncate">
           {activeTask ? `Active Task: ${activeTask.task_id}` : 'Environment: Confidential'}
         </div>
       </div>

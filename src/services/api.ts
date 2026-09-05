@@ -98,7 +98,7 @@ export const api = {
     };
   },
 
-  runAgentWorkflow: async (objective: string, attached_file: string = 'demo/synthetic/Inspection_Report_001.pdf'): Promise<TaskState> => {
+  runAgentWorkflow: async (objective: string, attached_file: string = 'Inspection_Report.pdf'): Promise<TaskState> => {
     return await api.createTask(objective, [attached_file]);
   },
 
@@ -187,50 +187,6 @@ export const api = {
     ];
   },
 
-  cleanFileMetadata: async (fileName: string, fileBlob?: Blob): Promise<{
-    file_name: string;
-    metadata_cleaned: boolean;
-    stripped_tags: string[];
-    summary: string;
-  }> => {
-    try {
-      if (fileBlob) {
-        const formData = new FormData();
-        formData.append('file', fileBlob, fileName);
-        const res = await fetch(`${API_BASE}/documents/upload`, {
-          method: 'POST',
-          body: formData
-        });
-        if (res.ok) {
-          const json = await res.json();
-          return {
-            file_name: json.file_name || fileName,
-            metadata_cleaned: true,
-            stripped_tags: json.metadata_report?.stripped_tags || ['EXIF Metadata Block', 'Author Tags', 'Creation Timestamp'],
-            summary: json.metadata_report?.summary || 'All file metadata and author identifiers stripped locally.'
-          };
-        }
-      }
-    } catch (e) {
-      console.warn('Backend sanitize endpoint offline, running local sanitization rule:', e);
-    }
-    
-    // Deterministic fallback for client-side local clean
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    const stripped = ext === 'pdf' 
-      ? ['PDF Info: /Author', 'PDF Info: /Creator', 'PDF Info: /CreationDate', 'XMP Stream']
-      : ['png', 'jpg', 'jpeg'].includes(ext || '')
-      ? ['EXIF Metadata Block', 'GPS Coordinates', 'Camera Hardware Serial']
-      : ['Author Header Tag', 'Local Filesystem Path'];
-    
-    return {
-      file_name: fileName,
-      metadata_cleaned: true,
-      stripped_tags: stripped,
-      summary: `Cleaned ${stripped.length} metadata blocks using local sanitization.`
-    };
-  },
-
   getModels: async (): Promise<ModelMetadata[]> => {
     const res = await api.listModels();
     return res.models;
@@ -244,67 +200,55 @@ export const api = {
     return {
       models: [
         {
-          id: 'qwen3-14b',
-          ollama_name: 'qwen3-14b',
+          id: 'qwen3-8b',
+          ollama_name: 'qwen3:8b',
           type: 'llm',
-          capabilities: ['main_agent', 'reasoning', 'planning', 'synthesis'],
+          capabilities: ['general', 'reasoning', 'planning', 'synthesis'],
           context_window: 32768,
           vision: false,
           coding: true,
-          vram_mb: 8800,
-          description: 'Main agent for complex reasoning, multi-step planning, and document synthesis.',
+          vram_mb: 6144,
+          description: 'High-performance open-weight LLM for industrial reasoning and planning.',
+          is_installed: true
+        },
+        {
+          id: 'qwen2.5-vl-7b',
+          ollama_name: 'qwen2.5-vl:7b',
+          type: 'vlm',
+          capabilities: ['vision', 'ocr', 'p_and_id_analysis'],
+          context_window: 32768,
+          vision: true,
+          coding: false,
+          vram_mb: 7680,
+          description: 'Vision-Language model for engineering schematics and scanned forms.',
           is_installed: true
         },
         {
           id: 'qwen2.5-coder-7b',
-          ollama_name: 'qwen2.5-coder-7b',
+          ollama_name: 'qwen2.5-coder:7b',
           type: 'code',
-          capabilities: ['coding', 'python_generation', 'data_science', 'debugging'],
+          capabilities: ['coding', 'python_generation', 'data_science'],
           context_window: 32768,
           vision: false,
           coding: true,
-          vram_mb: 5400,
-          description: 'Specialized coding model for sandboxed script execution and data analysis.',
+          vram_mb: 6144,
+          description: 'Specialized coding model for sandboxed data scripts.',
           is_installed: true
         },
         {
-          id: 'qwen3-vl-8b',
-          ollama_name: 'qwen3-vl-8b',
-          type: 'vlm',
-          capabilities: ['vision', 'ocr', 'diagram_analysis', 'scanned_documents'],
-          context_window: 32768,
-          vision: true,
-          coding: false,
-          vram_mb: 6200,
-          description: 'Multimodal Vision-Language model for scanned documents, images, and schematics.',
-          is_installed: true
-        },
-        {
-          id: 'qwen3-embedding-0.6b',
-          ollama_name: 'qwen3-embedding-0.6b',
+          id: 'nomic-embed-text',
+          ollama_name: 'nomic-embed-text',
           type: 'embedding',
-          capabilities: ['embedding', 'dense_retrieval', 'semantic_search'],
+          capabilities: ['embedding', 'semantic_search'],
           context_window: 8192,
           vision: false,
           coding: false,
-          vram_mb: 1200,
-          description: 'High-speed local dense vector embeddings for RAG system.',
-          is_installed: true
-        },
-        {
-          id: 'qwen3-reranker-0.6b',
-          ollama_name: 'qwen3-reranker-0.6b',
-          type: 'reranker',
-          capabilities: ['reranking', 'relevance_scoring', 'context_filtering'],
-          context_window: 8192,
-          vision: false,
-          coding: false,
-          vram_mb: 1200,
-          description: 'Neural reranker for scoring and prioritizing retrieved knowledge chunks.',
+          vram_mb: 512,
+          description: 'Local 768-dim embeddings for ChromaDB RAG.',
           is_installed: true
         }
       ],
-      total_vram_budget_mb: 24576
+      total_vram_budget_mb: 16384
     };
   },
 

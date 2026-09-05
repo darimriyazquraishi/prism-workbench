@@ -80,25 +80,25 @@ export const DeliverablesView: React.FC = () => {
   const getFormatIcon = (type: string) => {
     switch (type) {
       case 'docx': return <FileText className="w-5 h-5 text-[#569cd6]" />;
-      case 'xlsx': return <FileSpreadsheet className="w-5 h-5 text-[#4ec9b0]" />;
-      case 'pptx': return <Presentation className="w-5 h-5 text-[#ce9178]" />;
-      default: return <FileCode className="w-5 h-5 text-[#cccccc]" />;
+      case 'xlsx': return <FileSpreadsheet className="w-5 h-5 text-[var(--status-healthy)]" />;
+      case 'pptx': return <Presentation className="w-5 h-5 text-[var(--status-attention)]" />;
+      default: return <FileCode className="w-5 h-5 text-[var(--text-primary)]" />;
     }
   };
 
   return (
     <div className="h-full flex flex-col space-y-4 font-sans text-sm overflow-hidden">
       {/* 1. TOP TOOLBAR */}
-      <div className="bg-[#252526] border border-[#333333] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 select-none flex-shrink-0">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 select-none flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 font-mono font-bold text-white text-sm">
-            <FolderArchive className="w-5 h-5 text-[#4ec9b0]" />
+          <div className="flex items-center gap-2 font-mono font-bold text-[var(--text-primary)] text-sm">
+            <FolderArchive className="w-5 h-5 text-[var(--status-healthy)]" />
             <span>Business Deliverables Gallery:</span>
             <span className="text-[#9cdcfe]">{deliverables.length} Deliverables Ready</span>
           </div>
         </div>
 
-        <div className="text-xs font-mono text-[#858585]">
+        <div className="text-xs font-mono text-[var(--text-secondary)]">
           Formats: Word (.docx), Excel (.xlsx), PowerPoint (.pptx)
         </div>
       </div>
@@ -106,15 +106,15 @@ export const DeliverablesView: React.FC = () => {
       {/* 2. MAIN 2-PANE WORKSPACE */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
         {/* Left: Table (7 Cols) */}
-        <div className="lg:col-span-7 bg-[#252526] border border-[#333333] rounded-lg flex flex-col overflow-hidden shadow-sm">
-          <div className="h-9 bg-[#1e1e1e] border-b border-[#333333] px-4 flex items-center justify-between font-mono text-xs text-[#999999] flex-shrink-0">
+        <div className="lg:col-span-7 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg flex flex-col overflow-hidden shadow-sm">
+          <div className="h-9 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-4 flex items-center justify-between font-mono text-xs text-[var(--text-secondary)] flex-shrink-0">
             <span>REPOSITORY DELIVERABLES</span>
             <span>CLICK ROW TO REVIEW &amp; STAMP</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             <table className="w-full text-left font-sans text-xs">
-              <thead className="bg-[#1e1e1e] text-xs uppercase text-[#858585] border-b border-[#333333] font-mono">
+              <thead className="bg-[var(--bg-primary)] text-xs uppercase text-[var(--text-secondary)] border-b border-[var(--border-subtle)] font-mono">
                 <tr>
                   <th className="py-3 px-4">Deliverable File</th>
                   <th className="py-3 px-4">Type</th>
@@ -136,18 +136,18 @@ export const DeliverablesView: React.FC = () => {
                         isSelected ? 'bg-[#37373d]' : 'hover:bg-[#2a2d2e]'
                       }`}
                     >
-                      <td className="py-3 px-4 font-semibold text-white">
+                      <td className="py-3 px-4 font-semibold text-[var(--text-primary)]">
                         <div className="flex items-center gap-2.5">
                           {getFormatIcon(item.file_type)}
                           <span className="truncate max-w-[200px] text-sm">{item.file_name}</span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 uppercase text-[#858585] font-mono text-xs">{item.file_type}</td>
-                      <td className="py-3 px-4 text-[#858585] font-mono text-xs">{(item.size_bytes / 1024).toFixed(1)} KB</td>
+                      <td className="py-3 px-4 uppercase text-[var(--text-secondary)] font-mono text-xs">{item.file_type}</td>
+                      <td className="py-3 px-4 text-[var(--text-secondary)] font-mono text-xs">{(item.size_bytes / 1024).toFixed(1)} KB</td>
                       <td className="py-3 px-4">
                         <span className={`text-xs px-2.5 py-1 rounded border font-semibold inline-flex items-center gap-1.5 font-mono ${
                           isApproved
-                            ? 'bg-[#1f3a2b] text-[#4ec9b0] border-[#2e5d44]'
+                            ? 'bg-[#1f3a2b] text-[var(--status-healthy)] border-[#2e5d44]'
                             : 'bg-[#332a00] text-[#cca700] border-[#cca700]'
                         }`}>
                           {isApproved ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
@@ -159,7 +159,7 @@ export const DeliverablesView: React.FC = () => {
                           href={item.file_path}
                           download
                           onClick={(e) => e.stopPropagation()}
-                          className="px-3 py-1.5 rounded-md bg-[#007acc] hover:bg-[#1f8ad2] text-white text-xs font-bold inline-flex items-center gap-1 shadow"
+                          className="px-3 py-1.5 rounded-md bg-[var(--accent-fuchsia)] hover:bg-[#1f8ad2] text-[var(--text-primary)] text-xs font-bold inline-flex items-center gap-1 shadow"
                         >
                           <Download className="w-3.5 h-3.5" />
                           <span>GET</span>
@@ -174,44 +174,44 @@ export const DeliverablesView: React.FC = () => {
         </div>
 
         {/* Right: Inspector (5 Cols) */}
-        <div className="lg:col-span-5 bg-[#252526] border border-[#333333] rounded-lg p-5 flex flex-col space-y-4 overflow-y-auto font-sans text-xs shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#333333] pb-3 text-sm uppercase font-bold text-white">
+        <div className="lg:col-span-5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-5 flex flex-col space-y-4 overflow-y-auto font-sans text-xs shadow-sm">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 text-sm uppercase font-bold text-[var(--text-primary)]">
             <span className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-[#569cd6]" />
               Deliverable Metadata &amp; Sign-Off
             </span>
-            <span className="text-xs font-mono text-[#858585]">{selectedItem.artifact_id}</span>
+            <span className="text-xs font-mono text-[var(--text-secondary)]">{selectedItem.artifact_id}</span>
           </div>
 
-          <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg p-4 space-y-2">
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-4 space-y-2">
             <div className="flex items-center gap-2.5">
               {getFormatIcon(selectedItem.file_type)}
-              <div className="font-bold text-white text-sm truncate">
+              <div className="font-bold text-[var(--text-primary)] text-sm truncate">
                 {selectedItem.file_name}
               </div>
             </div>
-            <p className="text-xs text-[#cccccc] leading-relaxed">
+            <p className="text-xs text-[var(--text-primary)] leading-relaxed">
               {selectedItem.description}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <span className="text-xs font-mono text-[#858585] uppercase font-bold">Cited Governing Standards:</span>
+            <span className="text-xs font-mono text-[var(--text-secondary)] uppercase font-bold">Cited Governing Standards:</span>
             <div className="flex flex-wrap gap-1.5">
               {selectedItem.standardsCited.map((std, idx) => (
-                <span key={idx} className="px-2.5 py-1 rounded bg-[#1e1e1e] text-[#9cdcfe] border border-[#3c3c3c] text-xs font-mono">
+                <span key={idx} className="px-2.5 py-1 rounded bg-[var(--bg-primary)] text-[#9cdcfe] border border-[var(--border-subtle)] text-xs font-mono">
                   {std}
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg p-4 space-y-3 text-xs">
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-4 space-y-3 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono text-[#858585] uppercase font-bold">Review Status:</span>
+              <span className="text-xs font-mono text-[var(--text-secondary)] uppercase font-bold">Review Status:</span>
               <span className={`text-xs font-mono px-2.5 py-0.5 rounded font-bold ${
                 selectedItem.approval_status === 'approved'
-                  ? 'bg-[#1f3a2b] text-[#4ec9b0] border border-[#2e5d44]'
+                  ? 'bg-[#1f3a2b] text-[var(--status-healthy)] border border-[#2e5d44]'
                   : 'bg-[#332a00] text-[#cca700] border border-[#cca700]'
               }`}>
                 {selectedItem.approval_status.toUpperCase()}
@@ -219,12 +219,12 @@ export const DeliverablesView: React.FC = () => {
             </div>
 
             {selectedItem.signOffBy ? (
-              <div className="bg-[#181818] p-3 rounded-md text-xs text-[#cccccc] space-y-1 font-mono">
-                <div>Authority: <span className="text-[#4ec9b0] font-bold">{selectedItem.signOffBy}</span></div>
-                <div>Date: <span className="text-[#858585]">{selectedItem.signOffDate}</span></div>
+              <div className="bg-[#181818] p-3 rounded-md text-xs text-[var(--text-primary)] space-y-1 font-mono">
+                <div>Authority: <span className="text-[var(--status-healthy)] font-bold">{selectedItem.signOffBy}</span></div>
+                <div>Date: <span className="text-[var(--text-secondary)]">{selectedItem.signOffDate}</span></div>
               </div>
             ) : (
-              <div className="text-xs text-[#999999] italic">
+              <div className="text-xs text-[var(--text-secondary)] italic">
                 Awaiting digital approval stamp from Lead Inspection Engineer.
               </div>
             )}
@@ -234,7 +234,7 @@ export const DeliverablesView: React.FC = () => {
               className={`w-full py-2.5 rounded-md text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow ${
                 selectedItem.approval_status === 'approved'
                   ? 'bg-[#4a1818] hover:bg-[#602020] text-[#f14c4c] border border-[#f14c4c]'
-                  : 'bg-[#1f3a2b] hover:bg-[#2e5d44] text-[#4ec9b0] border border-[#4ec9b0]'
+                  : 'bg-[#1f3a2b] hover:bg-[#2e5d44] text-[var(--status-healthy)] border border-[var(--status-healthy)]'
               }`}
             >
               <CheckCircle2 className="w-4 h-4" />

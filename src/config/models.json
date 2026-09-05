@@ -1,0 +1,65 @@
+{
+  "models": [
+    {
+      "id": "qwen2.5-3b-chatbot",
+      "name": "Qwen2.5-3B-Instruct",
+      "provider": "Ollama / Local Front-Facing Chatbot",
+      "endpoint": "http://127.0.0.1:11434/api/generate",
+      "taskTypes": ["user_chat", "intent_classification", "request_parsing", "workplan_relay"],
+      "vramRequiredGb": 2.4,
+      "maxTokens": 4096,
+      "priority": 0,
+      "description": "Front-facing chatbot interface for parsing plain-language user requests, extracting file inputs, and relaying workplans."
+    },
+    {
+      "id": "qwen3-8b",
+      "name": "Qwen3-8B-Instruct",
+      "provider": "Ollama / Local vLLM",
+      "endpoint": "http://127.0.0.1:11434/api/generate",
+      "taskTypes": ["general_reasoning", "drafting", "summarization", "approval_notes", "compliance_audit"],
+      "vramRequiredGb": 5.8,
+      "maxTokens": 8192,
+      "priority": 1,
+      "description": "Primary model for structured reasoning, SOP compliance checks, and official approval note drafting."
+    },
+    {
+      "id": "qwen2.5-vl",
+      "name": "Qwen2.5-VL-7B-Instruct",
+      "provider": "Local Multimodal Engine",
+      "endpoint": "http://127.0.0.1:11435/v1/chat/completions",
+      "taskTypes": ["document_vision", "scanned_pdf", "handwritten_notes", "engineering_drawings", "pid_review", "ocr"],
+      "vramRequiredGb": 6.2,
+      "maxTokens": 4096,
+      "priority": 1,
+      "description": "Multimodal vision model for processing engineering drawings, P&IDs, scanned inspection reports, and hand-written logs."
+    },
+    {
+      "id": "qwen-coder",
+      "name": "Qwen2.5-Coder-7B",
+      "provider": "Ollama / Local Code Engine",
+      "endpoint": "http://127.0.0.1:11434/api/generate",
+      "taskTypes": ["code_generation", "code_review", "sandboxed_execution", "engineering_calculations", "data_processing"],
+      "vramRequiredGb": 5.5,
+      "maxTokens": 8192,
+      "priority": 1,
+      "description": "Dedicated code synthesis model for writing API 570 calculation scripts, data processing, and isolated python execution."
+    }
+  ],
+  "routingRules": [
+    {
+      "condition": "contains_image_or_pdf",
+      "targetModel": "qwen2.5-vl",
+      "fallbackModel": "qwen3-8b"
+    },
+    {
+      "condition": "requires_code_execution_or_math",
+      "targetModel": "qwen-coder",
+      "fallbackModel": "qwen3-8b"
+    },
+    {
+      "condition": "default",
+      "targetModel": "qwen3-8b",
+      "fallbackModel": "qwen3-8b"
+    }
+  ]
+}

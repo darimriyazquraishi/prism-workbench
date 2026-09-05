@@ -22,12 +22,12 @@ export const AntigravitySidebar: React.FC = () => {
   } = useAntigravityStore();
 
   return (
-    <aside className="w-60 bg-[#252526] border-r border-[#2d2d2d] flex flex-col font-sans select-none flex-shrink-0 text-xs">
+    <aside className="w-60 bg-[var(--bg-surface)] border-r border-[#2d2d2d] flex flex-col font-sans select-none flex-shrink-0 text-xs">
       {/* Top: New Session Button */}
       <div className="p-2.5 border-b border-[#2d2d2d]">
         <button
           onClick={() => createNewSession()}
-          className="w-full py-1.5 px-3 rounded bg-[#007acc] hover:bg-[#1f8ad2] text-white font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer text-xs"
+          className="w-full py-1.5 px-3 rounded bg-[var(--accent-fuchsia)] hover:bg-[#1f8ad2] text-[var(--text-primary)] font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer text-xs"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>New Agent Task</span>
@@ -38,7 +38,7 @@ export const AntigravitySidebar: React.FC = () => {
       <div className="flex-1 p-2 space-y-3 overflow-y-auto">
         {/* Section 1: Recent Sessions */}
         <div>
-          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[#858585] uppercase tracking-wider flex items-center gap-1">
+          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1">
             <ChevronDown className="w-3 h-3" />
             <span>Agent Sessions ({sessions.length})</span>
           </div>
@@ -52,14 +52,14 @@ export const AntigravitySidebar: React.FC = () => {
                   onClick={() => selectSession(sess.id)}
                   className={`w-full p-2 rounded text-left transition-all flex items-start gap-2 cursor-pointer ${
                     isActive
-                      ? 'bg-[#37373d] text-white font-medium border-l-2 border-[#007acc]'
-                      : 'text-[#cccccc] hover:text-white hover:bg-[#2a2d2e] border-l-2 border-transparent'
+                      ? 'bg-[#37373d] text-[var(--text-primary)] font-medium border-l-2 border-[var(--accent-fuchsia)]'
+                      : 'text-[var(--text-primary)] hover:text-[var(--text-primary)] hover:bg-[#2a2d2e] border-l-2 border-transparent'
                   }`}
                 >
-                  <Bot className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${isActive ? 'text-[#569cd6]' : 'text-[#858585]'}`} />
+                  <Bot className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${isActive ? 'text-[#569cd6]' : 'text-[var(--text-secondary)]'}`} />
                   <div className="truncate flex-1">
                     <div className="text-xs truncate leading-tight">{sess.title}</div>
-                    <div className="text-[10px] font-mono text-[#858585] mt-0.5">{sess.createdAt}</div>
+                    <div className="text-[10px] font-mono text-[var(--text-secondary)] mt-0.5">{sess.createdAt}</div>
                   </div>
                 </button>
               );
@@ -69,28 +69,28 @@ export const AntigravitySidebar: React.FC = () => {
 
         {/* Section 2: Local Agent Skills */}
         <div>
-          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[#858585] uppercase tracking-wider flex items-center justify-between">
+          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center justify-between">
             <span className="flex items-center gap-1">
               <ChevronDown className="w-3 h-3" />
               <span>Local Skills</span>
             </span>
-            <span className="text-[#4ec9b0] font-mono font-bold">{skills.length} Loaded</span>
+            <span className="text-[var(--status-healthy)] font-mono font-bold">{skills.length} Loaded</span>
           </div>
 
           <div className="space-y-1 mt-0.5 font-mono text-[11px]">
             {skills.map((sk) => (
               <div
                 key={sk.id}
-                className="p-2 rounded bg-[#1e1e1e] border border-[#2d2d2d] space-y-0.5"
+                className="p-2 rounded bg-[var(--bg-primary)] border border-[#2d2d2d] space-y-0.5"
               >
-                <div className="flex items-center justify-between text-[#cccccc]">
+                <div className="flex items-center justify-between text-[var(--text-primary)]">
                   <span className="font-bold text-[#9cdcfe] flex items-center gap-1.5 truncate">
                     <Wrench className="w-3 h-3 text-[#569cd6] flex-shrink-0" />
                     <span className="truncate">{sk.name}</span>
                   </span>
-                  <span className="text-[9px] text-[#4ec9b0]">LOCAL</span>
+                  <span className="text-[9px] text-[var(--status-healthy)]">LOCAL</span>
                 </div>
-                <div className="text-[10px] text-[#858585] font-sans truncate">
+                <div className="text-[10px] text-[var(--text-secondary)] font-sans truncate">
                   {sk.description}
                 </div>
               </div>
@@ -100,7 +100,7 @@ export const AntigravitySidebar: React.FC = () => {
 
         {/* Section 3: Knowledge Items (KIs) */}
         <div>
-          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[#858585] uppercase tracking-wider flex items-center justify-between">
+          <div className="px-2 py-1 text-[10px] font-mono font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center justify-between">
             <span className="flex items-center gap-1">
               <ChevronDown className="w-3 h-3" />
               <span>Knowledge Items</span>
@@ -116,13 +116,13 @@ export const AntigravitySidebar: React.FC = () => {
                   setActiveRightTab('rag_knowledge');
                   setRightPaneOpen(true);
                 }}
-                className="w-full p-2 rounded hover:bg-[#2a2d2e] text-left transition-colors cursor-pointer text-[#858585] hover:text-white"
+                className="w-full p-2 rounded hover:bg-[#2a2d2e] text-left transition-colors cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
-                <div className="flex items-center gap-2 font-mono text-xs text-[#cccccc] font-semibold truncate">
+                <div className="flex items-center gap-2 font-mono text-xs text-[var(--text-primary)] font-semibold truncate">
                   <BookOpen className="w-3.5 h-3.5 text-[#569cd6] flex-shrink-0" />
                   <span className="truncate">{ki.title}</span>
                 </div>
-                <div className="text-[10px] text-[#858585] truncate mt-0.5">
+                <div className="text-[10px] text-[var(--text-secondary)] truncate mt-0.5">
                   {ki.totalChunks} Chunks (768-D)
                 </div>
               </button>
@@ -132,8 +132,8 @@ export const AntigravitySidebar: React.FC = () => {
       </div>
 
       {/* Bottom Node info */}
-      <div className="p-2.5 border-t border-[#2d2d2d] bg-[#1e1e1e] font-mono text-[10px] text-[#858585]">
-        <div className="flex items-center justify-between text-[#4ec9b0]">
+      <div className="p-2.5 border-t border-[#2d2d2d] bg-[var(--bg-primary)] font-mono text-[10px] text-[var(--text-secondary)]">
+        <div className="flex items-center justify-between text-[var(--status-healthy)]">
           <span className="flex items-center gap-1.5 font-bold">
             <CheckCircle2 className="w-3.5 h-3.5" />
             SOVEREIGN WORKSPACE

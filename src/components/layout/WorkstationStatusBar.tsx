@@ -20,7 +20,7 @@ export const WorkstationStatusBar: React.FC = () => {
   };
 
   return (
-    <footer className="h-7 bg-[#007acc] text-white px-3 flex items-center justify-between text-xs font-mono select-none flex-shrink-0 z-20">
+    <footer className="h-7 bg-[var(--accent-fuchsia)] text-[var(--text-primary)] px-3 flex items-center justify-between text-xs font-mono select-none flex-shrink-0 z-20">
       {/* Left: Source Control / Git & Agent State */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5 hover:bg-[#1f8ad2] px-2 py-0.5 rounded cursor-pointer">
@@ -36,7 +36,7 @@ export const WorkstationStatusBar: React.FC = () => {
         </div>
 
         {activeTask && (
-          <span className="text-white/80 hidden sm:inline">[{activeTask.task_id}]</span>
+          <span className="text-[var(--text-primary)]/80 hidden sm:inline">[{activeTask.task_id}]</span>
         )}
       </div>
 

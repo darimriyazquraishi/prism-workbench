@@ -1,4 +1,4 @@
-# LUMI
+# Prism Workbench
 
 > **Sovereign On-Premise Agentic AI Workbench using Open-Weight Multimodal LLMs for Confidential Industrial Work**  
 > Built for **Smart India Hackathon 2026 Problem Statement SIH26117**  
@@ -8,14 +8,14 @@
 
 ## 🌟 Overview
 
-**LUMI** is an air-gapped, sovereign, on-premise agentic AI development environment modeled after Google DeepMind's Antigravity and Microsoft VS Code's Dark+ visual language.
+**Prism Workbench** is an air-gapped, sovereign, on-premise agentic AI development environment modeled after Google DeepMind's Antigravity and Microsoft VS Code's Dark+ visual language.
 
-Refineries and industrial plants handle sensitive process schematics, inspection reports, and confidential operating manuals that cannot leave plant premises. **LUMI** runs 100% locally with open-weight models (Qwen3, Qwen2.5-VL, Qwen2.5-Coder), local OCR, local ChromaDB RAG, deterministic industrial calculation tools, and Docker sandboxing with `--network=none`.
+Refineries and industrial plants handle sensitive process schematics, inspection reports, and confidential operating manuals that cannot leave plant premises. **Prism Workbench** runs 100% locally with open-weight models (Qwen3, Qwen2.5-VL, Qwen2.5-Coder), local OCR, local ChromaDB RAG, deterministic industrial calculation tools, and Docker sandboxing with `--network=none`.
 
 ```
 User: "Analyze these inspection reports, check against SOP-OPS-014, and compile an official Word approval note."
   │
-  ▼ [LUMI Autonomous Agent Orchestrator]
+  ▼ [Prism Autonomous Agent Orchestrator]
   ├── 1. Local OCR (PyMuPDF / PaddleOCR)
   ├── 2. SOP Retrieval (ChromaDB Local 768-D)
   ├── 3. Deterministic Engineering Math (API 570 / ASME B31.3)
@@ -78,3 +78,4 @@ npm run build
 ## 📜 License
 
 Confidential industrial prototype developed for Smart India Hackathon 2026 (SIH26117).
+# Lumi

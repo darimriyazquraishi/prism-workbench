@@ -69,20 +69,20 @@ export const KnowledgeRAGView: React.FC = () => {
   return (
     <div className="h-full flex flex-col space-y-4 font-sans text-sm overflow-hidden">
       {/* 1. TOP TOOLBAR */}
-      <div className="bg-[#252526] border border-[#333333] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 select-none flex-shrink-0">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 select-none flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 font-mono font-bold text-white text-sm">
+          <div className="flex items-center gap-2 font-mono font-bold text-[var(--text-primary)] text-sm">
             <BookOpen className="w-5 h-5 text-[#569cd6]" />
             <span>Knowledge Base (Local RAG):</span>
             <span className="text-[#9cdcfe]">MRPL Engineering Standards</span>
           </div>
-          <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-[#1e1e1e] text-[#4ec9b0] border border-[#3c3c3c]">
+          <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-[var(--bg-primary)] text-[var(--status-healthy)] border border-[var(--border-subtle)]">
             nomic-embed-text (768 Dim)
           </span>
         </div>
 
-        <div className="flex items-center gap-2 font-mono text-xs text-[#cccccc]">
-          <Database className="w-4 h-4 text-[#ce9178]" />
+        <div className="flex items-center gap-2 font-mono text-xs text-[var(--text-primary)]">
+          <Database className="w-4 h-4 text-[var(--status-attention)]" />
           <span>Local ChromaDB Embedded</span>
         </div>
       </div>
@@ -90,34 +90,34 @@ export const KnowledgeRAGView: React.FC = () => {
       {/* 2. MAIN 3-PANE RAG EXPLORER */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
         {/* Left: Collections (3 Cols) */}
-        <div className="lg:col-span-3 bg-[#252526] border border-[#333333] rounded-lg p-4 flex flex-col space-y-3 overflow-y-auto font-sans shadow-sm">
-          <div className="text-xs uppercase text-[#999999] font-bold tracking-wider px-1">
+        <div className="lg:col-span-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-4 flex flex-col space-y-3 overflow-y-auto font-sans shadow-sm">
+          <div className="text-xs uppercase text-[var(--text-secondary)] font-bold tracking-wider px-1">
             Indexed Collections &amp; Standards
           </div>
 
           <div className="space-y-2">
-            <div className="p-3 bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg space-y-1">
-              <div className="flex items-center justify-between font-bold text-white text-sm">
+            <div className="p-3 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg space-y-1">
+              <div className="flex items-center justify-between font-bold text-[var(--text-primary)] text-sm">
                 <span>Operations_SOP_014.pdf</span>
-                <span className="text-[#4ec9b0] text-xs font-mono">INDEXED</span>
+                <span className="text-[var(--status-healthy)] text-xs font-mono">INDEXED</span>
               </div>
-              <p className="text-xs text-[#999999] leading-relaxed">
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                 Crude Distillation Unit Operating Standards &amp; Integrity Gating.
               </p>
-              <div className="text-xs font-mono text-[#858585] pt-1">
+              <div className="text-xs font-mono text-[var(--text-secondary)] pt-1">
                 38 Chunks • 768-D Vectors
               </div>
             </div>
 
-            <div className="p-3 bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg space-y-1">
-              <div className="flex items-center justify-between font-bold text-white text-sm">
+            <div className="p-3 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg space-y-1">
+              <div className="flex items-center justify-between font-bold text-[var(--text-primary)] text-sm">
                 <span>Maintenance_Standard_007.pdf</span>
-                <span className="text-[#4ec9b0] text-xs font-mono">INDEXED</span>
+                <span className="text-[var(--status-healthy)] text-xs font-mono">INDEXED</span>
               </div>
-              <p className="text-xs text-[#999999] leading-relaxed">
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                 Flange and Valve Containment Maintenance Guidelines.
               </p>
-              <div className="text-xs font-mono text-[#858585] pt-1">
+              <div className="text-xs font-mono text-[var(--text-secondary)] pt-1">
                 24 Chunks • 768-D Vectors
               </div>
             </div>
@@ -125,9 +125,9 @@ export const KnowledgeRAGView: React.FC = () => {
         </div>
 
         {/* Center: Search & Ranked Results (5 Cols) */}
-        <div className="lg:col-span-5 bg-[#252526] border border-[#333333] rounded-lg p-4 flex flex-col space-y-3 overflow-hidden shadow-sm">
+        <div className="lg:col-span-5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-4 flex flex-col space-y-3 overflow-hidden shadow-sm">
           <form onSubmit={handleSearch} className="space-y-2 flex-shrink-0">
-            <span className="text-xs text-[#858585] uppercase font-bold block">
+            <span className="text-xs text-[var(--text-secondary)] uppercase font-bold block">
               Vector Semantic Query:
             </span>
             <div className="flex gap-2">
@@ -136,12 +136,12 @@ export const KnowledgeRAGView: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Query engineering standards..."
-                className="flex-1 bg-[#1e1e1e] border border-[#3c3c3c] rounded-md px-3 py-2 text-sm text-[#e0e0e0] placeholder-[#777777] focus:outline-none focus:border-[#007acc] font-sans"
+                className="flex-1 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-md px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[#777777] focus:outline-none focus:border-[var(--accent-fuchsia)] font-sans"
               />
               <button
                 type="submit"
                 disabled={isSearching}
-                className="px-4 py-2 rounded-md bg-[#007acc] hover:bg-[#1f8ad2] text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow"
+                className="px-4 py-2 rounded-md bg-[var(--accent-fuchsia)] hover:bg-[#1f8ad2] text-[var(--text-primary)] font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow"
               >
                 <Search className="w-4 h-4" />
                 <span>Search</span>
@@ -151,7 +151,7 @@ export const KnowledgeRAGView: React.FC = () => {
 
           {/* Results List */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            <span className="text-xs text-[#858585] uppercase font-bold block">
+            <span className="text-xs text-[var(--text-secondary)] uppercase font-bold block">
               Retrieved Ranked Chunks ({results.length}):
             </span>
 
@@ -163,18 +163,18 @@ export const KnowledgeRAGView: React.FC = () => {
                   onClick={() => setSelectedChunk(r)}
                   className={`p-3.5 rounded-lg border cursor-pointer transition-all space-y-1.5 ${
                     isSelected
-                      ? 'bg-[#37373d] border-[#007acc] text-white shadow-sm'
-                      : 'bg-[#1e1e1e] border-[#3c3c3c] text-[#cccccc] hover:border-[#555555]'
+                      ? 'bg-[#37373d] border-[var(--accent-fuchsia)] text-[var(--text-primary)] shadow-sm'
+                      : 'bg-[var(--bg-primary)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[#555555]'
                   }`}
                 >
                   <div className="flex items-center justify-between font-mono text-xs">
                     <span className="font-bold text-[#569cd6]">{r.source_file} (Page {r.page_number})</span>
-                    <span className="text-[#4ec9b0] font-bold">Similarity: {r.cosine_similarity}</span>
+                    <span className="text-[var(--status-healthy)] font-bold">Similarity: {r.cosine_similarity}</span>
                   </div>
-                  <div className="font-bold text-white text-sm">
+                  <div className="font-bold text-[var(--text-primary)] text-sm">
                     {r.section_title}
                   </div>
-                  <p className="text-xs text-[#cccccc] leading-relaxed italic border-l-2 border-[#007acc] pl-2.5">
+                  <p className="text-xs text-[var(--text-primary)] leading-relaxed italic border-l-2 border-[var(--accent-fuchsia)] pl-2.5">
                     "{r.snippet}"
                   </p>
                 </div>
@@ -184,48 +184,48 @@ export const KnowledgeRAGView: React.FC = () => {
         </div>
 
         {/* Right: Chunk Provenance (4 Cols) */}
-        <div className="lg:col-span-4 bg-[#252526] border border-[#333333] rounded-lg p-5 flex flex-col space-y-3 overflow-y-auto font-sans text-xs shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#333333] pb-2 text-sm uppercase font-bold text-white">
+        <div className="lg:col-span-4 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-5 flex flex-col space-y-3 overflow-y-auto font-sans text-xs shadow-sm">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 text-sm uppercase font-bold text-[var(--text-primary)]">
             <span className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-[#569cd6]" />
               Chunk Provenance
             </span>
-            <span className="text-xs font-mono text-[#4ec9b0]">ChromaDB Verified</span>
+            <span className="text-xs font-mono text-[var(--status-healthy)]">ChromaDB Verified</span>
           </div>
 
           {selectedChunk ? (
             <div className="space-y-3">
-              <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg p-3 space-y-1.5 font-mono text-xs">
+              <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-3 space-y-1.5 font-mono text-xs">
                 <div>
-                  <span className="text-[#858585] text-[10px] uppercase block">CHUNK ID:</span>
+                  <span className="text-[var(--text-secondary)] text-[10px] uppercase block">CHUNK ID:</span>
                   <span className="text-[#9cdcfe] font-bold">{selectedChunk.chunkId}</span>
                 </div>
                 <div>
-                  <span className="text-[#858585] text-[10px] uppercase block">SOURCE:</span>
-                  <span className="text-white">{selectedChunk.source_file} • Page {selectedChunk.page_number}</span>
+                  <span className="text-[var(--text-secondary)] text-[10px] uppercase block">SOURCE:</span>
+                  <span className="text-[var(--text-primary)]">{selectedChunk.source_file} • Page {selectedChunk.page_number}</span>
                 </div>
                 <div>
-                  <span className="text-[#858585] text-[10px] uppercase block">EMBEDDING SIMILARITY:</span>
-                  <span className="text-[#4ec9b0] font-bold">{selectedChunk.cosine_similarity} (Grounded)</span>
+                  <span className="text-[var(--text-secondary)] text-[10px] uppercase block">EMBEDDING SIMILARITY:</span>
+                  <span className="text-[var(--status-healthy)] font-bold">{selectedChunk.cosine_similarity} (Grounded)</span>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <span className="text-xs text-[#858585] uppercase font-bold block">
+                <span className="text-xs text-[var(--text-secondary)] uppercase font-bold block">
                   Verifiable Source Excerpt:
                 </span>
-                <div className="p-3.5 bg-[#181818] border border-[#3c3c3c] rounded-lg text-xs text-[#e0e0e0] leading-relaxed italic">
+                <div className="p-3.5 bg-[#181818] border border-[var(--border-subtle)] rounded-lg text-xs text-[var(--text-primary)] leading-relaxed italic">
                   "{selectedChunk.snippet}"
                 </div>
               </div>
 
-              <div className="p-3 bg-[#1f3a2b] border border-[#2e5d44] rounded-lg text-xs text-[#4ec9b0] font-semibold flex items-center gap-2">
+              <div className="p-3 bg-[#1f3a2b] border border-[#2e5d44] rounded-lg text-xs text-[var(--status-healthy)] font-semibold flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
                 <span>This SOP citation is embedded into the generated Word approval note.</span>
               </div>
             </div>
           ) : (
-            <div className="text-[#858585] text-center py-6">Select a chunk to inspect provenance.</div>
+            <div className="text-[var(--text-secondary)] text-center py-6">Select a chunk to inspect provenance.</div>
           )}
         </div>
       </div>

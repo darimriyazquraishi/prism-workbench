@@ -10,7 +10,6 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../store/useWorkbenchStore';
-import logo from '../../assets/logo.jpg';
 
 interface NavItem {
   id: string;
@@ -36,10 +35,12 @@ export const Sidebar: React.FC = () => {
     <aside className="w-64 bg-zinc-900/90 border-r border-zinc-800/80 flex flex-col flex-shrink-0 select-none">
       {/* Brand Header */}
       <div className="h-16 px-5 flex items-center gap-3 border-b border-zinc-800">
-        <img src={logo.src} alt="LUMI" className="w-8 h-8 rounded-md object-cover shadow-md" />
+        <div className="w-8 h-8 rounded bg-sky-600 flex items-center justify-center font-bold text-[var(--text-primary)] shadow-md">
+          S
+        </div>
         <div>
           <div className="text-sm font-semibold tracking-wide text-zinc-100 flex items-center gap-1.5">
-            LUMI
+            SovereignAI
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-950 text-sky-400 border border-sky-800 font-mono">
               MRPL
             </span>

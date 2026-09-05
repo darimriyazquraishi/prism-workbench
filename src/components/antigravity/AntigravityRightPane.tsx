@@ -25,7 +25,7 @@ export const AntigravityRightPane: React.FC = () => {
   if (!isRightPaneOpen) return null;
 
   return (
-    <aside className="w-[500px] bg-[#252526] border-l border-[#2d2d2d] flex flex-col font-sans select-none flex-shrink-0 z-20 text-xs shadow-xl">
+    <aside className="w-[500px] bg-[var(--bg-surface)] border-l border-[#2d2d2d] flex flex-col font-sans select-none flex-shrink-0 z-20 text-xs shadow-xl">
       {/* Pane Tab Navigation Strip */}
       <div className="h-9 bg-[#2d2d2d] border-b border-[#2d2d2d] px-2 flex items-center justify-between">
         <div className="flex items-center space-x-0.5 overflow-x-auto h-full font-mono text-xs">
@@ -33,11 +33,11 @@ export const AntigravityRightPane: React.FC = () => {
             onClick={() => setActiveRightTab('artifacts')}
             className={`h-full px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
               activeRightTab === 'artifacts'
-                ? 'border-[#007acc] text-white font-bold bg-[#1e1e1e]'
-                : 'border-transparent text-[#858585] hover:text-[#cccccc]'
+                ? 'border-[var(--accent-fuchsia)] text-[var(--text-primary)] font-bold bg-[var(--bg-primary)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <FolderArchive className="w-3.5 h-3.5 text-[#4ec9b0]" />
+            <FolderArchive className="w-3.5 h-3.5 text-[var(--status-healthy)]" />
             <span>Artifacts</span>
           </button>
 
@@ -45,11 +45,11 @@ export const AntigravityRightPane: React.FC = () => {
             onClick={() => setActiveRightTab('pdf_viewer')}
             className={`h-full px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
               activeRightTab === 'pdf_viewer'
-                ? 'border-[#007acc] text-white font-bold bg-[#1e1e1e]'
-                : 'border-transparent text-[#858585] hover:text-[#cccccc]'
+                ? 'border-[var(--accent-fuchsia)] text-[var(--text-primary)] font-bold bg-[var(--bg-primary)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-[#ce9178]" />
+            <FileText className="w-3.5 h-3.5 text-[var(--status-attention)]" />
             <span>PDF &amp; OCR</span>
           </button>
 
@@ -57,8 +57,8 @@ export const AntigravityRightPane: React.FC = () => {
             onClick={() => setActiveRightTab('pid_cad')}
             className={`h-full px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
               activeRightTab === 'pid_cad'
-                ? 'border-[#007acc] text-white font-bold bg-[#1e1e1e]'
-                : 'border-transparent text-[#858585] hover:text-[#cccccc]'
+                ? 'border-[var(--accent-fuchsia)] text-[var(--text-primary)] font-bold bg-[var(--bg-primary)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <Compass className="w-3.5 h-3.5 text-[#569cd6]" />
@@ -69,8 +69,8 @@ export const AntigravityRightPane: React.FC = () => {
             onClick={() => setActiveRightTab('rag_knowledge')}
             className={`h-full px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
               activeRightTab === 'rag_knowledge'
-                ? 'border-[#007acc] text-white font-bold bg-[#1e1e1e]'
-                : 'border-transparent text-[#858585] hover:text-[#cccccc]'
+                ? 'border-[var(--accent-fuchsia)] text-[var(--text-primary)] font-bold bg-[var(--bg-primary)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5 text-[#569cd6]" />
@@ -81,25 +81,25 @@ export const AntigravityRightPane: React.FC = () => {
             onClick={() => setActiveRightTab('telemetry')}
             className={`h-full px-2.5 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
               activeRightTab === 'telemetry'
-                ? 'border-[#007acc] text-white font-bold bg-[#1e1e1e]'
-                : 'border-transparent text-[#858585] hover:text-[#cccccc]'
+                ? 'border-[var(--accent-fuchsia)] text-[var(--text-primary)] font-bold bg-[var(--bg-primary)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Activity className="w-3.5 h-3.5 text-[#4ec9b0]" />
+            <Activity className="w-3.5 h-3.5 text-[var(--status-healthy)]" />
             <span>Telemetry</span>
           </button>
         </div>
 
         <button
           onClick={() => setRightPaneOpen(false)}
-          className="p-1 hover:bg-[#37373d] rounded text-[#858585] hover:text-white cursor-pointer"
+          className="p-1 hover:bg-[#37373d] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
         >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Pane Content Viewport */}
-      <div className="flex-1 overflow-hidden p-2 bg-[#1e1e1e]">
+      <div className="flex-1 overflow-hidden p-2 bg-[var(--bg-primary)]">
         {activeRightTab === 'artifacts' && <DeliverablesView />}
         {activeRightTab === 'pdf_viewer' && <DocumentIntelligenceView />}
         {activeRightTab === 'pid_cad' && <PIDDrawingView />}
