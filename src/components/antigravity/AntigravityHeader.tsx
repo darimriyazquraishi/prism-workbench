@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Cpu, 
@@ -19,6 +19,8 @@ export const AntigravityHeader: React.FC = () => {
     activeSessionId, 
     selectedModel, 
     setSelectedModel,
+    availableModels,
+    fetchAvailableModels,
     projectTitle,
     setProjectTitle,
     isRightPaneOpen,
@@ -30,6 +32,10 @@ export const AntigravityHeader: React.FC = () => {
     isServerOnline,
     toggleSidebar
   } = useAntigravityStore();
+
+  useEffect(() => {
+    fetchAvailableModels();
+  }, [fetchAvailableModels]);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(projectTitle);
@@ -107,13 +113,16 @@ export const AntigravityHeader: React.FC = () => {
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            className="bg-transparent border-none text-[var(--text-secondary)] focus:outline-none cursor-pointer hover:text-[var(--text-primary)] transition-colors max-w-[130px] truncate"
+            className="bg-transparent border-none text-[var(--text-secondary)] focus:outline-none cursor-pointer hover:text-[var(--text-primary)] transition-colors max-w-[140px] truncate font-mono text-[11px]"
           >
-            <option value="" className="bg-[var(--bg-elevated)]">No model selected</option>
-            <option value="Qwen3-8B-Instruct" className="bg-[var(--bg-elevated)]">Qwen3-8B</option>
-            <option value="Qwen3-14B-Instruct" className="bg-[var(--bg-elevated)]">Qwen3-14B</option>
-            <option value="Qwen2.5-VL-7B-Instruct" className="bg-[var(--bg-elevated)]">Qwen2.5-VL</option>
-            <option value="Qwen2.5-Coder-7B" className="bg-[var(--bg-elevated)]">Qwen-Coder</option>
+            <option value="" className="bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
+              {availableModels.length === 0 ? 'No models selected' : 'No model selected'}
+            </option>
+            {availableModels.map((m) => (
+              <option key={m} value={m} className="bg-[var(--bg-elevated)] text-[var(--text-primary)]">
+                {m}
+              </option>
+            ))}
           </select>
           <div className="w-1 h-1 rounded-full bg-[var(--border-subtle)]"></div>
           <button

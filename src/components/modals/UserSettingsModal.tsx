@@ -28,12 +28,14 @@ export const UserSettingsModal: React.FC = () => {
         <div className="p-5 space-y-4">
           {/* User Info */}
           <div className="p-3 bg-[var(--bg-base)] rounded-lg border border-[var(--border-subtle)] flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[var(--text-primary)] text-[var(--bg-base)] flex items-center justify-center text-xs font-bold font-mono">JS</div>
+            <div className="w-10 h-10 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center">
+              <User className="w-5 h-5 text-[var(--accent-primary)]" />
+            </div>
             <div>
-              <div className="font-semibold text-[var(--text-primary)] text-sm">J. Smith</div>
-              <div className="text-[11px] text-[var(--text-secondary)]">Lead Inspection Engineer · Defense &amp; PSU Manufacturing</div>
+              <div className="font-semibold text-[var(--text-primary)] text-sm">Local Workstation User</div>
+              <div className="text-[11px] text-[var(--text-secondary)]">On-Premise Operator Session</div>
               <div className="text-[10px] text-[var(--accent-success)] flex items-center gap-1 mt-0.5 font-mono">
-                <CheckCircle className="w-3 h-3" /> Local Enterprise Session Active
+                <CheckCircle className="w-3 h-3" /> Zero-Cloud Local Session Active
               </div>
             </div>
           </div>
@@ -77,7 +79,7 @@ export const UserSettingsModal: React.FC = () => {
                   <Cpu className="w-3.5 h-3.5 text-purple-400" />
                   <span>Active Default Engine</span>
                 </div>
-                <div className="font-mono font-bold text-[var(--text-primary)] truncate">{selectedModel}</div>
+                <div className="font-mono font-bold text-[var(--text-primary)] truncate">{selectedModel || 'No model selected'}</div>
                 <div className="text-[10px] text-[var(--accent-success)]">GPU 1 Resident</div>
               </div>
             </div>

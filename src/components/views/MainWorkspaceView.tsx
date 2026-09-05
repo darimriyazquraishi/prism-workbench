@@ -51,7 +51,9 @@ export const MainWorkspaceView: React.FC = () => {
     toggleComputerAccess,
     calculationResults,
     reRunCalculation,
-    setNetworkModalOpen
+    setNetworkModalOpen,
+    isExecuting,
+    selectedModel
   } = useAntigravityStore();
 
   const [promptText, setPromptText] = useState('');
@@ -528,6 +530,21 @@ export const MainWorkspaceView: React.FC = () => {
 
                     return null;
                   })}
+
+                  {isExecuting && (
+                    <div className="max-w-4xl mx-auto w-full flex items-center gap-3 p-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl animate-pulse font-mono text-xs text-[var(--text-secondary)]">
+                      <div className="w-6 h-6 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center flex-shrink-0 border border-[var(--border-subtle)]">
+                        <Sparkles className="w-3.5 h-3.5 text-[var(--accent-primary)] animate-spin" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-[var(--text-primary)]">
+                          {selectedModel ? selectedModel : 'Local Reasoning Engine'}
+                        </span>
+                        <span>generating response...</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div ref={chatEndRef} />
                 </div>
 

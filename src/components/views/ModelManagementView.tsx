@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Cpu, 
   ShieldCheck, 
@@ -40,99 +40,44 @@ interface DetectedModelFile {
   vramRequired: string;
 }
 
-const defaultDetectedModels: DetectedModelFile[] = [
-  {
-    id: 'qwen3-14b',
-    name: 'Qwen3-14B-Instruct',
-    fileName: 'Qwen3-14B-Q4_K_M.gguf',
-    relativePath: 'models/qwen3-14b/Qwen3-14B-Q4_K_M.gguf',
-    fullPath: 'F:\\corewithin\\models\\qwen3-14b\\Qwen3-14B-Q4_K_M.gguf',
-    sizeGb: '9.0 GB',
-    format: 'GGUF',
-    quant: 'Q4_K_M',
-    agentRole: 'Orchestrator & Structured Reasoning',
-    agentName: 'Orchestrator Agent',
-    vramRequired: '9.5 GB'
-  },
-  {
-    id: 'qwen3-vl-8b',
-    name: 'Qwen3-VL-8B-Instruct',
-    fileName: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf',
-    relativePath: 'models/qwen3-vl-8b/Qwen3VL-8B-Instruct-Q4_K_M.gguf',
-    fullPath: 'F:\\corewithin\\models\\qwen3-vl-8b\\Qwen3VL-8B-Instruct-Q4_K_M.gguf',
-    sizeGb: '5.0 GB',
-    format: 'GGUF',
-    quant: 'Q4_K_M',
-    agentRole: 'Multimodal Vision, P&ID & OCR',
-    agentName: 'Vision Document Agent',
-    vramRequired: '6.2 GB'
-  },
-  {
-    id: 'qwen3-vl-mmproj',
-    name: 'Qwen3-VL Multimodal Projector',
-    fileName: 'mmproj-Qwen3VL-8B-Instruct-F16.gguf',
-    relativePath: 'models/qwen3-vl-8b/mmproj-Qwen3VL-8B-Instruct-F16.gguf',
-    fullPath: 'F:\\corewithin\\models\\qwen3-vl-8b\\mmproj-Qwen3VL-8B-Instruct-F16.gguf',
-    sizeGb: '1.1 GB',
-    format: 'GGUF',
-    quant: 'F16',
-    agentRole: 'Vision Feature Projection',
-    agentName: 'Vision Document Agent',
-    vramRequired: '1.5 GB'
-  },
-  {
-    id: 'qwen2.5-coder-7b',
-    name: 'Qwen2.5-Coder-7B-Instruct',
-    fileName: 'Qwen2.5-Coder-7B-Instruct',
-    relativePath: 'models/qwen2.5-coder-7b/',
-    fullPath: 'F:\\corewithin\\models\\qwen2.5-coder-7b',
-    sizeGb: '4.8 GB',
-    format: 'GGUF',
-    quant: 'Q4_K_M',
-    agentRole: 'Python Sandbox & ASME/API 570 Math',
-    agentName: 'Code & Math Agent',
-    vramRequired: '5.5 GB'
-  },
-  {
-    id: 'qwen3-reranker',
-    name: 'Qwen3-Reranker-0.6B',
-    fileName: 'model.safetensors',
-    relativePath: 'models/qwen3-reranker-0.6b/model.safetensors',
-    fullPath: 'F:\\corewithin\\models\\qwen3-reranker-0.6b\\model.safetensors',
-    sizeGb: '1.2 GB',
-    format: 'SAFETENSORS',
-    quant: 'FP16',
-    agentRole: 'Neural Passage Reranking',
-    agentName: 'Knowledge Retrieval Agent',
-    vramRequired: '1.2 GB'
-  },
-  {
-    id: 'qwen3-embedding',
-    name: 'Qwen3-Embedding-0.6B',
-    fileName: 'model.safetensors',
-    relativePath: 'models/qwen3-embedding-0.6b/model.safetensors',
-    fullPath: 'F:\\corewithin\\models\\qwen3-embedding-0.6b\\model.safetensors',
-    sizeGb: '1.2 GB',
-    format: 'SAFETENSORS',
-    quant: 'FP16',
-    agentRole: '768-D Semantic Vector Projection',
-    agentName: 'Knowledge Retrieval Agent',
-    vramRequired: '1.2 GB'
-  }
-];
-
 export const ModelManagementView: React.FC = () => {
-  const { selectedModel, setSelectedModel } = useAntigravityStore();
-  const [detectedModels, setDetectedModels] = useState<DetectedModelFile[]>(defaultDetectedModels);
+  const { selectedModel, setSelectedModel, availableModels, addAvailableModel, fetchAvailableModels } = useAntigravityStore();
+  const [detectedModels, setDetectedModels] = useState<DetectedModelFile[]>([]);
   const [modelDirectory, setModelDirectory] = useState('F:\\corewithin\\models');
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync available models from Ollama / system on mount
+  useEffect(() => {
+    fetchAvailableModels().then((names) => {
+      if (names && names.length > 0) {
+        const ollamaEntries: DetectedModelFile[] = names.map((name, idx) => ({
+          id: `ollama-${name}-${idx}`,
+          name: name,
+          fileName: `${name}.gguf`,
+          relativePath: `ollama/${name}`,
+          fullPath: `Local Inference Engine: ${name}`,
+          sizeGb: 'Loaded',
+          format: 'GGUF',
+          quant: 'Auto',
+          agentRole: 'Local Model Weight / Engine',
+          agentName: 'Multi-Agent Runtime',
+          vramRequired: 'Dynamic'
+        }));
+        setDetectedModels(prev => {
+          const existing = new Set(prev.map(p => p.name));
+          const additions = ollamaEntries.filter(e => !existing.has(e.name));
+          return [...prev, ...additions];
+        });
+      }
+    });
+  }, [fetchAvailableModels]);
 
   const auditLogs = [
     { id: 'log-101', timestamp: '14:22:15', taskId: 'Task ID 456', action: 'Approval note document compiled (Approval_Note.docx)', model: 'Deliverable Agent (DOCX)', status: 'VERIFIED', network: '0 bytes ext' },
     { id: 'log-102', timestamp: '14:22:04', taskId: 'Task ID 456', action: 'Deterministic Python corrosion calculation executed in sandbox', model: 'Calculation Agent (Python)', status: 'SUCCESS', network: '0 bytes ext' },
     { id: 'log-103', timestamp: '14:21:48', taskId: 'Task ID 456', action: 'Vector similarity search against /corp/SOPs/Engineering/ (SOP-OPS-014)', model: 'Retrieval Agent (768-D)', status: 'SUCCESS', network: '0 bytes ext' },
-    { id: 'log-104', timestamp: '14:21:12', taskId: 'Task ID 456', action: 'Image OCR & visual table extraction on Inspection_Report_March.pdf', model: 'Vision Agent (Qwen-VL)', status: 'SUCCESS', network: '0 bytes ext' },
+    { id: 'log-104', timestamp: '14:21:12', taskId: 'Task ID 456', action: 'Image OCR & visual table extraction on Inspection_Report_March.pdf', model: 'Vision Agent (OCR)', status: 'SUCCESS', network: '0 bytes ext' },
     { id: 'log-105', timestamp: '14:20:55', taskId: 'Task ID 456', action: 'Task classification: Dispatched to multi-agent pipeline', model: 'Orchestrator Loop', status: 'SUCCESS', network: '0 bytes ext' }
   ];
 
@@ -154,7 +99,7 @@ export const ModelManagementView: React.FC = () => {
           fileName: file.name,
           relativePath: `models/custom/${file.name}`,
           fullPath: (file as any).path || `C:\\models\\${file.name}`,
-          sizeGb,
+          sizeGb: sizeGb !== '0.00 GB' ? sizeGb : 'Custom',
           format,
           quant: file.name.includes('Q4_K_M') ? 'Q4_K_M' : file.name.includes('F16') ? 'F16' : 'CUSTOM',
           agentRole: 'User-Selected Local Model Weight',
@@ -162,6 +107,7 @@ export const ModelManagementView: React.FC = () => {
           vramRequired: 'Auto-alloc'
         };
         newFiles.push(modelEntry);
+        addAvailableModel(cleanName);
       }
 
       setDetectedModels(prev => [...newFiles, ...prev]);
@@ -174,9 +120,33 @@ export const ModelManagementView: React.FC = () => {
     }
   };
 
-  const handleRescan = () => {
-    setScanMessage(`Scanning directory "${modelDirectory}"... Found ${detectedModels.length} model weights.`);
-    setTimeout(() => setScanMessage(null), 3500);
+  const handleRescan = async () => {
+    setScanMessage(`Scanning Ollama and directory "${modelDirectory}"...`);
+    const names = await fetchAvailableModels();
+    if (names && names.length > 0) {
+      const ollamaEntries: DetectedModelFile[] = names.map((name, idx) => ({
+        id: `ollama-${name}-${idx}`,
+        name: name,
+        fileName: `${name}.gguf`,
+        relativePath: `ollama/${name}`,
+        fullPath: `Local Inference Engine: ${name}`,
+        sizeGb: 'Loaded',
+        format: 'GGUF',
+        quant: 'Auto',
+        agentRole: 'Local Model Engine',
+        agentName: 'Multi-Agent Runtime',
+        vramRequired: 'Dynamic'
+      }));
+      setDetectedModels(prev => {
+        const existing = new Set(prev.map(p => p.name));
+        const additions = ollamaEntries.filter(e => !existing.has(e.name));
+        return [...prev, ...additions];
+      });
+      setScanMessage(`Scan complete. Found ${names.length} model(s) on local engine.`);
+    } else {
+      setScanMessage(`Local engine offline or no tags returned. Use "Browse Windows Files" to select model weights from disk.`);
+    }
+    setTimeout(() => setScanMessage(null), 4000);
   };
 
   const agentsRoster = [
@@ -184,7 +154,7 @@ export const ModelManagementView: React.FC = () => {
       title: 'Orchestrator & Task Planner',
       icon: Cpu,
       color: 'text-sky-400',
-      modelUsed: selectedModel || 'Qwen3-14B / Qwen3-8B',
+      modelUsed: selectedModel || 'Multi-Agent Orchestrator',
       description: 'Decomposes complex requests into sequential ReAct steps, tracks execution state, and manages human plan approvals.',
       trigger: 'Every User Request'
     },
@@ -192,7 +162,7 @@ export const ModelManagementView: React.FC = () => {
       title: 'Vision & Multimodal Document Agent',
       icon: Eye,
       color: 'text-amber-400',
-      modelUsed: 'Qwen3-VL-8B-Instruct (Vision GGUF)',
+      modelUsed: selectedModel ? `${selectedModel} (Vision Mode)` : 'Multimodal Vision Engine',
       description: 'Processes scanned PDF inspection reports, engineering drawings, and P&ID diagrams with symbol/table OCR extraction.',
       trigger: 'Attached Images / Scanned PDFs'
     },
@@ -200,7 +170,7 @@ export const ModelManagementView: React.FC = () => {
       title: 'Code & Engineering Math Agent',
       icon: Calculator,
       color: 'text-emerald-400',
-      modelUsed: 'Qwen2.5-Coder-7B / Local Python Sandbox',
+      modelUsed: selectedModel ? `${selectedModel} (Python Sandbox)` : 'Local Code & Math Sandbox',
       description: 'Generates and runs deterministic Python calculation scripts (API 570 wall thickness, corrosion rates, MTBF) in an isolated sandbox.',
       trigger: 'Math, Calculations, Code'
     },
@@ -208,7 +178,7 @@ export const ModelManagementView: React.FC = () => {
       title: 'Knowledge Retrieval Agent (RAG)',
       icon: BookOpen,
       color: 'text-indigo-400',
-      modelUsed: 'Nomic-Embed-Text (768-D) + Qwen Reranker',
+      modelUsed: 'Nomic-Embed-Text (768-D) + Reranker',
       description: 'Searches confidential internal SOPs, equipment manuals, and engineering standards for verbatim citations and threshold limits.',
       trigger: 'SOP Standards, Corporate Knowledge'
     },
@@ -369,49 +339,68 @@ export const ModelManagementView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
-                {detectedModels.map((m) => {
-                  const isSelected = selectedModel === m.name || selectedModel === m.id;
-                  return (
-                    <tr 
-                      key={m.id} 
-                      className={`transition-colors ${
-                        isSelected 
-                          ? 'bg-emerald-500/10' 
-                          : 'hover:bg-[var(--bg-elevated)]'
-                      }`}
-                    >
-                      <td className="p-2.5">
-                        <div className="font-bold text-[var(--text-primary)]">{m.name}</div>
-                        <div className="text-[10px] text-[var(--text-secondary)] opacity-75 truncate max-w-xs">{m.fullPath}</div>
-                      </td>
-                      <td className="p-2.5">
-                        <span className="px-1.5 py-0.5 rounded bg-[var(--bg-base)] border border-[var(--border-subtle)] font-bold text-[9px] text-[var(--text-primary)]">
-                          {m.format} [{m.quant}]
-                        </span>
-                      </td>
-                      <td className="p-2.5 text-[var(--text-primary)]">{m.sizeGb}</td>
-                      <td className="p-2.5 text-[var(--text-secondary)]">{m.vramRequired}</td>
-                      <td className="p-2.5">
-                        <div className="text-[var(--text-primary)] font-sans text-xs">{m.agentName}</div>
-                        <div className="text-[10px] text-[var(--text-secondary)] font-sans">{m.agentRole}</div>
-                      </td>
-                      <td className="p-2.5 text-right">
-                        {isSelected ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/20 border border-emerald-500/40 px-2 py-1 rounded-lg">
-                            <Check className="w-3 h-3" /> Selected
+                {detectedModels.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-[var(--text-secondary)]">
+                      <Cpu className="w-8 h-8 mx-auto mb-2 opacity-40 text-[var(--text-tertiary)]" />
+                      <div className="font-semibold text-sm text-[var(--text-primary)]">No models loaded or detected yet</div>
+                      <div className="text-xs text-[var(--text-tertiary)] mt-1 max-w-md mx-auto font-sans">
+                        Click "Browse Windows Files..." to load .gguf, .safetensors, .bin, or .onnx weights from your workstation, or start your local Ollama engine.
+                      </div>
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="mt-3 px-3.5 py-1.5 rounded-lg bg-[var(--text-primary)] text-[var(--bg-base)] font-semibold text-xs inline-flex items-center gap-2 cursor-pointer hover:opacity-90 transition-opacity"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        <span>Browse Local Model Weights</span>
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  detectedModels.map((m) => {
+                    const isSelected = selectedModel === m.name || selectedModel === m.id;
+                    return (
+                      <tr 
+                        key={m.id} 
+                        className={`transition-colors ${
+                          isSelected 
+                            ? 'bg-emerald-500/10' 
+                            : 'hover:bg-[var(--bg-elevated)]'
+                        }`}
+                      >
+                        <td className="p-2.5">
+                          <div className="font-bold text-[var(--text-primary)]">{m.name}</div>
+                          <div className="text-[10px] text-[var(--text-secondary)] opacity-75 truncate max-w-xs">{m.fullPath}</div>
+                        </td>
+                        <td className="p-2.5">
+                          <span className="px-1.5 py-0.5 rounded bg-[var(--bg-base)] border border-[var(--border-subtle)] font-bold text-[9px] text-[var(--text-primary)]">
+                            {m.format} [{m.quant}]
                           </span>
-                        ) : (
-                          <button
-                            onClick={() => setSelectedModel(m.name)}
-                            className="px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--text-primary)] hover:text-[var(--bg-base)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-medium text-[10px] cursor-pointer transition-colors"
-                          >
-                            Select Model
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="p-2.5 text-[var(--text-primary)]">{m.sizeGb}</td>
+                        <td className="p-2.5 text-[var(--text-secondary)]">{m.vramRequired}</td>
+                        <td className="p-2.5">
+                          <div className="text-[var(--text-primary)] font-sans text-xs">{m.agentName}</div>
+                          <div className="text-[10px] text-[var(--text-secondary)] font-sans">{m.agentRole}</div>
+                        </td>
+                        <td className="p-2.5 text-right">
+                          {isSelected ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/20 border border-emerald-500/40 px-2 py-1 rounded-lg">
+                              <Check className="w-3 h-3" /> Selected
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setSelectedModel(m.name)}
+                              className="px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--text-primary)] hover:text-[var(--bg-base)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-medium text-[10px] cursor-pointer transition-colors"
+                            >
+                              Select Model
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

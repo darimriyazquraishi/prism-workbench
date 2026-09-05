@@ -175,10 +175,155 @@ export function classifyIntent(
   };
 }
 
-export function generateChatbotResponse(
+export async function queryLocalChatbotLLM(
   promptText: string,
-  previousUserPrompts: string[] = []
-): string {
+  model?: string,
+  previousPrompts: string[] = []
+): Promise<string> {
+  const endpoints = [
+    'http://127.0.0.1:11434', // Ollama default
+    'http://localhost:11434',
+    'http://127.0.0.1:1234',  // LM Studio default
+  ];
+
+  let activeModel = (model || '').trim();
+
+  // If no model is explicitly passed, try to detect installed model from Ollama tags
+  if (!activeModel) {
+    try {
+      const tagRes = await fetch('http://127.0.0.1:11434/api/tags', {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000)
+      }).catch(() => null);
+      if (tagRes && tagRes.ok) {
+        const data = await tagRes.json().catch(() => null);
+        if (data && Array.isArray(data.models) && data.models.length > 0) {
+          activeModel = data.models[0].name || data.models[0].model || '';
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const systemPrompt = `You are Lumi, an on-premise, secure engineering and scientific AI assistant running locally on the user's workstation. Provide accurate, clear, and direct answers to the user's questions. Use concise markdown formatting where appropriate.`;
+
+  const messages: { role: string; content: string }[] = [
+    { role: 'system', content: systemPrompt }
+  ];
+
+  // Pass short conversational context (last 2 previous user questions)
+  const recentUser = previousPrompts.slice(-2);
+  for (const prev of recentUser) {
+    if (prev && prev.trim()) {
+      messages.push({ role: 'user', content: prev.trim() });
+      messages.push({ role: 'assistant', content: 'Understood.' });
+    }
+  }
+  messages.push({ role: 'user', content: promptText });
+
+  // 1. Try Ollama /api/chat
+  for (const base of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      const res = await fetch(`${base}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: activeModel || 'llama3',
+          messages: messages,
+          stream: false,
+          options: { temperature: 0.3 }
+        }),
+        signal: controller.signal
+      }).catch(() => null);
+
+      clearTimeout(timeoutId);
+
+      if (res && res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json && json.message && json.message.content) {
+          return json.message.content.trim();
+        }
+      }
+    } catch {
+      // try next
+    }
+  }
+
+  // 2. Try Ollama /api/generate
+  for (const base of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      const res = await fetch(`${base}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: activeModel || 'llama3',
+          prompt: `${systemPrompt}\n\nUser Question: ${promptText}\n\nAnswer:`,
+          stream: false,
+          options: { temperature: 0.3 }
+        }),
+        signal: controller.signal
+      }).catch(() => null);
+
+      clearTimeout(timeoutId);
+
+      if (res && res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json && json.response) {
+          return json.response.trim();
+        }
+      }
+    } catch {
+      // try next
+    }
+  }
+
+  // 3. Try OpenAI-compatible /v1/chat/completions (LM Studio, llama-server, vLLM, LocalAI)
+  for (const base of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(`${base}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: activeModel || 'local-model',
+          messages: messages,
+          temperature: 0.3
+        }),
+        signal: controller.signal
+      }).catch(() => null);
+
+      clearTimeout(timeoutId);
+
+      if (res && res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json && json.choices && json.choices[0]?.message?.content) {
+          return json.choices[0].message.content.trim();
+        }
+      }
+    } catch {
+      // try next
+    }
+  }
+
+  // 4. Honest offline diagnostic fallback
+  const modelMention = activeModel ? `\`${activeModel}\`` : 'a local model';
+  return `⚠️ **Local Chatbot LLM Offline**\n\nI attempted to query your local inference engine at \`127.0.0.1:11434\` to answer your question:\n> *"${promptText}"*\n\nHowever, no local LLM runtime responded.\n\n**To enable live local LLM reasoning:**\n1. Start your local LLM service in terminal:\n   \`\`\`bash\n   ollama serve\n   # or start LM Studio / llama-server\n   \`\`\`\n2. In **Model Management** or the header dropdown, select ${modelMention}.\n3. Once your local engine is running, Lumi will automatically execute all open-ended reasoning locally on your workstation with zero external cloud dependencies.`;
+}
+
+export async function generateChatbotResponse(
+  promptText: string,
+  previousUserPrompts: string[] = [],
+  activeModel?: string
+): Promise<string> {
   let rawP = promptText.trim();
   let p = rawP.toLowerCase();
 
@@ -266,8 +411,8 @@ export function generateChatbotResponse(
     return "CDU stands for Crude Distillation Unit, the primary refining unit in a petroleum refinery that separates crude oil into fractions (LPG, Naphtha, Kerosene, Diesel, Gas Oil, Residue) based on boiling point ranges.";
   }
 
-  // Direct Q&A fallback for any factual query without restating question boilerplate
-  return `Here is the information for your query:\n\n**Topic:** ${rawP}\n**Answer:** This is a direct factual query handled by Lumi on your local workstation. Feel free to ask any further technical questions or request calculations!`;
+  // 4. Fallback Reasoning Engine: Call the actual locally running chatbot LLM
+  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts);
 }
 
 export interface PreviewFile {
@@ -295,6 +440,10 @@ interface AntigravityStore {
   activeSessionId: string;
   activeMode: 'agent' | 'planning' | 'fast';
   selectedModel: string;
+  availableModels: string[];
+  fetchAvailableModels: () => Promise<string[]>;
+  addAvailableModel: (modelName: string) => void;
+  removeAvailableModel: (modelName: string) => void;
   attachedFiles: string[];
   uploadedFiles: UploadedFile[];
   isExecuting: boolean;
@@ -376,7 +525,7 @@ interface AntigravityStore {
   reRunCalculation: () => void;
 
   // Plan Approval Flow
-  proposePlanForTask: (prompt: string, flowType?: 'flow_a_inspection' | 'flow_b_coding') => void;
+  proposePlanForTask: (prompt: string, flowType?: 'flow_a_inspection' | 'flow_b_coding') => Promise<void>;
   approveProposedPlan: (plan: ProposedExecutionPlan) => Promise<void>;
   rejectProposedPlan: (userFeedback?: string) => void;
   runIndustrialDemo: (demoType: 'inspection' | 'pump_mtbf' | 'pid_vision' | 'sop_search') => Promise<void>;
@@ -482,6 +631,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   activeSessionId: initialSessionId,
   activeMode: 'agent',
   selectedModel: '',
+  availableModels: [],
   attachedFiles: [],
   uploadedFiles: [],
   isExecuting: false,
@@ -635,6 +785,46 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
   setActiveMode: (activeMode) => set({ activeMode }),
   setSelectedModel: (selectedModel) => set({ selectedModel }),
+  addAvailableModel: (modelName) => {
+    const trimmed = modelName.trim();
+    if (!trimmed) return;
+    set((state) => {
+      const exists = state.availableModels.includes(trimmed);
+      const updated = exists ? state.availableModels : [...state.availableModels, trimmed];
+      return {
+        availableModels: updated,
+        selectedModel: state.selectedModel || trimmed
+      };
+    });
+  },
+  removeAvailableModel: (modelName) => {
+    set((state) => ({
+      availableModels: state.availableModels.filter((m) => m !== modelName),
+      selectedModel: state.selectedModel === modelName ? '' : state.selectedModel
+    }));
+  },
+  fetchAvailableModels: async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:11434/api/tags', {
+        method: 'GET',
+        mode: 'cors'
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && Array.isArray(data.models)) {
+          const fetchedNames = data.models.map((m: any) => m.name || m.model).filter(Boolean);
+          const current = get().availableModels;
+          const merged = Array.from(new Set([...current, ...fetchedNames]));
+          set({ availableModels: merged, isServerOnline: true });
+          return merged;
+        }
+      }
+    } catch {
+      // offline
+    }
+    return get().availableModels;
+  },
   
   setProjectTitle: (projectTitle) => set((state) => ({
     projectTitle,
@@ -754,7 +944,11 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   checkServerHealth: async () => {
     try {
       const res = await fetch('http://127.0.0.1:11434/api/tags', { method: 'GET', mode: 'cors' }).catch(() => null);
-      set({ isServerOnline: !!(res && res.ok) });
+      const online = !!(res && res.ok);
+      set({ isServerOnline: online });
+      if (online) {
+        get().fetchAvailableModels();
+      }
     } catch {
       set({ isServerOnline: false });
     }
@@ -825,9 +1019,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       totalChunksSearched: res.totalChunksSearched,
       embeddingModel: res.embeddingModel
     };
-  },
-
-  proposePlanForTask: (prompt, flowType) => {
+  },  proposePlanForTask: async (prompt, flowType) => {
     const { addStepToActiveSession, setActiveTaskStarted, addNetworkLog, uploadedFiles, attachedFiles, queryKnowledgeBase } = get();
     setActiveTaskStarted(true);
 
@@ -851,7 +1043,10 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         timestamp: now()
       });
 
-      const responseText = generateChatbotResponse(prompt, previousUserPrompts);
+      set({ isExecuting: true });
+
+      const activeModel = get().selectedModel;
+      const responseText = await generateChatbotResponse(prompt, previousUserPrompts, activeModel);
 
       addStepToActiveSession({
         id: `step-${Date.now()}-resp`,
@@ -867,10 +1062,10 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         source: '127.0.0.1:4321',
         destination: '127.0.0.1:11434',
         protocol: 'HTTP',
-        bytesSent: 140,
-        bytesReceived: 420,
+        bytesSent: 140 + prompt.length,
+        bytesReceived: responseText.length * 2,
         isExternal: false,
-        modelOrTool: 'Qwen2.5-3B-Instruct (Direct QA Chatbot)'
+        modelOrTool: activeModel ? `${activeModel} (Local Direct Q&A)` : 'Local Chatbot LLM (Direct Q&A)'
       });
       return;
     }
@@ -903,7 +1098,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         bytesSent: 120,
         bytesReceived: 380,
         isExternal: false,
-        modelOrTool: 'Qwen2.5-3B-Instruct (Ambiguous Task Clarifier)'
+        modelOrTool: get().selectedModel ? `${get().selectedModel} (Clarifying Agent)` : 'Local Intent Clarifier'
       });
       return;
     }
@@ -968,10 +1163,12 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       ? `✓ Knowledge Base: No relevant guidance matched threshold (${kbResult.totalChunksSearched || 0} chunks searched using ${kbResult.embeddingModel || 'Nomic-768D'}) — proceeding using user upload content.`
       : `✓ Knowledge Base: Retrieved ${kbResult.guidance.length} relevant chunks using ${kbResult.embeddingModel || 'Nomic-768D'}: ${kbResult.guidance.map(g => g.title).join(', ')}`;
 
+    const activeModel = get().selectedModel;
+
     addStepToActiveSession({
       id: `step-${Date.now()}-chatbot`,
       type: 'chatbot_routing',
-      title: 'Front-Facing Chatbot (Qwen2.5-3B-Instruct)',
+      title: activeModel ? `Front-Facing Chatbot (${activeModel})` : 'Front-Facing Chatbot (Multi-Agent Router)',
       content: `I've received your workflow request! Passing to local multi-model router to assemble proposed execution plan:\n\n**Intent Summary:** ${intentSummary}\n**Output Contract:** \`${contract.deliverable_name}\` (Target: \`${contract.expected_filename}\`)\n**Task Content Uploads:** \`${fileContextStr}\` (Primary source_type = ${userUploadFiles.length > 0 ? 'USER_UPLOAD' : 'PROMPT_INPUT'})\n**Nomic Vector RAG:** ${kbStatusText}`,
       timestamp: now()
     });
@@ -985,8 +1182,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         id: `plan-${Date.now()}`,
         classifiedTaskType: 'inspection_analysis',
         outputContract: contract,
-        primaryModel: 'Qwen2.5-VL',
-        secondaryModel: 'Qwen2.5-Coder-7B',
+        primaryModel: activeModel || 'Multi-Agent Orchestrator',
+        secondaryModel: 'Specialized Multi-Agent Runtime',
         intentSummary,
         targetFileNames: userUploadFiles,
         userUploadFiles,
@@ -995,11 +1192,11 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         kbConflictDetected: kbResult.conflictDetected,
         kbConflictSummary: kbResult.conflictSummary,
         steps: [
-          { id: 's1', stepNumber: 1, toolName: 'scanned_image_ocr', description: `Analyze scanned report / OCR / vision on ${activeFileLabel}`, targetModel: 'Qwen2.5-VL', status: 'pending' },
-          { id: 's2', stepNumber: 2, toolName: 'vibration_extractor', description: `Extract vibration and temperature readings from report data`, targetModel: 'Qwen2.5-VL', status: 'pending' },
-          { id: 's3', stepNumber: 3, toolName: 'nomic_embed_rag', description: `Retrieve relevant SOP information using Nomic 768-D Embeddings`, targetModel: 'Nomic-Embed-Text', status: 'pending' },
-          { id: 's4', stepNumber: 4, toolName: 'docker_python_sandbox', description: `Run Python cost calculation to estimate total replacement cost (labor + taxes)`, targetModel: 'Qwen2.5-Coder-7B', status: 'pending' },
-          { id: 's5', stepNumber: 5, toolName: 'docx_compiler', description: `Generate editable Word document Approval Note \`${contract.expected_filename}\``, targetModel: 'Qwen3-8B-Instruct', status: 'pending' }
+          { id: 's1', stepNumber: 1, toolName: 'scanned_image_ocr', description: `Analyze scanned report / OCR / vision on ${activeFileLabel}`, targetModel: activeModel ? `${activeModel} (Vision Agent)` : 'Vision & OCR Agent', status: 'pending' },
+          { id: 's2', stepNumber: 2, toolName: 'vibration_extractor', description: `Extract vibration and temperature readings from report data`, targetModel: activeModel ? `${activeModel} (Sensor Agent)` : 'Sensor Extraction Agent', status: 'pending' },
+          { id: 's3', stepNumber: 3, toolName: 'nomic_embed_rag', description: `Retrieve relevant SOP information using Nomic 768-D Embeddings`, targetModel: 'Nomic-Embed-Text (768-D RAG)', status: 'pending' },
+          { id: 's4', stepNumber: 4, toolName: 'docker_python_sandbox', description: `Run Python cost calculation to estimate total replacement cost (labor + taxes)`, targetModel: activeModel ? `${activeModel} (Code Agent)` : 'Python Sandbox & Math Agent', status: 'pending' },
+          { id: 's5', stepNumber: 5, toolName: 'docx_compiler', description: `Generate editable Word document Approval Note \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (Deliverable Agent)` : 'Deliverable Synthesis Agent', status: 'pending' }
         ],
         expectedDeliverables: [contract.expected_filename],
         userDecision: 'pending',
@@ -1011,7 +1208,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         id: `plan-${Date.now()}`,
         classifiedTaskType: 'presentation_generation',
         outputContract: contract,
-        primaryModel: 'Qwen3-8B-Instruct',
+        primaryModel: activeModel || 'Multi-Agent Orchestrator',
         intentSummary,
         targetFileNames: userUploadFiles,
         userUploadFiles,
@@ -1020,10 +1217,10 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         kbConflictDetected: kbResult.conflictDetected,
         kbConflictSummary: kbResult.conflictSummary,
         steps: [
-          { id: 's1', stepNumber: 1, toolName: 'pdf-document-extractor', description: `Parse key topics, decisions, and action items from ${activeFileLabel}`, targetModel: 'Qwen3-8B-Instruct', status: 'pending' },
-          { id: 's2', stepNumber: 2, toolName: 'nomic-embed-rag', description: kbResult.noGuidanceFound ? `Query Knowledge Base via Nomic 768-D Embeddings (No guidance matched threshold)` : `Query Knowledge Base via Nomic 768-D Embeddings (Retrieved: ${kbResult.guidance.map(g => g.title).join(', ')})`, targetModel: 'Nomic-Embed-Text', status: 'pending' },
-          { id: 's3', stepNumber: 3, toolName: 'slide_outline_generator', description: `Synthesize 5-slide outline from ${activeFileLabel} + company presentation guidelines`, targetModel: 'Qwen3-8B-Instruct', status: 'pending' },
-          { id: 's4', stepNumber: 4, toolName: 'pptx_artifact_builder', description: `Generate PowerPoint presentation artifact \`${contract.expected_filename}\``, targetModel: 'Qwen3-8B-Instruct', status: 'pending' }
+          { id: 's1', stepNumber: 1, toolName: 'pdf-document-extractor', description: `Parse key topics, decisions, and action items from ${activeFileLabel}`, targetModel: activeModel ? `${activeModel} (Doc Agent)` : 'Document Intelligence Agent', status: 'pending' },
+          { id: 's2', stepNumber: 2, toolName: 'nomic-embed-rag', description: kbResult.noGuidanceFound ? `Query Knowledge Base via Nomic 768-D Embeddings (No guidance matched threshold)` : `Query Knowledge Base via Nomic 768-D Embeddings (Retrieved: ${kbResult.guidance.map(g => g.title).join(', ')})`, targetModel: 'Nomic-Embed-Text (768-D RAG)', status: 'pending' },
+          { id: 's3', stepNumber: 3, toolName: 'slide_outline_generator', description: `Synthesize 5-slide outline from ${activeFileLabel} + company presentation guidelines`, targetModel: activeModel ? `${activeModel} (Slide Agent)` : 'Slide Design Agent', status: 'pending' },
+          { id: 's4', stepNumber: 4, toolName: 'pptx_artifact_builder', description: `Generate PowerPoint presentation artifact \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (PPTX Agent)` : 'PPTX Deliverable Agent', status: 'pending' }
         ],
         expectedDeliverables: [contract.expected_filename],
         userDecision: 'pending',
@@ -1035,7 +1232,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         id: `plan-${Date.now()}`,
         classifiedTaskType: 'code_generation',
         outputContract: contract,
-        primaryModel: 'Qwen2.5-Coder-7B',
+        primaryModel: activeModel || 'Multi-Agent Orchestrator',
         intentSummary,
         targetFileNames: userUploadFiles,
         userUploadFiles,
@@ -1044,9 +1241,9 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         kbConflictDetected: kbResult.conflictDetected,
         kbConflictSummary: kbResult.conflictSummary,
         steps: [
-          { id: 's1', stepNumber: 1, toolName: 'file_system.read', description: `Extract requirements/structure from ${activeFileLabel}`, targetModel: 'Qwen2.5-Coder-7B', status: 'pending' },
-          { id: 's2', stepNumber: 2, toolName: 'docker-python-sandbox', description: `Execute Python code in isolated Docker container (--network=none)`, targetModel: 'Qwen2.5-Coder-7B', status: 'pending' },
-          { id: 's3', stepNumber: 3, toolName: 'artifact_builder', description: `Generate deliverable \`${contract.expected_filename}\``, targetModel: 'Qwen2.5-Coder-7B', status: 'pending' }
+          { id: 's1', stepNumber: 1, toolName: 'file_system.read', description: `Extract requirements/structure from ${activeFileLabel}`, targetModel: activeModel ? `${activeModel} (Code Agent)` : 'Code & Math Agent', status: 'pending' },
+          { id: 's2', stepNumber: 2, toolName: 'docker-python-sandbox', description: `Execute Python code in isolated Docker container (--network=none)`, targetModel: activeModel ? `${activeModel} (Sandbox)` : 'Docker Python Sandbox', status: 'pending' },
+          { id: 's3', stepNumber: 3, toolName: 'artifact_builder', description: `Generate deliverable \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (Artifact Agent)` : 'Artifact Synthesis Agent', status: 'pending' }
         ],
         expectedDeliverables: [contract.expected_filename],
         userDecision: 'pending',
@@ -1058,7 +1255,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         id: `plan-${Date.now()}`,
         classifiedTaskType: taskType,
         outputContract: contract,
-        primaryModel: 'Qwen3-8B-Instruct',
+        primaryModel: activeModel || 'Multi-Agent Orchestrator',
         intentSummary,
         targetFileNames: userUploadFiles,
         userUploadFiles,
@@ -1067,9 +1264,9 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         kbConflictDetected: kbResult.conflictDetected,
         kbConflictSummary: kbResult.conflictSummary,
         steps: [
-          { id: 's1', stepNumber: 1, toolName: 'document_analyzer', description: `Extract requirements from ${activeFileLabel}`, targetModel: 'Qwen3-8B-Instruct', status: 'pending' },
-          { id: 's2', stepNumber: 2, toolName: 'nomic-embed-rag', description: `Query Knowledge Base via Nomic 768-D Embeddings`, targetModel: 'Nomic-Embed-Text', status: 'pending' },
-          { id: 's3', stepNumber: 3, toolName: 'docx_compiler', description: `Generate Word document deliverable \`${contract.expected_filename}\``, targetModel: 'Qwen3-8B-Instruct', status: 'pending' }
+          { id: 's1', stepNumber: 1, toolName: 'document_analyzer', description: `Extract requirements from ${activeFileLabel}`, targetModel: activeModel ? `${activeModel} (Doc Agent)` : 'Document Intelligence Agent', status: 'pending' },
+          { id: 's2', stepNumber: 2, toolName: 'nomic-embed-rag', description: `Query Knowledge Base via Nomic 768-D Embeddings`, targetModel: 'Nomic-Embed-Text (768-D RAG)', status: 'pending' },
+          { id: 's3', stepNumber: 3, toolName: 'docx_compiler', description: `Generate Word document deliverable \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (DOCX Agent)` : 'DOCX Deliverable Agent', status: 'pending' }
         ],
         expectedDeliverables: [contract.expected_filename],
         userDecision: 'pending',
@@ -1094,7 +1291,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       bytesSent: 820,
       bytesReceived: 3410,
       isExternal: false,
-      modelOrTool: `Qwen2.5-3B-Instruct & Router (${contract.deliverable_name})`
+      modelOrTool: activeModel ? `${activeModel} & Router (${contract.deliverable_name})` : `Multi-Agent Router (${contract.deliverable_name})`
     });
   },
 

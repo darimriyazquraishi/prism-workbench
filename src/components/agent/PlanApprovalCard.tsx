@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { ProposedExecutionPlan, ProposedStepItem } from '../../types/antigravity';
+import { useAntigravityStore } from '../../store/useAntigravityStore';
 
 interface PlanApprovalCardProps {
   plan: ProposedExecutionPlan;
@@ -25,6 +26,7 @@ export const PlanApprovalCard: React.FC<PlanApprovalCardProps> = ({
   onApprove,
   onReject
 }) => {
+  const { availableModels } = useAntigravityStore();
   const [isEditing, setIsEditing] = useState(false);
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectFeedback, setRejectFeedback] = useState('');
@@ -175,11 +177,12 @@ export const PlanApprovalCard: React.FC<PlanApprovalCardProps> = ({
                 <select 
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
-                  className="bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded border border-[var(--border-subtle)] text-xs px-2 py-0.5 mt-0.5 focus:outline-none"
+                  className="bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded border border-[var(--border-subtle)] text-xs px-2 py-0.5 mt-0.5 focus:outline-none font-mono"
                 >
-                  <option value="Qwen3-8B-Instruct">Qwen3-8B-Instruct (Reasoning & Draft)</option>
-                  <option value="Qwen2.5-VL-7B-Instruct">Qwen2.5-VL-7B (Vision & P&ID)</option>
-                  <option value="Qwen2.5-Coder-7B">Qwen2.5-Coder-7B (Python & Engineering)</option>
+                  <option value={selectedModel || 'Multi-Agent Orchestrator'}>{selectedModel || 'Multi-Agent Orchestrator'}</option>
+                  {availableModels.filter(m => m !== selectedModel).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
                 </select>
               ) : (
                 <div className="font-semibold text-[var(--text-primary)] font-mono">{selectedModel}</div>
