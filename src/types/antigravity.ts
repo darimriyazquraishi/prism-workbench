@@ -155,9 +155,76 @@ export interface ArtifactItem {
   description: string;
   createdAt: string;
   previewUrl?: string;
+  downloadUrl?: string;
+  blob?: Blob;
   approvalStatus?: 'draft' | 'approved';
   slideCount?: number;
   slides?: { title: string; bullets: string[]; layout?: string }[];
+}
+
+export interface PptxSlide {
+  title: string;
+  purpose?: string;
+  content: string[];
+  speakerNotes?: string;
+  layout?: 'title' | 'content' | 'split' | 'summary';
+  visualSuggestion?: string;
+  sourceReferences?: string[];
+}
+
+export interface PptxStructuredContent {
+  title: string;
+  subtitle: string;
+  executiveSummary?: string;
+  slides: PptxSlide[];
+}
+
+export interface DocxSection {
+  heading: string;
+  paragraphs: string[];
+  bulletPoints?: string[];
+  keyMetrics?: Record<string, string>;
+}
+
+export interface DocxStructuredContent {
+  documentTitle: string;
+  documentType: string;
+  metadata?: Record<string, string>;
+  executiveSummary: string;
+  sections: DocxSection[];
+  signOffBlock?: {
+    preparedBy?: string;
+    verifiedBy?: string;
+    status?: string;
+  };
+}
+
+export interface XlsxSheet {
+  name: string;
+  purpose?: string;
+  headers: string[];
+  rows: (string | number)[][];
+  formulas?: string[];
+  summary?: string;
+}
+
+export interface XlsxStructuredContent {
+  workbookTitle: string;
+  summary?: string;
+  sheets: XlsxSheet[];
+}
+
+export interface WorkflowContext {
+  userRequest: string;
+  sourceFiles: { name: string; content?: string; dataUrl?: string; type: string }[];
+  extractedContent: string;
+  ragContext: KbGuidanceRef[];
+  visionFindings?: string;
+  sensorReadings?: Record<string, any>;
+  calculations?: { formula: string; result: any; summary: string };
+  llmOutputs: Record<string, string>;
+  structuredDeliverable?: any;
+  artifact?: ArtifactItem;
 }
 
 export interface SkillItem {

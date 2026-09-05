@@ -285,8 +285,8 @@ export const TrajectoryStream: React.FC<TrajectoryStreamProps> = ({ onRunDemo })
                             Inspect
                           </button>
                           <a
-                            href={art.path}
-                            download
+                            href={art.downloadUrl || art.path}
+                            download={art.name}
                             className="px-2 py-0.5 rounded bg-[var(--accent-fuchsia)] hover:bg-[#1f8ad2] text-[var(--text-primary)] text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all"
                           >
                             <Download className="w-3 h-3" />
