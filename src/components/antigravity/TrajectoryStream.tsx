@@ -221,9 +221,24 @@ export const TrajectoryStream: React.FC<TrajectoryStreamProps> = ({ onRunDemo })
                   <span className="text-[var(--text-secondary)] font-mono">· {step.timestamp}</span>
                 </div>
 
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#1f3a2b] text-[var(--status-healthy)] border border-[#2e5d44] font-bold">
-                  ● Air-Gap Verified
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {step.groundedStatus === 'routed' ? (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-950/90 text-blue-300 border border-blue-700/60 font-bold">
+                      ● Re-routed via General Reasoning
+                    </span>
+                  ) : step.groundedStatus === 'insufficient' ? (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-700/60 font-bold">
+                      ● Insufficient Source Evidence
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1f3a2b] text-[var(--status-healthy)] border border-[#2e5d44] font-bold">
+                      ● Source-Grounded
+                    </span>
+                  )}
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1b2333] text-gray-400 border border-[#2c374e]">
+                    Air-Gap Verified
+                  </span>
+                </div>
               </div>
 
               {/* Response Markdown */}
@@ -285,7 +300,7 @@ export const TrajectoryStream: React.FC<TrajectoryStreamProps> = ({ onRunDemo })
                             Inspect
                           </button>
                           <a
-                            href={art.downloadUrl || art.path}
+                            href={art.downloadUrl || `/api/download/${art.name}`}
                             download={art.name}
                             className="px-2 py-0.5 rounded bg-[var(--accent-fuchsia)] hover:bg-[#1f8ad2] text-[var(--text-primary)] text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all"
                           >

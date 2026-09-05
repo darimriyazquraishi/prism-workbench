@@ -1,3 +1,4 @@
+import { useTelemetryStore } from '../store/telemetryStore';
 import type {
   PptxStructuredContent,
   DocxStructuredContent,
@@ -36,8 +37,7 @@ export function resolveOllamaModelTag(requested?: string): string {
     return 'qwen2.5-coder:7b';
   }
   if (r.includes('vl') || r.includes('vision')) {
-    // If vision model is requested, try vision or fallback to qwen3
-    return 'qwen3:8b';
+    return 'qwen2.5vl:7b';
   }
   if (r.includes('14b')) {
     return 'qwen3:14b';
@@ -127,6 +127,11 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
   }
 
   const durationMs = Math.round(performance.now() - startTime);
+
+  useTelemetryStore.getState().recordInference({
+    model: modelTag,
+    inferenceTimeMs: durationMs
+  });
 
   return {
     content: responseText.trim(),

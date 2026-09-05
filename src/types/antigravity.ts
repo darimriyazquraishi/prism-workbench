@@ -139,12 +139,50 @@ export interface TrajectoryStep {
   toolOutput?: any;
   durationMs?: number;
   status?: 'pending' | 'running' | 'success' | 'error' | 'waiting_approval';
+  groundedStatus?: 'grounded' | 'routed' | 'insufficient';
   timestamp: string;
   citations?: { source: string; page?: number; snippet: string }[];
   artifacts?: ArtifactItem[];
   proposedPlan?: ProposedExecutionPlan;
   isExpanded?: boolean;
 }
+
+export interface ValidationResult {
+  grounded: boolean;
+  answers_question: boolean;
+  evidence_sufficient: boolean;
+  confidence: number;
+  unsupported_claims: string[];
+  missing_information: string[];
+  contradictions: string[];
+  reason: string;
+  route: 'RETURN' | 'REEVALUATE' | 'RETURN_LOW_CONFIDENCE' | 'GENERAL_REASONING' | 'INSUFFICIENT_EVIDENCE';
+}
+
+export interface ValidationAuditLog {
+  id: string;
+  timestamp: string;
+  user_query: string;
+  retrieved_context: string;
+  selected_initial_model: string;
+  initial_answer: string;
+  validation_confidence: number;
+  initial_confidence?: number;
+  reevaluation_confidence?: number;
+  evaluation_count?: number;
+  max_evaluations?: number;
+  disclaimer_added?: boolean;
+  validation_result: ValidationResult;
+  unsupported_claims: string[];
+  missing_information: string[];
+  contradictions: string[];
+  routing_decision: 'ACCEPTED_INITIAL' | 'REEVALUATED' | 'ACCEPTED_AFTER_REEVALUATION' | 'RETURN_LOW_CONFIDENCE' | 'ROUTED_TO_REASONING' | 'INSUFFICIENT_EVIDENCE_RETURN';
+  reasoning_model_used?: string;
+  reasoning_answer?: string;
+  final_answer: string;
+  final_validation_result?: ValidationResult;
+}
+
 
 export interface ArtifactItem {
   id: string;

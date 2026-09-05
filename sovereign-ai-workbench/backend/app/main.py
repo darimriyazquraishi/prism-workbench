@@ -1,3 +1,19 @@
+import sys
+import site
+from pathlib import Path
+
+# Ensure user site packages and local virtual environment paths are included in sys.path
+user_site = site.getusersitepackages()
+if user_site and user_site not in sys.path:
+    sys.path.insert(0, user_site)
+
+for extra_path in [
+    "/home/aidl/.local/lib/python3.10/site-packages",
+    str(Path(__file__).resolve().parent.parent / ".venv" / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages")
+]:
+    if extra_path not in sys.path and Path(extra_path).exists():
+        sys.path.insert(0, extra_path)
+
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -5,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.api.routes import chat, documents, knowledge, artifacts, models, tools, audit, system
+from app.api.routes import chat, documents, knowledge, kb, artifacts, models, tools, audit, system
 
 # Import all tools to ensure they are registered with tool_registry
 import app.tools.file_tools
@@ -54,6 +70,7 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(knowledge.router, prefix="/api")
+app.include_router(kb.router, prefix="/api")
 app.include_router(artifacts.router, prefix="/api")
 app.include_router(models.router, prefix="/api")
 app.include_router(tools.router, prefix="/api")

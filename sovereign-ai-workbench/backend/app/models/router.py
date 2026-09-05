@@ -23,16 +23,17 @@ class ModelRouter:
         attached_files: list[str] | None = None,
         force_model: str | None = None
     ) -> RoutingDecision:
-        if force_model and registry.get(force_model):
-            meta = registry.get(force_model)!
-            return RoutingDecision(
-                selected_model_id=meta.id,
-                ollama_model_name=meta.ollama_name,
-                task_type="Manual Override",
-                reason=f"User explicitly requested {meta.id}.",
-                alternatives=[],
-                vram_allocated_mb=meta.vram_mb
-            )
+        if force_model:
+            meta = registry.get(force_model)
+            if meta:
+                return RoutingDecision(
+                    selected_model_id=meta.id,
+                    ollama_model_name=meta.ollama_name,
+                    task_type="Manual Override",
+                    reason=f"User explicitly requested {meta.id}.",
+                    alternatives=[],
+                    vram_allocated_mb=meta.vram_mb
+                )
 
         attached_files = attached_files or []
         task_lower = task_text.lower()

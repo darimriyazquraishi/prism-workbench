@@ -156,8 +156,8 @@ export const DeliverablesView: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <a
-                          href={item.file_path}
-                          download
+                          href={`/api/download/${item.file_name}`}
+                          download={item.file_name}
                           onClick={(e) => e.stopPropagation()}
                           className="px-3 py-1.5 rounded-md bg-[var(--accent-fuchsia)] hover:bg-[#1f8ad2] text-[var(--text-primary)] text-xs font-bold inline-flex items-center gap-1 shadow"
                         >

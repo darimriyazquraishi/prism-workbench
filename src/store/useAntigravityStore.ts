@@ -13,8 +13,12 @@ import type {
   ContractValidationResult,
   RoutingIntent,
   IntentRoutingResult,
-  WorkflowContext
+  WorkflowContext,
+  ValidationAuditLog
 } from '../types/antigravity';
+import { defaultPipelineConfig, type PipelineConfig } from '../config/pipelineConfig';
+import { executeValidationAndRoutingPipeline } from '../services/answerValidatorService';
+import { useTelemetryStore } from './telemetryStore';
 import { searchKnowledgeBaseWithNomic, chunkDocumentText } from '../services/nomicEmbeddings';
 import {
   generatePptxDeliverable,
@@ -192,152 +196,37 @@ export function classifyIntent(
 export async function queryLocalChatbotLLM(
   promptText: string,
   model?: string,
-  previousPrompts: string[] = []
-): Promise<string> {
-  const endpoints = [
-    'http://127.0.0.1:11434', // Ollama default
-    'http://localhost:11434',
-    'http://127.0.0.1:1234',  // LM Studio default
-  ];
-
-  let activeModel = (model || '').trim();
-
-  // If no model is explicitly passed, try to detect installed model from Ollama tags
-  if (!activeModel) {
-    try {
-      const tagRes = await fetch('http://127.0.0.1:11434/api/tags', {
-        method: 'GET',
-        signal: AbortSignal.timeout(2000)
-      }).catch(() => null);
-      if (tagRes && tagRes.ok) {
-        const data = await tagRes.json().catch(() => null);
-        if (data && Array.isArray(data.models) && data.models.length > 0) {
-          activeModel = data.models[0].name || data.models[0].model || '';
-        }
-      }
-    } catch {
-      // ignore
+  previousPrompts: string[] = [],
+  contextText: string = '',
+  requestId?: string
+): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
+  try {
+    const pipelineRes = await executeValidationAndRoutingPipeline(promptText, contextText, {
+      initialModel: model || defaultPipelineConfig.initialModel
+    }, requestId);
+    return {
+      text: pipelineRes.finalAnswer,
+      auditLog: pipelineRes.auditLog,
+      groundedStatus: pipelineRes.groundedStatus
+    };
+  } catch (err: any) {
+    if (requestId) {
+      useTelemetryStore.getState().failCurrentExecution(requestId, err.message, 'Validation Pipeline');
     }
+    return {
+      text: `⚠️ **Execution Error**: ${err.message}`,
+      groundedStatus: 'insufficient'
+    };
   }
-
-  const systemPrompt = `You are Lumi, an on-premise, secure engineering and scientific AI assistant running locally on the user's workstation. Provide accurate, clear, and direct answers to the user's questions. Use concise markdown formatting where appropriate.`;
-
-  const messages: { role: string; content: string }[] = [
-    { role: 'system', content: systemPrompt }
-  ];
-
-  // Pass short conversational context (last 2 previous user questions)
-  const recentUser = previousPrompts.slice(-2);
-  for (const prev of recentUser) {
-    if (prev && prev.trim()) {
-      messages.push({ role: 'user', content: prev.trim() });
-      messages.push({ role: 'assistant', content: 'Understood.' });
-    }
-  }
-  messages.push({ role: 'user', content: promptText });
-
-  // 1. Try Ollama /api/chat
-  for (const base of endpoints) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-      const res = await fetch(`${base}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: activeModel || 'llama3',
-          messages: messages,
-          stream: false,
-          options: { temperature: 0.3 }
-        }),
-        signal: controller.signal
-      }).catch(() => null);
-
-      clearTimeout(timeoutId);
-
-      if (res && res.ok) {
-        const json = await res.json().catch(() => null);
-        if (json && json.message && json.message.content) {
-          return json.message.content.trim();
-        }
-      }
-    } catch {
-      // try next
-    }
-  }
-
-  // 2. Try Ollama /api/generate
-  for (const base of endpoints) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-      const res = await fetch(`${base}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: activeModel || 'llama3',
-          prompt: `${systemPrompt}\n\nUser Question: ${promptText}\n\nAnswer:`,
-          stream: false,
-          options: { temperature: 0.3 }
-        }),
-        signal: controller.signal
-      }).catch(() => null);
-
-      clearTimeout(timeoutId);
-
-      if (res && res.ok) {
-        const json = await res.json().catch(() => null);
-        if (json && json.response) {
-          return json.response.trim();
-        }
-      }
-    } catch {
-      // try next
-    }
-  }
-
-  // 3. Try OpenAI-compatible /v1/chat/completions (LM Studio, llama-server, vLLM, LocalAI)
-  for (const base of endpoints) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      const res = await fetch(`${base}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: activeModel || 'local-model',
-          messages: messages,
-          temperature: 0.3
-        }),
-        signal: controller.signal
-      }).catch(() => null);
-
-      clearTimeout(timeoutId);
-
-      if (res && res.ok) {
-        const json = await res.json().catch(() => null);
-        if (json && json.choices && json.choices[0]?.message?.content) {
-          return json.choices[0].message.content.trim();
-        }
-      }
-    } catch {
-      // try next
-    }
-  }
-
-  // 4. Honest offline diagnostic fallback
-  const modelMention = activeModel ? `\`${activeModel}\`` : 'a local model';
-  return `⚠️ **Local Chatbot LLM Offline**\n\nI attempted to query your local inference engine at \`127.0.0.1:11434\` to answer your question:\n> *"${promptText}"*\n\nHowever, no local LLM runtime responded.\n\n**To enable live local LLM reasoning:**\n1. Start your local LLM service in terminal:\n   \`\`\`bash\n   ollama serve\n   # or start LM Studio / llama-server\n   \`\`\`\n2. In **Model Management** or the header dropdown, select ${modelMention}.\n3. Once your local engine is running, Lumi will automatically execute all open-ended reasoning locally on your workstation with zero external cloud dependencies.`;
 }
 
 export async function generateChatbotResponse(
   promptText: string,
   previousUserPrompts: string[] = [],
-  activeModel?: string
-): Promise<string> {
+  activeModel?: string,
+  contextText: string = '',
+  requestId?: string
+): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   let rawP = promptText.trim();
   let p = rawP.toLowerCase();
 
@@ -351,82 +240,80 @@ export async function generateChatbotResponse(
     }
   }
 
+  const cleanP = p.replace(/^[^\w\s]+|[^\w\s]+$/g, '').trim();
+
   // Greetings & Small talk
-  if (/^(hi|hello|hey|good morning|good afternoon|good evening|greetings|howdy|sup)\b/i.test(p) && p.length < 30) {
-    return "Hello! I am your local Lumi assistant. How can I help you today?";
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening|greetings|howdy|sup)\b/i.test(cleanP) && cleanP.length < 30) {
+    return { text: "Hello! I am your local Lumi assistant. How can I help you today?", groundedStatus: 'grounded' };
   }
 
   if (/^(how are you|who are you|what can you do|thanks|thank you|bye)\b/i.test(p) && p.length < 40) {
     if (p.includes('who are you') || p.includes('what can you do')) {
-      return "I am Lumi, an on-premise engineering & agentic intelligence assistant running locally on your workstation. I can answer technical questions, explain standards, perform calculations, or coordinate specialized agents to analyze inspection reports, query SOP manuals, and build PPTX/DOCX/XLSX deliverables.";
+      return { text: "I am Lumi, an on-premise engineering & agentic intelligence assistant running locally on your workstation. I can answer technical questions, explain standards, perform calculations, or coordinate specialized agents to analyze inspection reports, query SOP manuals, and build PPTX/DOCX/XLSX deliverables.", groundedStatus: 'grounded' };
     }
     if (p.includes('how are you')) {
-      return "I'm running smoothly on your local workstation engine, ready to assist!";
+      return { text: "I'm running smoothly on your local workstation engine, ready to assist!", groundedStatus: 'grounded' };
     }
     if (p.includes('thanks') || p.includes('thank you')) {
-      return "You're welcome! Let me know if you need anything else.";
+      return { text: "You're welcome! Let me know if you need anything else.", groundedStatus: 'grounded' };
     }
-    return "Goodbye! Have a great day.";
+    return { text: "Goodbye! Have a great day.", groundedStatus: 'grounded' };
   }
 
-  // 1. Math & Geometry Formulas
+  // Math & Geometry Formulas
   if ((p.includes('area of') || p.includes('formula for')) && p.includes('circle')) {
-    return "The formula for the area of a circle is **$A = \\pi r^2$**, where **$A$** is the area and **$r$** is the radius of the circle (or $A = \\frac{\\pi d^2}{4}$ using diameter $d$).";
+    return { text: "The formula for the area of a circle is **$A = \\pi r^2$**, where **$A$** is the area and **$r$** is the radius of the circle (or $A = \\frac{\\pi d^2}{4}$ using diameter $d$).", groundedStatus: 'grounded' };
   }
 
   if (p.includes('circumference') && p.includes('circle')) {
-    return "The formula for the circumference of a circle is **$C = 2\\pi r$** (or **$C = \\pi d$**), where **$r$** is the radius and **$d$** is the diameter.";
+    return { text: "The formula for the circumference of a circle is **$C = 2\\pi r$** (or **$C = \\pi d$**), where **$r$** is the radius and **$d$** is the diameter.", groundedStatus: 'grounded' };
   }
 
   if (p.includes('volume') && p.includes('sphere')) {
-    return "The formula for the volume of a sphere is **$V = \\frac{4}{3}\\pi r^3$**, where **$r$** is the radius.";
+    return { text: "The formula for the volume of a sphere is **$V = \\frac{4}{3}\\pi r^3$**, where **$r$** is the radius.", groundedStatus: 'grounded' };
   }
 
   if (p.includes('volume') && p.includes('cylinder')) {
-    return "The formula for the volume of a cylinder is **$V = \\pi r^2 h$**, where **$r$** is the base radius and **$h$** is the height.";
+    return { text: "The formula for the volume of a cylinder is **$V = \\pi r^2 h$**, where **$r$** is the base radius and **$h$** is the height.", groundedStatus: 'grounded' };
   }
 
   if (p.includes('quadratic formula')) {
-    return "The quadratic formula for finding roots of $ax^2 + bx + c = 0$ is **$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$**.";
+    return { text: "The quadratic formula for finding roots of $ax^2 + bx + c = 0$ is **$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$**.", groundedStatus: 'grounded' };
   }
 
   if (p.includes('pythagorean')) {
-    return "The Pythagorean Theorem for a right triangle states: **$a^2 + b^2 = c^2$**, where $c$ is the hypotenuse.";
+    return { text: "The Pythagorean Theorem for a right triangle states: **$a^2 + b^2 = c^2$**, where $c$ is the hypotenuse.", groundedStatus: 'grounded' };
   }
 
-  // 2. Math Calculations
+  // Math Calculations
   const mathMatch = p.match(/^calculate\s+(.+)$/i) || p.match(/^(what is|what's)\s+([\d\s\+\-\*\/\(\)\.]+)\??$/i);
   if (mathMatch) {
     try {
       const expr = mathMatch[mathMatch.length - 1].replace(/[^0-9\+\-\*\/\(\)\.]/g, '');
       if (expr) {
         const result = Function(`'use strict'; return (${expr})`)();
-        return `The result of \`${expr}\` is **${result}**.`;
+        return { text: `The result of \`${expr}\` is **${result}**.`, groundedStatus: 'grounded' };
       }
     } catch {
       // Fallback
     }
   }
 
-  // 3. Science & Engineering Direct Q&A
+  // Science & Engineering Direct Q&A (Domain knowledge definitions, but NO aggressive generic traps)
   if (p.includes('newton') && (p.includes('second law') || p.includes('2nd law') || p.includes('law'))) {
-    return "Newton's Second Law of Motion states that force equals mass times acceleration: **$F = m \\cdot a$**.";
+    return { text: "Newton's Second Law of Motion states that force equals mass times acceleration: **$F = m \\cdot a$**.", groundedStatus: 'grounded' };
   }
 
-  if (p.includes('vibration rms') || p.includes('vibration')) {
-    return "Vibration RMS (Root Mean Square) measures the overall energy of structural or rotational vibration in industrial machinery. According to ISO 10816 standards, RMS vibration velocity (in mm/s) reflects the kinetic energy dissipated through bearings and structural supports, helping engineers assess mechanical health and detect imbalance, misalignment, or bearing degradation before catastrophic failure.";
+  if (p.includes('api 570') && p.includes('definition')) {
+    return { text: "API 570 is the Piping Inspection Code covering in-service inspection, rating, repair, and alteration of metallic and fiberglass-reinforced plastic (FRP) piping systems.", groundedStatus: 'grounded' };
   }
 
-  if (p.includes('api 570') || p.includes('corrosion')) {
-    return "API 570 is the Piping Inspection Code covering in-service inspection, rating, repair, and alteration of metallic and fiberglass-reinforced plastic (FRP) piping systems. It defines minimum thickness thresholds ($t_{\\text{min}}$), localized corrosion monitoring rates ($CR = \\frac{t_{\\text{initial}} - t_{\\text{actual}}}{\\Delta T}$), and remaining corrosion life estimates.";
+  if (p.includes('cdu') && p.includes('definition')) {
+    return { text: "CDU stands for Crude Distillation Unit, the primary refining unit in a petroleum refinery that separates crude oil into fractions based on boiling point ranges.", groundedStatus: 'grounded' };
   }
 
-  if (p.includes('cdu')) {
-    return "CDU stands for Crude Distillation Unit, the primary refining unit in a petroleum refinery that separates crude oil into fractions (LPG, Naphtha, Kerosene, Diesel, Gas Oil, Residue) based on boiling point ranges.";
-  }
-
-  // 4. Fallback Reasoning Engine: Call the actual locally running chatbot LLM
-  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts);
+  // Fallback Reasoning Engine: Call the actual validation and routing pipeline
+  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId);
 }
 
 export interface PreviewFile {
@@ -495,14 +382,6 @@ interface AntigravityStore {
   notifications: NotificationItem[];
   isServerOnline: boolean;
 
-  // Dynamic Tool Output & Calculation State
-  calculationResults: {
-    corrosionRate: string;
-    remainingLife: string;
-    alertTriggered: boolean;
-    lastRunTime: string;
-  };
-
   // Proposed Plan State
   activeProposedPlan: ProposedExecutionPlan | null;
 
@@ -558,6 +437,13 @@ interface AntigravityStore {
   // Modals
   setCommandPaletteOpen: (val: boolean) => void;
   setSecurityModalOpen: (val: boolean) => void;
+
+  // Validation Audit Logs & Configuration
+  pipelineConfig: PipelineConfig;
+  validationAuditLogs: ValidationAuditLog[];
+  updatePipelineConfig: (config: Partial<PipelineConfig>) => void;
+  addValidationAuditLog: (log: ValidationAuditLog) => void;
+  clearValidationAuditLogs: () => void;
 }
 
 const initialSkills: SkillItem[] = [
@@ -654,6 +540,12 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   activeDocumentContext: 'No active context',
   isComputerAccessEnabled: true,
   
+  pipelineConfig: defaultPipelineConfig,
+  validationAuditLogs: [],
+  updatePipelineConfig: (cfg) => set((state) => ({ pipelineConfig: { ...state.pipelineConfig, ...cfg } })),
+  addValidationAuditLog: (log) => set((state) => ({ validationAuditLogs: [log, ...state.validationAuditLogs] })),
+  clearValidationAuditLogs: () => set({ validationAuditLogs: [] }),
+
   activeRightTab: 'artifacts',
   isRightPaneOpen: true,
   isSidebarOpen: true,
@@ -677,70 +569,24 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     knowledgeItems: state.knowledgeItems.filter((item) => item.id !== id)
   })),
 
-  queryKnowledgeBase: (prompt: string, taskType: string) => {
+  reRunCalculation: () => {},
+
+  queryKnowledgeBase: (prompt, taskType) => {
     const { knowledgeItems } = get();
-    // STRICT SOURCE SEPARATION: Filter ONLY source_type === 'KNOWLEDGE_BASE'
-    const kbDocs = knowledgeItems.filter((item) => item.source_type === 'KNOWLEDGE_BASE');
-
-    if (kbDocs.length === 0) {
-      return {
-        guidance: [],
-        noGuidanceFound: true,
-        conflictDetected: false
-      };
-    }
-
-    const p = prompt.toLowerCase();
-    const isPptRequest = p.includes('ppt') || p.includes('presentation') || p.includes('slide');
-    const isSopRequest = p.includes('sop') || p.includes('inspect') || p.includes('corrosion') || p.includes('api 570') || p.includes('report') || p.includes('summary');
-
-    const matchedDocs = kbDocs.filter((doc) => {
-      if (isPptRequest) {
-        return doc.document_type === 'guideline' || doc.title.toLowerCase().includes('presentation') || doc.category?.toLowerCase().includes('branding');
-      }
-      if (isSopRequest) {
-        return doc.document_type === 'sop' || doc.document_type === 'guideline' || doc.title.toLowerCase().includes('sop') || doc.category?.toLowerCase().includes('operations') || doc.category?.toLowerCase().includes('maintenance');
-      }
-      const words = p.split(/\s+/).filter((w) => w.length > 3);
-      return words.some((w) => doc.title.toLowerCase().includes(w) || doc.summary.toLowerCase().includes(w));
+    const start = performance.now();
+    const res = searchKnowledgeBaseWithNomic(prompt, knowledgeItems);
+    const durationMs = Math.round(performance.now() - start);
+    useTelemetryStore.getState().recordInference({
+      model: 'nomic-embed-text',
+      inferenceTimeMs: durationMs
     });
-
-    if (matchedDocs.length === 0) {
-      return {
-        guidance: [],
-        noGuidanceFound: true,
-        conflictDetected: false
-      };
-    }
-
-    let conflictDetected = false;
-    let conflictSummary: string | undefined = undefined;
-
-    for (const doc of matchedDocs) {
-      if (doc.conflictWithDocId) {
-        const targetConflict = matchedDocs.find((d) => d.id === doc.conflictWithDocId);
-        if (targetConflict) {
-          conflictDetected = true;
-          conflictSummary = `Conflicting Knowledge Base guidance detected between '${doc.title}' and '${targetConflict.title}'. ${doc.conflictDetails || 'Directly contradictory rules.'}`;
-          break;
-        }
-      }
-    }
-
-    const guidance = matchedDocs.map((doc) => ({
-      id: doc.id,
-      title: doc.title,
-      document_type: doc.document_type || 'guideline',
-      category: doc.category || 'Company Standard',
-      snippet: doc.summary,
-      relevanceScore: 0.94
-    }));
-
     return {
-      guidance,
-      noGuidanceFound: false,
-      conflictDetected,
-      conflictSummary
+      guidance: res.guidance,
+      noGuidanceFound: res.noGuidanceFound,
+      conflictDetected: res.conflictDetected,
+      conflictSummary: res.conflictSummary,
+      totalChunksSearched: res.totalChunksSearched,
+      embeddingModel: res.embeddingModel
     };
   },
 
@@ -754,13 +600,6 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   networkLogs: initialNetworkLogs,
   notifications: initialNotifications,
   isServerOnline: true,
-
-  calculationResults: {
-    corrosionRate: '0.343 mm/yr',
-    remainingLife: '2.33 years',
-    alertTriggered: true,
-    lastRunTime: 'Just now'
-  },
 
   activeProposedPlan: null,
 
@@ -968,28 +807,6 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     }
   },
 
-  reRunCalculation: () => {
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    set({
-      calculationResults: {
-        corrosionRate: '0.343 mm/yr',
-        remainingLife: '2.33 years',
-        alertTriggered: true,
-        lastRunTime: nowTime
-      }
-    });
-    get().addNetworkLog({
-      timestamp: nowTime,
-      source: '127.0.0.1:Sandbox',
-      destination: 'NONE',
-      protocol: 'SANDBOX_ISOLATED',
-      bytesSent: 0,
-      bytesReceived: 0,
-      isExternal: false,
-      modelOrTool: 'Docker Python Sandbox (Re-Executed API 570 Calc)'
-    });
-  },
-
   setNetworkModalOpen: (isNetworkModalOpen) => set({ isNetworkModalOpen }),
   addNetworkLog: (log) => set((state) => ({
     networkLogs: [
@@ -1022,34 +839,32 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     });
   },
 
-  queryKnowledgeBase: (prompt, taskType) => {
-    const { knowledgeItems } = get();
-    const res = searchKnowledgeBaseWithNomic(prompt, knowledgeItems);
-    return {
-      guidance: res.guidance,
-      noGuidanceFound: res.noGuidanceFound,
-      conflictDetected: res.conflictDetected,
-      conflictSummary: res.conflictSummary,
-      totalChunksSearched: res.totalChunksSearched,
-      embeddingModel: res.embeddingModel
-    };
-  },  proposePlanForTask: async (prompt, flowType) => {
+  proposePlanForTask: async (prompt, flowType) => {
     const { addStepToActiveSession, setActiveTaskStarted, addNetworkLog, uploadedFiles, attachedFiles, queryKnowledgeBase } = get();
     setActiveTaskStarted(true);
+
+    const totalStart = performance.now();
+    const requestId = `req-${Date.now()}`;
+    const activeModel = get().selectedModel || 'qwen3:8b';
+    useTelemetryStore.getState().resetExecutionState(requestId, prompt, activeModel);
 
     const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     // Retrieve previous user prompts from active session for short-term context & push-back resolution
     const activeSess = get().sessions.find(s => s.id === get().activeSessionId);
-    const previousUserPrompts = activeSess
-      ? activeSess.steps.filter(s => s.type === 'user_input').map(s => s.content)
+    const previousUserPrompts: string[] = activeSess
+      ? activeSess.steps.filter(s => s.type === 'user_input' && typeof s.content === 'string').map(s => s.content!)
       : [];
 
     // 1. Lightweight Intent Classification inside Chatbot's Turn
+    const routerStart = performance.now();
     const routing = classifyIntent(prompt, attachedFiles, uploadedFiles, previousUserPrompts);
+    const routerDurationMs = Math.round(performance.now() - routerStart);
 
     // 2. DIRECT_QA Intent Execution Path (Answers immediately, no router/workplan pipeline)
     if (routing.intent === 'DIRECT_QA') {
+      useTelemetryStore.getState().updateExecutionRetrieval(requestId, { status: 'not_required' });
+
       addStepToActiveSession({
         id: `step-${Date.now()}-u`,
         type: 'user_input',
@@ -1059,17 +874,32 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
       set({ isExecuting: true });
 
-      const activeModel = get().selectedModel;
-      const responseText = await generateChatbotResponse(prompt, previousUserPrompts, activeModel);
+      const modelStart = performance.now();
+      const chatRes = await generateChatbotResponse(prompt, previousUserPrompts, activeModel, '', requestId);
+      const modelDurationMs = Math.round(performance.now() - modelStart);
+      const totalDurationMs = Math.round(performance.now() - totalStart);
+
+      console.log(`[PIPELINE LATENCY DIAGNOSTIC] Request ID: ${requestId}
+  Prompt: "${prompt.slice(0, 50)}"
+  Intent Router: ${routerDurationMs} ms (Intent: DIRECT_QA)
+  RAG Retrieval: SKIPPED (0 ms)
+  Model Generation & Validation: ${modelDurationMs} ms
+  Total Execution Latency: ${totalDurationMs} ms`);
+
+      if (chatRes.auditLog) {
+        get().addValidationAuditLog(chatRes.auditLog);
+      }
 
       addStepToActiveSession({
         id: `step-${Date.now()}-resp`,
         type: 'response',
-        content: responseText,
+        content: chatRes.text,
+        groundedStatus: chatRes.groundedStatus,
         timestamp: now()
       });
 
       set({ isExecuting: false });
+      useTelemetryStore.getState().completeCurrentExecution(requestId);
 
       addNetworkLog({
         timestamp: now(),
@@ -1077,9 +907,9 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         destination: '127.0.0.1:11434',
         protocol: 'HTTP',
         bytesSent: 140 + prompt.length,
-        bytesReceived: responseText.length * 2,
+        bytesReceived: (chatRes.text || '').length * 2,
         isExternal: false,
-        modelOrTool: activeModel ? `${activeModel} (Local Direct Q&A)` : 'Local Chatbot LLM (Direct Q&A)'
+        modelOrTool: `${activeModel} (Local Direct Q&A)`
       });
       return;
     }
@@ -1163,9 +993,23 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     };
 
     // Query RAG ONLY if required
+    if (routing.requires_rag) {
+      useTelemetryStore.getState().updateExecutionRetrieval(requestId, { status: 'running', query: contract.rag_query || prompt });
+    } else {
+      useTelemetryStore.getState().updateExecutionRetrieval(requestId, { status: 'not_required' });
+    }
+
     const kbResult = routing.requires_rag
       ? queryKnowledgeBase(contract.rag_query || prompt, taskType)
       : { guidance: [], noGuidanceFound: true, conflictDetected: false, conflictSummary: '', totalChunksSearched: 0, embeddingModel: 'Nomic-768D' };
+
+    if (routing.requires_rag) {
+      useTelemetryStore.getState().updateExecutionRetrieval(requestId, {
+        status: 'completed',
+        chunksRetrieved: kbResult.guidance.length,
+        chunks: kbResult.guidance.map(g => ({ title: g.title, snippet: g.snippet }))
+      });
+    }
 
     const intentSummary = userUploadFiles.length > 0
       ? `User requested: "${prompt}". Task Upload Content: [${fileContextStr}]. Output Contract: Deliverable = ${contract.deliverable_name}`
@@ -1176,8 +1020,6 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       : kbResult.noGuidanceFound
       ? `✓ Knowledge Base: No relevant guidance matched threshold (${kbResult.totalChunksSearched || 0} chunks searched using ${kbResult.embeddingModel || 'Nomic-768D'}) — proceeding using user upload content.`
       : `✓ Knowledge Base: Retrieved ${kbResult.guidance.length} relevant chunks using ${kbResult.embeddingModel || 'Nomic-768D'}: ${kbResult.guidance.map(g => g.title).join(', ')}`;
-
-    const activeModel = get().selectedModel;
 
     addStepToActiveSession({
       id: `step-${Date.now()}-chatbot`,
@@ -1322,6 +1164,17 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     set({ activeProposedPlan: null });
     setIsExecuting(true);
 
+    const activeModel = get().selectedModel || 'qwen3:8b';
+    const userFiles = approvedPlan.userUploadFiles || [];
+
+    useTelemetryStore.getState().startJob({
+      jobId: approvedPlan.id,
+      fileName: userFiles[0] || approvedPlan.expectedDeliverables[0] || 'Deliverable Task',
+      totalFrames: approvedPlan.steps.length,
+      stage: 'Authorized Execution Plan',
+      model: activeModel
+    });
+
     const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const contract = approvedPlan.outputContract;
     const requestedFormat = contract?.requested_output_type || (
@@ -1341,7 +1194,6 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     });
 
     // Initialize explicit WorkflowContext
-    const userFiles = approvedPlan.userUploadFiles || [];
     const targetFiles = uploadedFiles.filter(u => userFiles.includes(u.name) || userFiles.length === 0);
     const meetingNotesText = targetFiles.map(u => u.content).filter(Boolean).join('\n') || 
       uploadedFiles.map(u => u.content).filter(Boolean).join('\n') || 
@@ -1360,13 +1212,16 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       artifact: undefined
     };
 
-    const activeModel = get().selectedModel || 'qwen3:8b';
     let executionFailed = false;
     let failureReason = '';
 
     // 2. Execute steps sequentially using actual local model/tool logic
-    for (const step of approvedPlan.steps) {
+    for (let stepIndex = 0; stepIndex < approvedPlan.steps.length; stepIndex++) {
+      const step = approvedPlan.steps[stepIndex];
       if (executionFailed) break;
+
+      useTelemetryStore.getState().updateStage(step.description, step.targetModel);
+      useTelemetryStore.getState().recordFrame({ currentFrame: stepIndex + 1, totalFrames: approvedPlan.steps.length });
 
       const stepId = `step-${Date.now()}-${step.id}`;
       addStepToActiveSession({
@@ -1396,7 +1251,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           
           if (imageFile && imageFile.dataUrl) {
             const visionRes = await callLocalLlm({
-              model: 'qwen3:8b',
+              model: 'qwen2.5vl:7b',
               userPrompt: 'Extract and transcribe all text, inspection data, equipment tags, and sensor readings from this image.',
               images: [imageFile.dataUrl]
             });
@@ -1738,6 +1593,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     }
 
     if (executionFailed) {
+      useTelemetryStore.getState().failJob(failureReason, 'Agent Step Execution');
       addStepToActiveSession({
         id: `step-${Date.now()}-failed`,
         type: 'response',
@@ -1824,6 +1680,11 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         ? kbGuidance.map(g => ({ source: g.title, snippet: g.snippet }))
         : [{ source: 'User Upload Content', snippet: 'Extracted content from user uploaded task material.' }],
       artifacts: [finalArtifact]
+    });
+
+    useTelemetryStore.getState().completeJob({
+      inputSizeBytes: meetingNotesText.length,
+      outputSizeBytes: finalArtifact.sizeBytes
     });
 
     setIsExecuting(false);
