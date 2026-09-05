@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Cpu, 
   ShieldCheck, 
@@ -11,227 +11,493 @@ import {
   Database,
   Lock,
   Download,
-  Filter
+  Filter,
+  FolderOpen,
+  FileCode,
+  HardDrive,
+  Eye,
+  Calculator,
+  BookOpen,
+  FileText,
+  Layers,
+  Sparkles,
+  Check,
+  X
 } from 'lucide-react';
+import { useAntigravityStore } from '../../store/useAntigravityStore';
 
-interface ModelInfo {
+interface DetectedModelFile {
   id: string;
   name: string;
-  role: string;
-  status: 'ACTIVE' | 'STANDBY' | 'OFFLINE';
-  vramMb: number;
-  contextLength: string;
-  latencyMs: number;
+  fileName: string;
+  relativePath: string;
+  fullPath: string;
+  sizeGb: string;
+  format: 'GGUF' | 'SAFETENSORS' | 'BIN' | 'ONNX';
   quant: string;
+  agentRole: string;
+  agentName: string;
+  vramRequired: string;
 }
 
-export const ModelManagementView: React.FC = () => {
-  const [models, setModels] = useState<ModelInfo[]>([
-    { id: 'qwen2.5-3b', name: 'Qwen2.5-3B-Instruct', role: 'Front-Facing Chatbot / Intent Orchestrator', status: 'ACTIVE', vramMb: 2450, contextLength: '16,384', latencyMs: 14, quant: 'Q4_K_M' },
-    { id: 'qwen2.5-vl', name: 'Qwen2.5-VL', role: 'Vision / Multimodal / Document Summary', status: 'ACTIVE', vramMb: 6348, contextLength: '32,768', latencyMs: 28, quant: 'Q4_K_M' },
-    { id: 'qwen-coder', name: 'Qwen-Coder', role: 'Coding / Math / Python Execution', status: 'ACTIVE', vramMb: 5632, contextLength: '65,536', latencyMs: 32, quant: 'Q5_K_M' },
-    { id: 'qwen3-8b', name: 'Qwen3-8B', role: 'General Reasoning & Approval Notes', status: 'ACTIVE', vramMb: 5939, contextLength: '32,768', latencyMs: 22, quant: 'Q4_K_S' }
-  ]);
+const defaultDetectedModels: DetectedModelFile[] = [
+  {
+    id: 'qwen3-14b',
+    name: 'Qwen3-14B-Instruct',
+    fileName: 'Qwen3-14B-Q4_K_M.gguf',
+    relativePath: 'models/qwen3-14b/Qwen3-14B-Q4_K_M.gguf',
+    fullPath: 'F:\\corewithin\\models\\qwen3-14b\\Qwen3-14B-Q4_K_M.gguf',
+    sizeGb: '9.0 GB',
+    format: 'GGUF',
+    quant: 'Q4_K_M',
+    agentRole: 'Orchestrator & Structured Reasoning',
+    agentName: 'Orchestrator Agent',
+    vramRequired: '9.5 GB'
+  },
+  {
+    id: 'qwen3-vl-8b',
+    name: 'Qwen3-VL-8B-Instruct',
+    fileName: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf',
+    relativePath: 'models/qwen3-vl-8b/Qwen3VL-8B-Instruct-Q4_K_M.gguf',
+    fullPath: 'F:\\corewithin\\models\\qwen3-vl-8b\\Qwen3VL-8B-Instruct-Q4_K_M.gguf',
+    sizeGb: '5.0 GB',
+    format: 'GGUF',
+    quant: 'Q4_K_M',
+    agentRole: 'Multimodal Vision, P&ID & OCR',
+    agentName: 'Vision Document Agent',
+    vramRequired: '6.2 GB'
+  },
+  {
+    id: 'qwen3-vl-mmproj',
+    name: 'Qwen3-VL Multimodal Projector',
+    fileName: 'mmproj-Qwen3VL-8B-Instruct-F16.gguf',
+    relativePath: 'models/qwen3-vl-8b/mmproj-Qwen3VL-8B-Instruct-F16.gguf',
+    fullPath: 'F:\\corewithin\\models\\qwen3-vl-8b\\mmproj-Qwen3VL-8B-Instruct-F16.gguf',
+    sizeGb: '1.1 GB',
+    format: 'GGUF',
+    quant: 'F16',
+    agentRole: 'Vision Feature Projection',
+    agentName: 'Vision Document Agent',
+    vramRequired: '1.5 GB'
+  },
+  {
+    id: 'qwen2.5-coder-7b',
+    name: 'Qwen2.5-Coder-7B-Instruct',
+    fileName: 'Qwen2.5-Coder-7B-Instruct',
+    relativePath: 'models/qwen2.5-coder-7b/',
+    fullPath: 'F:\\corewithin\\models\\qwen2.5-coder-7b',
+    sizeGb: '4.8 GB',
+    format: 'GGUF',
+    quant: 'Q4_K_M',
+    agentRole: 'Python Sandbox & ASME/API 570 Math',
+    agentName: 'Code & Math Agent',
+    vramRequired: '5.5 GB'
+  },
+  {
+    id: 'qwen3-reranker',
+    name: 'Qwen3-Reranker-0.6B',
+    fileName: 'model.safetensors',
+    relativePath: 'models/qwen3-reranker-0.6b/model.safetensors',
+    fullPath: 'F:\\corewithin\\models\\qwen3-reranker-0.6b\\model.safetensors',
+    sizeGb: '1.2 GB',
+    format: 'SAFETENSORS',
+    quant: 'FP16',
+    agentRole: 'Neural Passage Reranking',
+    agentName: 'Knowledge Retrieval Agent',
+    vramRequired: '1.2 GB'
+  },
+  {
+    id: 'qwen3-embedding',
+    name: 'Qwen3-Embedding-0.6B',
+    fileName: 'model.safetensors',
+    relativePath: 'models/qwen3-embedding-0.6b/model.safetensors',
+    fullPath: 'F:\\corewithin\\models\\qwen3-embedding-0.6b\\model.safetensors',
+    sizeGb: '1.2 GB',
+    format: 'SAFETENSORS',
+    quant: 'FP16',
+    agentRole: '768-D Semantic Vector Projection',
+    agentName: 'Knowledge Retrieval Agent',
+    vramRequired: '1.2 GB'
+  }
+];
 
-  const [auditFilter, setAuditFilter] = useState('ALL');
+export const ModelManagementView: React.FC = () => {
+  const { selectedModel, setSelectedModel } = useAntigravityStore();
+  const [detectedModels, setDetectedModels] = useState<DetectedModelFile[]>(defaultDetectedModels);
+  const [modelDirectory, setModelDirectory] = useState('F:\\corewithin\\models');
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const auditLogs = [
-    { id: 'log-101', timestamp: '14:22:15', taskId: 'Task ID 456', action: 'Approval note document compiled (Approval_Note.docx)', model: 'Qwen3-8B (Drafting)', status: 'VERIFIED', network: '0 bytes ext' },
-    { id: 'log-102', timestamp: '14:22:04', taskId: 'Task ID 456', action: 'Sandboxed Python corrosion calculation executed in Docker container', model: 'Qwen-Coder (Sandbox)', status: 'SUCCESS', network: '0 bytes ext' },
-    { id: 'log-103', timestamp: '14:21:48', taskId: 'Task ID 456', action: 'ChromaDB local vector search against /corp/SOPs/Engineering/ (SOP-OPS-014)', model: 'nomic-embed-text', status: 'SUCCESS', network: '0 bytes ext' },
-    { id: 'log-104', timestamp: '14:21:12', taskId: 'Task ID 456', action: 'Image OCR & visual table extraction on Inspection_Report_March.pdf', model: 'Qwen2.5-VL (Vision)', status: 'SUCCESS', network: '0 bytes ext' },
-    { id: 'log-105', timestamp: '14:20:55', taskId: 'Task ID 456', action: 'Task classification: Routed to Qwen2.5-VL for multimodal document summary', model: 'Local Router (Qwen3-8B)', status: 'SUCCESS', network: '0 bytes ext' }
+    { id: 'log-101', timestamp: '14:22:15', taskId: 'Task ID 456', action: 'Approval note document compiled (Approval_Note.docx)', model: 'Deliverable Agent (DOCX)', status: 'VERIFIED', network: '0 bytes ext' },
+    { id: 'log-102', timestamp: '14:22:04', taskId: 'Task ID 456', action: 'Deterministic Python corrosion calculation executed in sandbox', model: 'Calculation Agent (Python)', status: 'SUCCESS', network: '0 bytes ext' },
+    { id: 'log-103', timestamp: '14:21:48', taskId: 'Task ID 456', action: 'Vector similarity search against /corp/SOPs/Engineering/ (SOP-OPS-014)', model: 'Retrieval Agent (768-D)', status: 'SUCCESS', network: '0 bytes ext' },
+    { id: 'log-104', timestamp: '14:21:12', taskId: 'Task ID 456', action: 'Image OCR & visual table extraction on Inspection_Report_March.pdf', model: 'Vision Agent (Qwen-VL)', status: 'SUCCESS', network: '0 bytes ext' },
+    { id: 'log-105', timestamp: '14:20:55', taskId: 'Task ID 456', action: 'Task classification: Dispatched to multi-agent pipeline', model: 'Orchestrator Loop', status: 'SUCCESS', network: '0 bytes ext' }
+  ];
+
+  const handleFileBrowse = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles: DetectedModelFile[] = [];
+      for (let i = 0; i < e.target.files.length; i++) {
+        const file = e.target.files[i];
+        const ext = file.name.split('.').pop()?.toUpperCase() || 'BIN';
+        const format: 'GGUF' | 'SAFETENSORS' | 'BIN' | 'ONNX' = 
+          ext === 'GGUF' ? 'GGUF' : ext === 'SAFETENSORS' ? 'SAFETENSORS' : ext === 'ONNX' ? 'ONNX' : 'BIN';
+        
+        const sizeGb = (file.size / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        const cleanName = file.name.replace(/\.[^/.]+$/, "");
+        
+        const modelEntry: DetectedModelFile = {
+          id: `custom-${Date.now()}-${i}`,
+          name: cleanName,
+          fileName: file.name,
+          relativePath: `models/custom/${file.name}`,
+          fullPath: (file as any).path || `C:\\models\\${file.name}`,
+          sizeGb,
+          format,
+          quant: file.name.includes('Q4_K_M') ? 'Q4_K_M' : file.name.includes('F16') ? 'F16' : 'CUSTOM',
+          agentRole: 'User-Selected Local Model Weight',
+          agentName: 'Specialized Engine',
+          vramRequired: 'Auto-alloc'
+        };
+        newFiles.push(modelEntry);
+      }
+
+      setDetectedModels(prev => [...newFiles, ...prev]);
+      if (newFiles.length > 0) {
+        setSelectedModel(newFiles[0].name);
+        setScanMessage(`Loaded ${newFiles.length} local model file(s). Active model set to "${newFiles[0].name}".`);
+        setTimeout(() => setScanMessage(null), 4000);
+      }
+      e.target.value = '';
+    }
+  };
+
+  const handleRescan = () => {
+    setScanMessage(`Scanning directory "${modelDirectory}"... Found ${detectedModels.length} model weights.`);
+    setTimeout(() => setScanMessage(null), 3500);
+  };
+
+  const agentsRoster = [
+    {
+      title: 'Orchestrator & Task Planner',
+      icon: Cpu,
+      color: 'text-sky-400',
+      modelUsed: selectedModel || 'Qwen3-14B / Qwen3-8B',
+      description: 'Decomposes complex requests into sequential ReAct steps, tracks execution state, and manages human plan approvals.',
+      trigger: 'Every User Request'
+    },
+    {
+      title: 'Vision & Multimodal Document Agent',
+      icon: Eye,
+      color: 'text-amber-400',
+      modelUsed: 'Qwen3-VL-8B-Instruct (Vision GGUF)',
+      description: 'Processes scanned PDF inspection reports, engineering drawings, and P&ID diagrams with symbol/table OCR extraction.',
+      trigger: 'Attached Images / Scanned PDFs'
+    },
+    {
+      title: 'Code & Engineering Math Agent',
+      icon: Calculator,
+      color: 'text-emerald-400',
+      modelUsed: 'Qwen2.5-Coder-7B / Local Python Sandbox',
+      description: 'Generates and runs deterministic Python calculation scripts (API 570 wall thickness, corrosion rates, MTBF) in an isolated sandbox.',
+      trigger: 'Math, Calculations, Code'
+    },
+    {
+      title: 'Knowledge Retrieval Agent (RAG)',
+      icon: BookOpen,
+      color: 'text-indigo-400',
+      modelUsed: 'Nomic-Embed-Text (768-D) + Qwen Reranker',
+      description: 'Searches confidential internal SOPs, equipment manuals, and engineering standards for verbatim citations and threshold limits.',
+      trigger: 'SOP Standards, Corporate Knowledge'
+    },
+    {
+      title: 'Deliverable Synthesis Agent',
+      icon: FileText,
+      color: 'text-purple-400',
+      modelUsed: 'Deterministic Document Generator Engine',
+      description: 'Compiles verified task findings into official Word (.docx) approval notes, PowerPoint (.pptx) briefings, and Excel spreadsheets.',
+      trigger: 'Document / Presentation Export'
+    },
+    {
+      title: 'Policy & Safety Guard Agent',
+      icon: ShieldCheck,
+      color: 'text-rose-400',
+      modelUsed: 'Rule Policy & Contract Validation Engine',
+      description: 'Validates output contracts, blocks unverified math hallucinations, and guarantees zero external network telemetry.',
+      trigger: 'Continuous Background Guard'
+    }
   ];
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto bg-[var(--bg-primary)] font-sans text-xs text-[var(--text-primary)] p-4 space-y-4">
-      {/* Header bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-[#2d2d2d]">
+    <div className="flex-1 flex flex-col overflow-y-auto bg-[var(--bg-base)] font-sans text-xs text-[var(--text-primary)] p-5 space-y-5">
+      {/* Hidden Native File Input for Windows Browsing */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileBrowse} 
+        accept=".gguf,.bin,.safetensors,.pt,.pth,.onnx" 
+        multiple 
+        className="hidden" 
+      />
+
+      {/* Header Bar */}
+      <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
         <div>
-          <h2 className="text-sm font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2">
-            <span>MODEL MANAGEMENT &amp; AUDIT DASHBOARD</span>
-            <span className="text-[10px] font-mono font-normal text-[var(--status-healthy)] px-2 py-0.5 rounded bg-[#1f3a2b] border border-[#2e5d44]">
-              ● AIR-GAP ENFORCED
+          <h2 className="text-base font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2.5">
+            <span>MODEL MANAGEMENT &amp; MULTI-AGENT RUNTIME</span>
+            <span className="text-[10px] font-mono font-semibold text-[var(--accent-success)] px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+              ● LOCAL RUNTIME
             </span>
           </h2>
-          <p className="text-[var(--text-secondary)] text-xs mt-0.5">
-            Manage local open-weight models loaded on GPU workstation. Inspect real-time air-gap telemetry and tamper-evident audit logs.
+          <p className="text-[var(--text-secondary)] text-xs mt-1 leading-relaxed">
+            Manage local open-weight model files on Windows. Coordinate specialized agents across vision, coding, reasoning, and retrieval.
           </p>
         </div>
 
-        <button className="px-3 py-1.5 rounded bg-[var(--accent-fuchsia)] hover:bg-[#1f8ad2] text-[var(--text-primary)] font-bold font-mono text-xs flex items-center gap-1.5 shadow-sm cursor-pointer">
-          <Plus className="w-3.5 h-3.5" />
-          <span>UPDATE / ADD NEW MODEL</span>
+        <button 
+          onClick={() => fileInputRef.current?.click()}
+          className="px-3.5 py-2 rounded-xl bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 font-semibold text-xs flex items-center gap-2 shadow-sm cursor-pointer transition-opacity"
+        >
+          <FolderOpen className="w-4 h-4" />
+          <span>Browse Windows Files...</span>
         </button>
       </div>
 
-      {/* Top Half: Models Inventory (Left) + Network Traffic Monitor (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Panel 1: Installed Open-Weight Models */}
-        <div className="bg-[var(--bg-surface)] border border-[#2d2d2d] rounded p-3.5 space-y-3 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono font-bold text-[var(--text-secondary)]">
-            <span className="flex items-center gap-1.5">
-              <Cpu className="w-4 h-4 text-[#569cd6]" />
-              <span className="uppercase text-[var(--text-primary)]">Installed Open-Weight Models</span>
+      {/* Dynamic Model Selection Alert / Banner */}
+      {!selectedModel ? (
+        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+            <div>
+              <div className="font-bold text-sm text-white">No models selected</div>
+              <div className="text-xs text-amber-200/80 mt-0.5">
+                No primary local model is currently active. Explore the Windows files below and click <strong>Select Model</strong>, or click <strong>Browse Windows Files</strong> to pick model weights from your disk.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-1.5 rounded-lg bg-amber-400 text-black font-bold text-xs hover:bg-amber-300 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer whitespace-nowrap self-start sm:self-auto"
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span>Browse Model File</span>
+          </button>
+        </div>
+      ) : (
+        <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <div>
+              <div className="font-bold text-sm text-white flex items-center gap-2">
+                <span>Active Model: {selectedModel}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+                  ACTIVE
+                </span>
+              </div>
+              <div className="text-xs text-emerald-200/80 mt-0.5">
+                Local open-weight model loaded on GPU. All agents will route specialized sub-tasks through this engine.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--text-secondary)] font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>Browse Other...</span>
+            </button>
+            <button
+              onClick={() => setSelectedModel('')}
+              className="px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/30 font-semibold text-xs transition-colors cursor-pointer"
+            >
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {scanMessage && (
+        <div className="px-3 py-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-xs text-[var(--accent-success)] font-mono flex items-center gap-2">
+          <Check className="w-3.5 h-3.5" />
+          <span>{scanMessage}</span>
+        </div>
+      )}
+
+      {/* SECTION 1: Local Windows Model File Explorer */}
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 space-y-3 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <HardDrive className="w-4 h-4 text-[var(--accent-primary)]" />
+            <span className="font-bold text-sm uppercase text-[var(--text-primary)]">
+              Windows Model Files Explorer
             </span>
-            <span className="text-[var(--status-healthy)]">VRAM: 17.5 / 24.0 GB (72.9%)</span>
           </div>
 
-          <div className="space-y-2 font-mono text-xs">
-            {models.map((m) => (
-              <div
-                key={m.id}
-                className="p-3 rounded bg-[var(--bg-primary)] border border-[#2d2d2d] space-y-1.5 hover:border-[var(--border-subtle)] transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        m.status === 'ACTIVE'
-                          ? 'bg-[var(--status-healthy)] shadow-sm shadow-[#4ec9b0]'
-                          : m.status === 'STANDBY'
-                          ? 'bg-[#cca700]'
-                          : 'bg-[#666666]'
-                      }`}
-                    ></span>
-                    <span className="font-bold text-[var(--text-primary)] text-xs">{m.name}</span>
-                    <span className="text-[10px] text-[var(--text-secondary)]">[{m.quant}]</span>
-                  </div>
-
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      m.status === 'ACTIVE'
-                        ? 'bg-[#1f3a2b] text-[var(--status-healthy)] border border-[#2e5d44]'
-                        : 'bg-[#2d2d2d] text-[var(--text-secondary)]'
-                    }`}
-                  >
-                    {m.status}
-                  </span>
-                </div>
-
-                <div className="text-[11px] font-sans text-[var(--text-secondary)]">
-                  {m.role}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#2d2d2d] text-[10px] text-[var(--text-secondary)]">
-                  <div>VRAM: <strong className="text-[var(--text-primary)]">{(m.vramMb / 1024).toFixed(1)} GB</strong></div>
-                  <div>Context: <strong className="text-[var(--text-primary)]">{m.contextLength}</strong></div>
-                  <div>Latency: <strong className="text-[var(--text-primary)]">{m.latencyMs} ms/tok</strong></div>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center gap-2">
+            <input 
+              type="text" 
+              value={modelDirectory}
+              onChange={(e) => setModelDirectory(e.target.value)}
+              placeholder="e.g. F:\corewithin\models or C:\models"
+              className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1 text-xs font-mono text-[var(--text-primary)] w-56 focus:outline-none focus:border-[var(--text-secondary)]"
+            />
+            <button 
+              onClick={handleRescan}
+              className="px-3 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Scan Directory</span>
+            </button>
           </div>
         </div>
 
-        {/* Panel 2: Real-Time Network Traffic Monitor */}
-        <div className="bg-[var(--bg-surface)] border border-[#2d2d2d] rounded p-3.5 space-y-3 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between text-xs font-mono font-bold text-[var(--text-secondary)]">
-            <span className="flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-[var(--status-healthy)]" />
-              <span className="uppercase text-[var(--text-primary)]">Network Traffic Monitor (Last 24 Hours)</span>
-            </span>
-            <span className="text-[var(--status-healthy)] font-bold">100% PROOF OF AIR-GAP</span>
-          </div>
-
-          {/* SVG Traffic Graph */}
-          <div className="flex-1 min-h-[160px] bg-[#181818] border border-[#2d2d2d] rounded p-3 flex flex-col justify-between relative overflow-hidden">
-            {/* Legend */}
-            <div className="flex items-center justify-between text-[10px] font-mono z-10">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-1 bg-[var(--status-healthy)] rounded"></span>
-                  <span className="text-[var(--status-healthy)] font-bold">INTERNAL TRAFFIC (ACTIVE)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-1 bg-[var(--status-attention)] rounded"></span>
-                  <span className="text-[var(--status-attention)] font-bold">EXTERNAL TRAFFIC (BLOCKED, 0 bytes)</span>
-                </div>
-              </div>
-              <span className="text-[var(--text-secondary)]">Host NIC: eth0 (Isolated)</span>
-            </div>
-
-            {/* Simulated Dual-Line Waveform SVG */}
-            <div className="w-full h-24 my-auto relative">
-              <svg className="w-full h-full" viewBox="0 0 400 100" preserveAspectRatio="none">
-                {/* Horizontal Grid lines */}
-                <line x1="0" y1="20" x2="400" y2="20" stroke="#2d2d2d" strokeDasharray="3 3" />
-                <line x1="0" y1="50" x2="400" y2="50" stroke="#2d2d2d" strokeDasharray="3 3" />
-                <line x1="0" y1="80" x2="400" y2="80" stroke="#2d2d2d" strokeDasharray="3 3" />
-
-                {/* Line 1: Internal Active Traffic (Dynamic Curve) */}
-                <path
-                  d="M0,85 Q40,40 80,65 T160,30 T240,70 T320,25 T400,60"
-                  fill="none"
-                  stroke="#4ec9b0"
-                  strokeWidth="2.5"
-                />
-                {/* Line 1 Subtle Fill */}
-                <path
-                  d="M0,85 Q40,40 80,65 T160,30 T240,70 T320,25 T400,60 L400,100 L0,100 Z"
-                  fill="#4ec9b0"
-                  fillOpacity="0.08"
-                />
-
-                {/* Line 2: External Traffic (Flatline zero on bottom axis) */}
-                <line x1="0" y1="96" x2="400" y2="96" stroke="#ce9178" strokeWidth="3" />
-              </svg>
-
-              {/* Zero flatline callout badge */}
-              <div className="absolute bottom-1 right-3 px-2 py-0.5 rounded bg-[var(--bg-primary)] border border-[var(--status-attention)] text-[9px] font-mono text-[var(--status-attention)] font-bold">
-                EXTERNAL: EXACT ZERO (0.000 KB/s)
-              </div>
-            </div>
-
-            {/* Time markers */}
-            <div className="flex justify-between text-[9px] font-mono text-[#666666] pt-1 border-t border-[#2d2d2d]">
-              <span>24h ago</span>
-              <span>18h ago</span>
-              <span>12h ago</span>
-              <span>6h ago</span>
-              <span>Now (14:22)</span>
-            </div>
-          </div>
-
-          <div className="p-2 rounded bg-[var(--bg-primary)] border border-[#2d2d2d] text-[10px] font-mono text-[var(--text-secondary)] flex items-center justify-between">
-            <span>Hardware Enclosure: Physical Server Rack (Local Node)</span>
-            <span className="text-[var(--status-healthy)] font-bold">AIR-GAP SIGNATURE VERIFIED</span>
+        {/* Model Files Table / Cards */}
+        <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden font-mono text-[11px]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-b border-[var(--border-subtle)] text-[10px]">
+                <tr>
+                  <th className="p-2.5">MODEL NAME &amp; FILE</th>
+                  <th className="p-2.5">FORMAT</th>
+                  <th className="p-2.5">SIZE</th>
+                  <th className="p-2.5">VRAM</th>
+                  <th className="p-2.5">AGENT SPECIALIZATION</th>
+                  <th className="p-2.5 text-right">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)]">
+                {detectedModels.map((m) => {
+                  const isSelected = selectedModel === m.name || selectedModel === m.id;
+                  return (
+                    <tr 
+                      key={m.id} 
+                      className={`transition-colors ${
+                        isSelected 
+                          ? 'bg-emerald-500/10' 
+                          : 'hover:bg-[var(--bg-elevated)]'
+                      }`}
+                    >
+                      <td className="p-2.5">
+                        <div className="font-bold text-[var(--text-primary)]">{m.name}</div>
+                        <div className="text-[10px] text-[var(--text-secondary)] opacity-75 truncate max-w-xs">{m.fullPath}</div>
+                      </td>
+                      <td className="p-2.5">
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--bg-base)] border border-[var(--border-subtle)] font-bold text-[9px] text-[var(--text-primary)]">
+                          {m.format} [{m.quant}]
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-[var(--text-primary)]">{m.sizeGb}</td>
+                      <td className="p-2.5 text-[var(--text-secondary)]">{m.vramRequired}</td>
+                      <td className="p-2.5">
+                        <div className="text-[var(--text-primary)] font-sans text-xs">{m.agentName}</div>
+                        <div className="text-[10px] text-[var(--text-secondary)] font-sans">{m.agentRole}</div>
+                      </td>
+                      <td className="p-2.5 text-right">
+                        {isSelected ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/20 border border-emerald-500/40 px-2 py-1 rounded-lg">
+                            <Check className="w-3 h-3" /> Selected
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setSelectedModel(m.name)}
+                            className="px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--text-primary)] hover:text-[var(--bg-base)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-medium text-[10px] cursor-pointer transition-colors"
+                          >
+                            Select Model
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      {/* Bottom Half: Detailed Timestamped Audit Logs */}
-      <div className="bg-[var(--bg-surface)] border border-[#2d2d2d] rounded p-3.5 space-y-2.5 shadow-sm">
-        <div className="flex items-center justify-between text-xs font-mono font-bold text-[var(--text-secondary)]">
-          <span className="flex items-center gap-1.5">
-            <Lock className="w-4 h-4 text-[#569cd6]" />
-            <span className="uppercase text-[var(--text-primary)]">Immutable On-Premise Audit Logs</span>
+      {/* SECTION 2: Cooperative Multi-Agent Architecture */}
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-[var(--accent-primary)]" />
+            <span className="font-bold text-sm uppercase text-[var(--text-primary)]">
+              Cooperative Multi-Agent Architecture
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-[var(--text-secondary)]">
+            6 Specialized Local Agents
           </span>
-          <span className="text-[var(--text-secondary)]">SQLite Local Ledger (SHA-256 Chained)</span>
         </div>
 
-        {/* Logs Table */}
-        <div className="bg-[#181818] border border-[#2d2d2d] rounded overflow-hidden font-mono text-[10px]">
+        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+          This workbench is designed for <strong>multi-agent collaboration</strong>. All agents work cooperatively whenever required by the task modality — rather than restricting execution to a single agent.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+          {agentsRoster.map((agent, i) => {
+            const Icon = agent.icon;
+            return (
+              <div 
+                key={i} 
+                className="p-3.5 rounded-xl bg-[var(--bg-base)] border border-[var(--border-subtle)] hover:border-[var(--text-secondary)] transition-colors space-y-2 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="p-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                      <Icon className={`w-4 h-4 ${agent.color}`} />
+                    </div>
+                    <h4 className="font-bold text-xs text-[var(--text-primary)]">{agent.title}</h4>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                    {agent.description}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono flex items-center justify-between">
+                  <span className="text-[var(--text-secondary)]">Model: <strong className="text-[var(--text-primary)]">{agent.modelUsed}</strong></span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)]">{agent.trigger}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* SECTION 3: Detailed Local Audit Ledger */}
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between text-xs font-mono font-bold text-[var(--text-secondary)]">
+          <span className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-[var(--accent-primary)]" />
+            <span className="uppercase text-[var(--text-primary)]">On-Premise Task Audit Ledger</span>
+          </span>
+          <span className="text-[var(--text-secondary)] font-normal">SHA-256 Provenance Ledger</span>
+        </div>
+
+        <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden font-mono text-[10px]">
           <table className="w-full text-left">
-            <thead className="bg-[var(--bg-surface)] text-[var(--text-secondary)] border-b border-[#2d2d2d]">
+            <thead className="bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
               <tr>
-                <th className="p-2">TIMESTAMP</th>
-                <th className="p-2">TASK ID</th>
-                <th className="p-2">AUDIT ACTION / EVENT</th>
-                <th className="p-2">MODEL / COMPONENT</th>
-                <th className="p-2">OUTBOUND NETWORK</th>
-                <th className="p-2">STATUS</th>
+                <th className="p-2.5">TIMESTAMP</th>
+                <th className="p-2.5">TASK ID</th>
+                <th className="p-2.5">AUDIT ACTION / EVENT</th>
+                <th className="p-2.5">AGENT / ENGINE</th>
+                <th className="p-2.5">NETWORK</th>
+                <th className="p-2.5">STATUS</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#2d2d2d]">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {auditLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-[var(--bg-primary)] transition-colors">
-                  <td className="p-2 text-[var(--text-secondary)]">{log.timestamp}</td>
-                  <td className="p-2 font-bold text-[var(--text-primary)]">{log.taskId}</td>
-                  <td className="p-2 text-[var(--text-primary)]">{log.action}</td>
-                  <td className="p-2 text-[#569cd6]">{log.model}</td>
-                  <td className="p-2 text-[var(--status-healthy)] font-bold">{log.network}</td>
-                  <td className="p-2">
-                    <span className="px-1.5 py-0.2 rounded bg-[#1f3a2b] text-[var(--status-healthy)] font-bold">
+                <tr key={log.id} className="hover:bg-[var(--bg-base)] transition-colors">
+                  <td className="p-2.5 text-[var(--text-secondary)]">{log.timestamp}</td>
+                  <td className="p-2.5 font-bold text-[var(--text-primary)]">{log.taskId}</td>
+                  <td className="p-2.5 text-[var(--text-primary)]">{log.action}</td>
+                  <td className="p-2.5 text-[var(--accent-primary)]">{log.model}</td>
+                  <td className="p-2.5 text-[var(--accent-success)] font-bold">{log.network}</td>
+                  <td className="p-2.5">
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--accent-success)] font-bold border border-[var(--border-subtle)]">
                       {log.status}
                     </span>
                   </td>

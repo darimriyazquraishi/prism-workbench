@@ -199,7 +199,7 @@ export function generateChatbotResponse(
 
   if (/^(how are you|who are you|what can you do|thanks|thank you|bye)\b/i.test(p) && p.length < 40) {
     if (p.includes('who are you') || p.includes('what can you do')) {
-      return "I am Lumi, an air-gapped engineering & intelligence assistant running locally on your workstation. I can answer technical questions, explain standards, perform calculations, or run multi-step workflows to analyze inspection reports, query SOP manuals, and build PPTX/DOCX/XLSX deliverables.";
+      return "I am Lumi, an on-premise engineering & agentic intelligence assistant running locally on your workstation. I can answer technical questions, explain standards, perform calculations, or coordinate specialized agents to analyze inspection reports, query SOP manuals, and build PPTX/DOCX/XLSX deliverables.";
     }
     if (p.includes('how are you')) {
       return "I'm running smoothly on your local workstation engine, ready to assist!";
@@ -267,7 +267,7 @@ export function generateChatbotResponse(
   }
 
   // Direct Q&A fallback for any factual query without restating question boilerplate
-  return `Here is the information for your query:\n\n**Topic:** ${rawP}\n**Answer:** This is a direct factual query handled by Lumi. The system is operating in air-gapped direct Q&A mode. Feel free to ask any further technical questions or request calculations!`;
+  return `Here is the information for your query:\n\n**Topic:** ${rawP}\n**Answer:** This is a direct factual query handled by Lumi on your local workstation. Feel free to ask any further technical questions or request calculations!`;
 }
 
 export interface PreviewFile {
@@ -481,7 +481,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   sessions: initialSessions,
   activeSessionId: initialSessionId,
   activeMode: 'agent',
-  selectedModel: 'Qwen3-8B-Instruct',
+  selectedModel: '',
   attachedFiles: [],
   uploadedFiles: [],
   isExecuting: false,
@@ -1112,7 +1112,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       id: `step-${Date.now()}-approved`,
       type: 'thought',
       title: 'Workplan Authorized by User',
-      content: `Authorized execution plan. Target Contract Deliverable: \`${contract?.deliverable_name || requestedFormat}\`. Executing ${approvedPlan.steps.length} sequential steps under full air-gap isolation.`,
+      content: `Authorized execution plan. Target Contract Deliverable: \`${contract?.deliverable_name || requestedFormat}\`. Coordinating ${approvedPlan.steps.length} sequential agent steps locally.`,
       status: 'success',
       timestamp: now()
     });
@@ -1212,7 +1212,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     addStepToActiveSession({
       id: finalStepId,
       type: 'response',
-      content: `### Task Execution Complete\n\n**Pipeline Status Checklist:**\n- ${uploadsText}\n- ${kbStatusChecklist}\n- ✓ Output Contract Validation: **PASSED (\`${generatedArtifact.type.toUpperCase()}\`)**\n- ✓ Generated deliverables under zero network egress\n\nGenerated deliverable written to **\`${generatedArtifact.path}\`**:\n- \`${generatedArtifact.name}\` (${generatedArtifact.description})\n\n**Grounding Provenance:**\n- Primary Engine: \`${approvedPlan.primaryModel}\`\n- Embedding Model: \`Nomic-Embed-Text (768-D)\`\n- Isolation Mode: \`AIR-GAPPED (--network=none)\``,
+      content: `### Task Execution Complete\n\n**Pipeline Status Checklist:**\n- ${uploadsText}\n- ${kbStatusChecklist}\n- ✓ Output Contract Validation: **PASSED (\`${generatedArtifact.type.toUpperCase()}\`)**\n- ✓ Generated deliverables under zero network egress\n\nGenerated deliverable written to **\`${generatedArtifact.path}\`**:\n- \`${generatedArtifact.name}\` (${generatedArtifact.description})\n\n**Grounding Provenance:**\n- Primary Engine: \`${approvedPlan.primaryModel}\`\n- Embedding Model: \`Nomic-Embed-Text (768-D)\`\n- Isolation Mode: \`LOCAL SECURE (--network=none)\``,
       timestamp: now(),
       citations: kbGuidance.length > 0
         ? kbGuidance.map(g => ({ source: g.title, snippet: g.snippet }))

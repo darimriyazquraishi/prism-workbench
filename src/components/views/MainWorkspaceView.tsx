@@ -20,7 +20,8 @@ import {
   Code,
   Calculator,
   BookOpen,
-  FileCode
+  FileCode,
+  User
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 import { PlanApprovalCard } from '../agent/PlanApprovalCard';
@@ -338,7 +339,7 @@ export const MainWorkspaceView: React.FC = () => {
                 </div>
                 
                 <div className="mt-8 flex items-center gap-4 text-xs text-[var(--text-secondary)] opacity-80">
-                  <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[var(--accent-success)]" /> 100% On-Premise Air-Gapped</span>
+                  <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[var(--accent-success)]" /> 100% On-Premise Local</span>
                   <span className="w-1 h-1 rounded-full bg-[var(--border-subtle)]"></span>
                   <span>Qwen3-8B &amp; Qwen2.5-VL Local Engines</span>
                 </div>
@@ -351,8 +352,8 @@ export const MainWorkspaceView: React.FC = () => {
                     if (step.type === 'user_input') {
                       return (
                         <div key={step.id} className="max-w-4xl mx-auto w-full flex items-start gap-3 pt-2">
-                          <div className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center font-bold text-xs text-[var(--text-primary)] shadow-sm">
-                            JS
+                          <div className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] shadow-sm">
+                            <User className="w-4 h-4" />
                           </div>
                           <div className="flex-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 shadow-sm">
                             <div className="flex items-center justify-between mb-1.5 border-b border-[var(--border-subtle)] pb-1.5">
@@ -601,7 +602,7 @@ export const MainWorkspaceView: React.FC = () => {
                     </div>
                     
                     <div className="flex items-center justify-center mt-2 text-[10px] text-[var(--text-secondary)]">
-                      <span>Air-Gapped Workstation · Zero External Network Traffic</span>
+                      <span>Local Workstation · Zero External Network Traffic</span>
                     </div>
                   </div>
                 </div>
@@ -737,7 +738,7 @@ export const MainWorkspaceView: React.FC = () => {
                   <div className="pt-4 border-t border-[var(--border-subtle)] grid grid-cols-2 gap-4 font-mono text-[10px]">
                     <div className="p-3 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded space-y-1">
                       <div className="text-[var(--text-secondary)]">PREPARED BY LOCAL AI AGENT:</div>
-                      <div className="text-[var(--text-primary)] font-bold">Qwen3-8B-Instruct (Local Air-Gapped)</div>
+                      <div className="text-[var(--text-primary)] font-bold">Qwen3-8B-Instruct (Local Engine)</div>
                       <div className="text-[var(--accent-success)]">Hash: SHA256: 8f9b...a102 (Tamper Proof)</div>
                     </div>
                     <div className={`p-3 bg-[var(--bg-elevated)] border rounded space-y-1 ${isSignedOff ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-[var(--border-subtle)]'}`}>
@@ -795,11 +796,11 @@ export const MainWorkspaceView: React.FC = () => {
             <div 
               onClick={() => setNetworkModalOpen(true)}
               className="flex items-center justify-between text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer transition-colors"
-              title="Click to view air-gap telemetry details"
+              title="Click to view network telemetry details"
             >
               <span>Network:</span>
               <span className="text-[var(--accent-success)] font-bold flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3" /> No egress (Air-Gapped)
+                <ShieldCheck className="w-3 h-3" /> No egress (Local Only)
               </span>
             </div>
             

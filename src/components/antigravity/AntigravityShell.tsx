@@ -26,7 +26,8 @@ import {
   Upload,
   X,
   Image as ImageIcon,
-  Code
+  Code,
+  Settings
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 
@@ -204,30 +205,19 @@ export const AntigravityShell: React.FC = () => {
 
               </>
             )}
-
-            {/* Air-Gap Enterprise Card */}
-            <div className="mt-4 mx-2 p-3 bg-[var(--bg-base)] rounded-xl border border-[var(--border-subtle)] relative overflow-hidden">
-              <div className="relative z-10">
-                <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Local Enterprise Vault</h4>
-                <p className="text-[11px] text-[var(--text-secondary)] mb-3 leading-relaxed">Air-gapped session state automatically persisted to local memory.</p>
-                <div className="text-[10px] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--accent-success)] px-3 py-1.5 rounded-full text-center font-mono font-bold flex items-center justify-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-success)]"></span>
-                  <span>Auto-Saved to Local Storage</span>
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* Bottom User Profile Row */}
+          {/* Bottom Settings & Notifications */}
           <div className="p-2 relative">
-            <div className="flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-elevated)] rounded-xl cursor-pointer transition-colors">
-              <div 
+            <div className="flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-elevated)] rounded-xl transition-colors">
+              <button 
                 onClick={() => setSettingsModalOpen(true)}
-                className="flex items-center gap-2.5 flex-1 min-w-0"
+                className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                title="Application Settings"
               >
-                <div className="w-6 h-6 rounded-full bg-[var(--text-primary)] text-[var(--bg-base)] flex items-center justify-center text-[10px] font-bold">JS</div>
-                <span className="text-sm font-medium text-[var(--text-primary)] truncate">J. Smith</span>
-              </div>
+                <Settings className="w-4 h-4 text-[var(--text-secondary)]" />
+                <span>Settings</span>
+              </button>
               <button 
                 onClick={(e) => {
                   e.stopPropagation();

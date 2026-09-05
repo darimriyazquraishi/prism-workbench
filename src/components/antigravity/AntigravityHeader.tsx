@@ -109,7 +109,9 @@ export const AntigravityHeader: React.FC = () => {
             onChange={(e) => setSelectedModel(e.target.value)}
             className="bg-transparent border-none text-[var(--text-secondary)] focus:outline-none cursor-pointer hover:text-[var(--text-primary)] transition-colors max-w-[130px] truncate"
           >
+            <option value="" className="bg-[var(--bg-elevated)]">No model selected</option>
             <option value="Qwen3-8B-Instruct" className="bg-[var(--bg-elevated)]">Qwen3-8B</option>
+            <option value="Qwen3-14B-Instruct" className="bg-[var(--bg-elevated)]">Qwen3-14B</option>
             <option value="Qwen2.5-VL-7B-Instruct" className="bg-[var(--bg-elevated)]">Qwen2.5-VL</option>
             <option value="Qwen2.5-Coder-7B" className="bg-[var(--bg-elevated)]">Qwen-Coder</option>
           </select>

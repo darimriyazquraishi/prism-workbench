@@ -58,10 +58,10 @@ export const AntigravityStatusBar: React.FC = () => {
           <button 
             onClick={() => setSecurityModalOpen(true)}
             className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer bg-[var(--bg-base)] px-2 py-0.5 rounded border border-[var(--border-subtle)]"
-            title="Air-Gap & Hardware Isolation Audit"
+            title="Local System & Network Isolation Audit"
           >
             <ShieldCheck className="w-3 h-3" />
-            <span className="font-semibold text-[10px]">AIR-GAP EGRESS: 0.00 KB (STRICT ISOLATION)</span>
+            <span className="font-semibold text-[10px]">NETWORK: LOCAL ONLY (0.00 KB EGRESS)</span>
           </button>
 
           <div className="h-3 w-[1px] bg-[var(--border-subtle)]"></div>
@@ -70,10 +70,10 @@ export const AntigravityStatusBar: React.FC = () => {
             {isExecuting ? (
               <span className="flex items-center gap-1 text-[var(--accent-primary)] font-bold">
                 <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-ping"></span>
-                Agent Running...
+                Agents Active...
               </span>
             ) : (
-              <span>Engine Ready ({selectedModel})</span>
+              <span>Engine Ready ({selectedModel || 'No models selected'})</span>
             )}
           </div>
         </div>
@@ -86,7 +86,7 @@ export const AntigravityStatusBar: React.FC = () => {
             title="View Live Network Audit Logs"
           >
             <Terminal className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-            <span>SANDBOX: DOCKER (--net=none)</span>
+            <span>SANDBOX: ISOLATED (--net=none)</span>
           </button>
           <span className="hidden sm:inline">UTF-8</span>
           <button 
