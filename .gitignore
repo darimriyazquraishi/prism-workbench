@@ -79,3 +79,6 @@ chroma_db/
 
 # Archives
 *.zip
+
+# Generated local demo output
+per_design/

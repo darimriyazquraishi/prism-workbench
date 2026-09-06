@@ -14,7 +14,9 @@ import type {
   RoutingIntent,
   IntentRoutingResult,
   WorkflowContext,
-  ValidationAuditLog
+  ValidationAuditLog,
+  DiscoveredModel,
+  ModelArsenal
 } from '../types/antigravity';
 import { defaultPipelineConfig, type PipelineConfig } from '../config/pipelineConfig';
 import { executeValidationAndRoutingPipeline } from '../services/answerValidatorService';
@@ -225,6 +227,76 @@ export async function queryLocalChatbotLLM(
   }
 }
 
+export function detectModelInfo(filename: string, fullPath?: string, sizeBytes?: number): DiscoveredModel {
+  let name = filename.replace(/\.(gguf|bin|safetensors|pt|pth|onnx)$/i, '').trim();
+  if (/qwen3.*14b/i.test(name)) name = 'Qwen 3 14B';
+  else if (/qwen2\.5.*coder.*7b/i.test(name)) name = 'Qwen 2.5 Coder 7B';
+  else if (/qwen3.*vl.*8b/i.test(name)) name = 'Qwen 3 VL 8B';
+  else if (/qwen3.*embed/i.test(name)) name = 'Qwen 3 Embedding 0.6B';
+  else if (/qwen3.*rerank/i.test(name)) name = 'Qwen 3 Reranker 0.6B';
+
+  const lower = (filename + ' ' + (fullPath || '')).toLowerCase();
+
+  let role: DiscoveredModel['role'] = 'reasoning';
+  let roleName = 'Master Reasoning & Planning';
+  let assignedAgent = 'Reasoning & Planning Agent (Master Orchestrator)';
+  let description = 'Coordinates specialist models, deconstructs user intent, and synthesizes final answers.';
+  let ollamaTag = 'qwen3:8b';
+
+  if (lower.includes('vl') || lower.includes('vision') || lower.includes('multimodal') || lower.includes('clip') || lower.includes('llava')) {
+    role = 'vision';
+    roleName = 'Vision & Document OCR';
+    assignedAgent = 'Vision & Multimodal Agent';
+    description = 'Extracts visual observations from images, engineering schematics, and scanned reports.';
+    ollamaTag = 'qwen2.5vl:7b';
+  } else if (lower.includes('coder') || lower.includes('code') || lower.includes('python') || lower.includes('starcoder')) {
+    role = 'coder';
+    roleName = 'Code & Math Synthesis';
+    assignedAgent = 'Code & Math Agent';
+    description = 'Generates production-grade scripts, performs calculations, and debugs software issues.';
+    ollamaTag = 'qwen2.5-coder:7b';
+  } else if (lower.includes('embed') || lower.includes('nomic') || lower.includes('bge') || lower.includes('minilm')) {
+    role = 'embedding';
+    roleName = 'Vector Embeddings (RAG)';
+    assignedAgent = 'Knowledge Retrieval Agent (RAG)';
+    description = 'Generates vector representations of queries and documents for semantic knowledge search.';
+    ollamaTag = 'nomic-embed-text';
+  } else if (lower.includes('rerank')) {
+    role = 'reranker';
+    roleName = 'Cross-Encoder Re-ranker';
+    assignedAgent = 'Neural Re-ranking Agent';
+    description = 'Re-ranks retrieved knowledge candidates to guarantee high context precision.';
+    ollamaTag = 'qwen3-reranker:0.6b';
+  } else if (lower.includes('14b')) {
+    role = 'reasoning';
+    roleName = 'Deep Reasoning & Synthesis';
+    assignedAgent = 'Reasoning & Planning Agent (Master Orchestrator)';
+    description = 'Complex logic evaluation, multi-step problem solving, and formal brief synthesis.';
+    ollamaTag = 'qwen3:14b';
+  }
+
+  const formattedSize = sizeBytes && sizeBytes > 0
+    ? (sizeBytes > 1024 * 1024 * 1024 
+        ? `${(sizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GB` 
+        : `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`)
+    : 'Local Directory';
+
+  return {
+    id: `model-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    name,
+    filename,
+    path: fullPath || filename,
+    sizeFormatted: formattedSize,
+    bytes: sizeBytes || 0,
+    role,
+    roleName,
+    assignedAgent,
+    description,
+    detectedAt: new Date().toLocaleTimeString(),
+    ollamaTag
+  };
+}
+
 export async function generateChatbotResponse(
   promptText: string,
   previousUserPrompts: string[] = [],
@@ -360,6 +432,15 @@ interface AntigravityStore {
   fetchAvailableModels: () => Promise<string[]>;
   addAvailableModel: (modelName: string) => void;
   removeAvailableModel: (modelName: string) => void;
+  arsenalModels: DiscoveredModel[];
+  setArsenalModels: (models: DiscoveredModel[]) => void;
+  addArsenalModel: (model: DiscoveredModel) => void;
+  removeArsenalModel: (id: string) => void;
+  clearArsenalModels: () => void;
+  saveCurrentModelLayout: () => boolean;
+  loadSavedModelLayout: () => boolean;
+  clearSavedModelLayout: () => void;
+  getSavedModelLayout: () => DiscoveredModel[] | null;
   attachedFiles: string[];
   uploadedFiles: UploadedFile[];
   isExecuting: boolean;
@@ -403,6 +484,7 @@ interface AntigravityStore {
   // Actions
   createNewSession: (title?: string) => string;
   selectSession: (id: string) => void;
+  deleteSession: (id: string) => void;
   setActiveMode: (mode: 'agent' | 'planning' | 'fast') => void;
   setSelectedModel: (model: string) => void;
   setProjectTitle: (title: string) => void;
@@ -779,6 +861,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   activeMode: 'agent',
   selectedModel: '',
   availableModels: [],
+  arsenalModels: [],
   attachedFiles: [],
   uploadedFiles: [],
   isExecuting: false,
@@ -881,6 +964,104 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       activeTaskStarted: (session?.steps.length || 0) > 0,
       activeProposedPlan: session?.activeProposedPlan || null
     });
+  },
+
+  deleteSession: (id) => {
+    set((state) => {
+      const remaining = state.sessions.filter(s => s.id !== id);
+      const nextActive = state.activeSessionId === id 
+        ? (remaining[0]?.id || '') 
+        : state.activeSessionId;
+      const activeSess = remaining.find(s => s.id === nextActive);
+      return {
+        sessions: remaining,
+        activeSessionId: nextActive,
+        projectTitle: activeSess?.title || 'LUMI - Local Unified Multimodal Intelligence',
+        activeTaskStarted: (activeSess?.steps.length || 0) > 0,
+        activeProposedPlan: activeSess?.activeProposedPlan || null
+      };
+    });
+  },
+
+  setArsenalModels: (models) => {
+    const reasoningModel = models.find(m => m.role === 'reasoning');
+    const coderModel = models.find(m => m.role === 'coder');
+    const defaultSelection = reasoningModel?.name || coderModel?.name || models[0]?.name || '';
+    const modelNames = models.map(m => m.name);
+    set((state) => ({
+      arsenalModels: models,
+      availableModels: Array.from(new Set([...state.availableModels, ...modelNames])),
+      selectedModel: state.selectedModel || defaultSelection
+    }));
+  },
+  addArsenalModel: (model) => {
+    set((state) => {
+      const exists = state.arsenalModels.some(m => m.name === model.name || m.id === model.id);
+      const updated = exists ? state.arsenalModels : [...state.arsenalModels, model];
+      return {
+        arsenalModels: updated,
+        availableModels: Array.from(new Set([...state.availableModels, model.name])),
+        selectedModel: state.selectedModel || model.name
+      };
+    });
+  },
+  removeArsenalModel: (id) => {
+    set((state) => {
+      const updated = state.arsenalModels.filter(m => m.id !== id);
+      return { arsenalModels: updated };
+    });
+  },
+  clearArsenalModels: () => {
+    set({ arsenalModels: [] });
+  },
+  saveCurrentModelLayout: () => {
+    const models = get().arsenalModels;
+    if (!models || models.length === 0) return false;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('lumi_saved_model_layout', JSON.stringify(models));
+        return true;
+      }
+    } catch (e) {
+      console.error('Failed to save model layout:', e);
+    }
+    return false;
+  },
+  loadSavedModelLayout: () => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem('lumi_saved_model_layout');
+        if (stored) {
+          const models: DiscoveredModel[] = JSON.parse(stored);
+          if (Array.isArray(models) && models.length > 0) {
+            get().setArsenalModels(models);
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load saved model layout:', e);
+    }
+    return false;
+  },
+  clearSavedModelLayout: () => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('lumi_saved_model_layout');
+      }
+    } catch {}
+  },
+  getSavedModelLayout: (): DiscoveredModel[] | null => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem('lumi_saved_model_layout');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch {}
+    return null;
   },
 
   setActiveMode: (activeMode) => set({ activeMode }),
