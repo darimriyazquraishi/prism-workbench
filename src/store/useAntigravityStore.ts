@@ -969,6 +969,23 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   deleteSession: (id) => {
     set((state) => {
       const remaining = state.sessions.filter(s => s.id !== id);
+      if (remaining.length === 0) {
+        const freshId = `sess-${Date.now()}`;
+        return {
+          sessions: [{
+            id: freshId,
+            title: 'New Chat',
+            startedAt: new Date().toLocaleTimeString(),
+            status: 'in_progress',
+            steps: []
+          }],
+          activeSessionId: freshId,
+          projectTitle: 'LUMI - Local Unified Multimodal Intelligence',
+          activeTaskStarted: false,
+          activeProposedPlan: null,
+          attachedFiles: []
+        };
+      }
       const nextActive = state.activeSessionId === id 
         ? (remaining[0]?.id || '') 
         : state.activeSessionId;
@@ -1271,6 +1288,10 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     const { addStepToActiveSession, setActiveTaskStarted, addNetworkLog, uploadedFiles, attachedFiles, queryKnowledgeBase } = get();
     setActiveTaskStarted(true);
 
+    const currentAttachedFiles = [...(attachedFiles || get().attachedFiles)];
+    // Clear attached files from attach input box immediately so it doesn't linger!
+    set({ attachedFiles: [] });
+
     const totalStart = performance.now();
     const requestId = `req-${Date.now()}`;
     const activeModel = get().selectedModel || 'qwen3:8b';
@@ -1286,7 +1307,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
     // 1. Lightweight Intent Classification inside Chatbot's Turn
     const routerStart = performance.now();
-    const routing = classifyIntent(prompt, attachedFiles, uploadedFiles, previousUserPrompts);
+    const routing = classifyIntent(prompt, currentAttachedFiles, uploadedFiles, previousUserPrompts);
     const routerDurationMs = Math.round(performance.now() - routerStart);
 
     // 2. DIRECT_QA Intent Execution Path (Answers immediately, no router/workplan pipeline)
@@ -1297,6 +1318,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         id: `step-${Date.now()}-u`,
         type: 'user_input',
         content: prompt,
+        attachedFiles: currentAttachedFiles,
         timestamp: now()
       });
 
@@ -1348,6 +1370,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         id: `step-${Date.now()}-u`,
         type: 'user_input',
         content: prompt,
+        attachedFiles: currentAttachedFiles,
         timestamp: now()
       });
 
@@ -1380,6 +1403,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       id: `step-${Date.now()}-u`,
       type: 'user_input',
       content: prompt,
+      attachedFiles: currentAttachedFiles,
       timestamp: now()
     });
 
@@ -1449,19 +1473,28 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       ? `✓ Knowledge Base: No relevant guidance matched threshold (${kbResult.totalChunksSearched || 0} chunks searched using ${kbResult.embeddingModel || 'Nomic-768D'}) — proceeding using user upload content.`
       : `✓ Knowledge Base: Retrieved ${kbResult.guidance.length} relevant chunks using ${kbResult.embeddingModel || 'Nomic-768D'}: ${kbResult.guidance.map(g => g.title).join(', ')}`;
 
+    const cleanRoutingText = `I have received your request and coordinated the plan with the local General Reasoning model:
+
+• Task Objective: ${prompt.trim()}
+• Attached Context: ${fileContextStr}
+• Target Deliverable: ${contract.deliverable_name || 'Standard Deliverable'}
+• Knowledge Base: ${routing.requires_rag ? (kbResult.guidance.length > 0 ? `Retrieved ${kbResult.guidance.length} relevant sections` : 'No specific guideline match') : 'Not required for this task'}
+
+Passing to local specialist models to assemble the execution plan.`;
+
     addStepToActiveSession({
       id: `step-${Date.now()}-chatbot`,
       type: 'chatbot_routing',
-      title: activeModel ? `Front-Facing Chatbot (${activeModel})` : 'Front-Facing Chatbot (Multi-Agent Router)',
-      content: `I've received your workflow request! Passing to local multi-model router to assemble proposed execution plan:\n\n**Intent Summary:** ${intentSummary}\n**Output Contract:** \`${contract.deliverable_name}\` (Target: \`${contract.expected_filename}\`)\n**Task Content Uploads:** \`${fileContextStr}\` (Primary source_type = ${userUploadFiles.length > 0 ? 'USER_UPLOAD' : 'PROMPT_INPUT'})\n**Nomic Vector RAG:** ${kbStatusText}`,
+      title: activeModel ? `General LLM Orchestrator (${activeModel})` : 'General LLM Orchestrator',
+      content: cleanRoutingText,
       timestamp: now()
     });
 
-    const caps = detectRequiredCapabilities(prompt, attachedFiles, uploadedFiles);
-    const visionModel = resolveModelForCapability('vision');
-    const reasoningModel = resolveModelForCapability('text_reasoning', activeModel);
-    const codeModel = resolveModelForCapability('code');
-    const embedModel = resolveModelForCapability('embeddings');
+    const caps = detectRequiredCapabilities(prompt, currentAttachedFiles, uploadedFiles);
+    const visionModel = resolveModelForCapability('vision', undefined, get().arsenalModels);
+    const reasoningModel = resolveModelForCapability('text_reasoning', activeModel, get().arsenalModels);
+    const codeModel = resolveModelForCapability('code', undefined, get().arsenalModels);
+    const embedModel = resolveModelForCapability('embeddings', undefined, get().arsenalModels);
 
     const steps: ProposedStepItem[] = [];
     let stepNum = 1;
@@ -1473,8 +1506,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         id: `s${stepNum}`,
         stepNumber: stepNum++,
         toolName: 'vision_analyzer',
-        description: `Extract visual context, text, novel title, and details from \`${activeImgLabel}\` using Vision LLM`,
-        targetModel: `${visionModel.tag} (${visionModel.name})`,
+        description: `Analyze visual content and extract text from ${activeImgLabel}`,
+        targetModel: `Vision Model (${visionModel.name})`,
         status: 'pending'
       });
     }
@@ -1486,9 +1519,9 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         stepNumber: stepNum++,
         toolName: 'nomic-embed-rag',
         description: kbResult.noGuidanceFound 
-          ? `Query Knowledge Base via Nomic 768-D Embeddings (No guidance matched threshold)` 
-          : `Query Knowledge Base via Nomic 768-D Embeddings (Retrieved: ${kbResult.guidance.map(g => g.title).join(', ')})`,
-        targetModel: `${embedModel.name} (768-D Vector Search)`,
+          ? `Query Knowledge Base standards` 
+          : `Retrieve relevant guidelines: ${kbResult.guidance.map(g => g.title).join(', ')}`,
+        targetModel: `Knowledge Base (${embedModel.name})`,
         status: 'pending'
       });
     }
@@ -1498,9 +1531,9 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       steps.push({
         id: `s${stepNum}`,
         stepNumber: stepNum++,
-        toolName: 'docker-python-sandbox',
-        description: `Execute Python calculations in isolated container (--network=none)`,
-        targetModel: `${codeModel.tag} (Python Sandbox & Math Agent)`,
+        toolName: 'code_generator',
+        description: `Generate Python program and execute in sandbox`,
+        targetModel: `Coder Model (${codeModel.name})`,
         status: 'pending'
       });
     }
@@ -1511,9 +1544,9 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       stepNumber: stepNum++,
       toolName: 'general_reasoning_synthesis',
       description: caps.includes('vision') || routing.requires_vision
-        ? `Synthesize final response using extracted visual context and local reasoning model`
-        : `Reason over task requirements and synthesized source data`,
-      targetModel: `${reasoningModel.tag} (${reasoningModel.name})`,
+        ? `Synthesize final answer from extracted visual findings and code`
+        : `Reason over task requirements and formulate verified response`,
+      targetModel: `General Model (${reasoningModel.name})`,
       status: 'pending'
     });
 
@@ -1525,8 +1558,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         id: `s${stepNum}`,
         stepNumber: stepNum++,
         toolName,
-        description: `Generate verified ${targetFormat.toUpperCase()} deliverable \`${contract.expected_filename}\``,
-        targetModel: `${reasoningModel.tag} (Deliverable Agent)`,
+        description: `Compile verified ${targetFormat.toUpperCase()} deliverable (${contract.expected_filename})`,
+        targetModel: `Deliverable Builder`,
         status: 'pending'
       });
     }
@@ -1674,13 +1707,16 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
             const dynamicVisionPrompt = `Examine this image in detail and extract all key information relevant to fulfilling the user request: "${approvedPlan.intentSummary || workflowContext.userRequest}".
 Describe titles, authors, text, headings, diagrams, numbers, equipment tags, and any other visual content present clearly and thoroughly.`;
 
-            console.log('[VISION STEP DIAGNOSTIC] Calling Vision LLM (qwen2.5vl:7b)...', {
+            const visionDesc = resolveModelForCapability('vision', undefined, get().arsenalModels);
+            const visionModelTag = visionDesc.tag || 'qwen2.5vl:7b';
+
+            console.log(`[VISION STEP DIAGNOSTIC] Calling Vision LLM (${visionModelTag})...`, {
               imageName: imageFile.name,
               prompt: dynamicVisionPrompt
             });
 
             const visionRes = await callLocalLlm({
-              model: 'qwen2.5vl:7b',
+              model: visionModelTag,
               systemPrompt: 'You are a precise computer vision and OCR assistant. Extract visual content, text, titles, numbers, and cover details accurately without speculation.',
               userPrompt: dynamicVisionPrompt,
               images: [imageFile.dataUrl]
@@ -1944,10 +1980,17 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
             workflowContext.artifact = xlsxRes;
             stepOutputText = `XLSX renderer compiled ${qwenXlsx.data.sheets.length} sheets into ${xlsxRes.name} (${(xlsxRes.sizeBytes / 1024).toFixed(1)} KB). Ready for download.`;
           } else if (requestedFormat === 'py') {
+            const codeDescriptor = resolveModelForCapability('code', undefined, get().arsenalModels);
+            const codeModelTag = codeDescriptor.tag || 'qwen2.5-coder:7b';
+            const contextForCode = [
+              workflowContext.visionFindings ? `Extracted Visual Context / Novel Info:\n${workflowContext.visionFindings}` : '',
+              workflowContext.extractedContent ? `Source Context:\n${workflowContext.extractedContent}` : ''
+            ].filter(Boolean).join('\n\n');
+
             const qwenCode = await generatePythonCodeWithQwen(
               approvedPlan.intentSummary || 'Python script calculation',
-              workflowContext.extractedContent,
-              'qwen2.5-coder:7b'
+              contextForCode || workflowContext.extractedContent,
+              codeModelTag
             );
 
             addNetworkLog({
@@ -2067,7 +2110,8 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
       addStepToActiveSession({
         id: `step-${Date.now()}-failed`,
         type: 'response',
-        content: `❌ **Task Execution Halted: Model or Tool Failure**\n\n> ${failureReason}\n\n**Diagnostic Checklist:**\n1. Ensure Ollama service is running locally (\`ollama serve\` at \`http://127.0.0.1:11434\`).\n2. Verify the required model is installed (\`ollama list\`).\n3. Lumi strictly prohibits simulated fake execution — all deliverable workflows require live local model inference.`,
+        status: 'error',
+        content: `❌ Task Execution Halted: Model or Tool Failure\n\n> ${failureReason}\n\nDiagnostic Checklist:\n1. Ensure Ollama service is running locally (ollama serve at http://127.0.0.1:11434).\n2. Verify the required model is installed (ollama list).\n3. Lumi strictly prohibits simulated fake execution — all deliverable workflows require live local model inference.`,
         timestamp: now()
       });
       setIsExecuting(false);

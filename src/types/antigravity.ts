@@ -145,6 +145,7 @@ export interface TrajectoryStep {
   artifacts?: ArtifactItem[];
   proposedPlan?: ProposedExecutionPlan;
   isExpanded?: boolean;
+  attachedFiles?: string[];
 }
 
 export interface ValidationResult {

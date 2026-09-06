@@ -28,6 +28,44 @@ import { PlanApprovalCard } from '../agent/PlanApprovalCard';
 import { LivePipelineTelemetryPanel } from '../antigravity/LivePipelineTelemetryPanel';
 import { TaskResultView } from '../antigravity/TaskResultView';
 
+function formatCleanText(content?: string): string {
+  if (!content) return '';
+  let text = content.trim();
+
+  // If content is wrapped in or is a JSON string, try to parse it
+  if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed === 'string') {
+        text = parsed;
+      } else if (parsed.response) {
+        text = parsed.response;
+      } else if (parsed.answer) {
+        text = parsed.answer;
+      } else if (parsed.content) {
+        text = parsed.content;
+      } else if (parsed.summary) {
+        text = parsed.summary;
+      } else if (parsed.message) {
+        text = parsed.message;
+      } else {
+        text = Object.entries(parsed)
+          .map(([k, v]) => `• ${k.replace(/_/g, ' ')}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+          .join('\n');
+      }
+    } catch {
+      // Keep original text
+    }
+  }
+
+  // Remove markdown asterisks (**bold** -> bold, *bullet -> bullet) and unescape quotes
+  text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+  text = text.replace(/(^|[^\\])\*(?!\s)(.*?)\*/g, '$1$2');
+  text = text.replace(/\\"/g, '"');
+
+  return text;
+}
+
 export const MainWorkspaceView: React.FC = () => {
   const { 
     activeTaskStarted, 
@@ -43,6 +81,7 @@ export const MainWorkspaceView: React.FC = () => {
     attachedFiles,
     attachFile,
     removeAttachedFile,
+    clearAttachments,
     uploadedFiles,
     addUploadedFiles,
     removeUploadedFile,
@@ -224,13 +263,11 @@ export const MainWorkspaceView: React.FC = () => {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      if (promptText.trim()) {
-                        proposePlanForTask(promptText, 'flow_a_inspection');
-                        setPromptText('');
-                        setShowSlashMenu(false);
-                      } else {
-                        proposePlanForTask('Read Inspection_Report_001.pdf, identify ultrasonic findings, compare against SOP-OPS-014, and compile Word (.docx) approval note.', 'flow_a_inspection');
-                      }
+                      const toSend = promptText.trim() || 'Read inspection findings and generate deliverable.';
+                      clearAttachments();
+                      proposePlanForTask(toSend, 'flow_a_inspection');
+                      setPromptText('');
+                      setShowSlashMenu(false);
                     }
                   }}
                 />
@@ -283,6 +320,7 @@ export const MainWorkspaceView: React.FC = () => {
                     <button 
                       onClick={() => {
                         if (promptText.trim()) {
+                          clearAttachments();
                           proposePlanForTask(promptText, 'flow_a_inspection');
                           setPromptText('');
                           setShowSlashMenu(false);
@@ -305,23 +343,33 @@ export const MainWorkspaceView: React.FC = () => {
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Scrollable Conversation Stream */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* Scrollable Conversation Stream - Clean Centered Layout Without Avatar Gutter */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-5">
                 {sessionSteps.map((step) => {
                   if (step.type === 'user_input') {
                     return (
-                      <div key={step.id} className="max-w-4xl mx-auto w-full flex items-start gap-3 pt-2">
-                        <div className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] shadow-sm">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 shadow-sm">
-                          <div className="flex items-center justify-between mb-1.5 border-b border-[var(--border-subtle)] pb-1.5">
+                      <div key={step.id} className="max-w-3xl mx-auto w-full pt-1">
+                        <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 shadow-sm space-y-2">
+                          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
                             <span className="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
-                              User Input Directive
+                              <User className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                              User Directive
                             </span>
                             <span className="font-mono text-[10px] text-[var(--text-tertiary)]">{step.timestamp}</span>
                           </div>
-                          <div className="text-sm text-[var(--text-primary)] font-sans leading-relaxed">{step.content}</div>
+
+                          {step.attachedFiles && step.attachedFiles.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {step.attachedFiles.map((file) => (
+                                <div key={file} className="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-2.5 py-1 rounded-md text-[11px] font-mono text-[var(--text-primary)] shadow-sm">
+                                  <FileText className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                                  <span className="truncate max-w-[200px]">{file}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="text-sm text-[var(--text-primary)] font-sans leading-relaxed whitespace-pre-wrap">{step.content}</div>
                         </div>
                       </div>
                     );
@@ -329,22 +377,20 @@ export const MainWorkspaceView: React.FC = () => {
 
                   if (step.type === 'chatbot_routing') {
                     return (
-                      <div key={step.id} className="max-w-4xl mx-auto w-full flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-950/60 border border-blue-500/40 flex items-center justify-center font-bold text-xs text-blue-400 shadow-sm">
-                          <Sparkles className="w-4 h-4 text-blue-400" />
-                        </div>
-                        <div className="flex-1 bg-blue-950/20 border border-blue-800/30 rounded-xl p-4 shadow-sm space-y-2">
+                      <div key={step.id} className="max-w-3xl mx-auto w-full">
+                        <div className="bg-blue-950/20 border border-blue-800/30 rounded-xl p-4 shadow-sm space-y-2">
                           <div className="flex items-center justify-between border-b border-blue-800/30 pb-2">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs text-blue-300">Qwen2.5-3B-Instruct</span>
+                              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                              <span className="font-bold text-xs text-blue-300">{selectedModel || 'General Reasoning LLM'}</span>
                               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-900/50 text-blue-200 border border-blue-700/40">
-                                FRONT-FACING CHATBOT &amp; INTENT ROUTER
+                                LOCAL ORCHESTRATOR
                               </span>
                             </div>
                             <span className="font-mono text-[10px] text-blue-400">{step.timestamp}</span>
                           </div>
                           <div className="text-xs text-[var(--text-primary)] whitespace-pre-line leading-relaxed font-sans">
-                            {step.content}
+                            {formatCleanText(step.content)}
                           </div>
                         </div>
                       </div>
@@ -359,7 +405,7 @@ export const MainWorkspaceView: React.FC = () => {
 
                     if (planToRender.userDecision === 'pending' && activeProposedPlan) {
                       return (
-                        <div key={step.id} className="max-w-4xl mx-auto w-full">
+                        <div key={step.id} className="max-w-3xl mx-auto w-full">
                           <PlanApprovalCard 
                             plan={activeProposedPlan}
                             onApprove={(plan) => approveProposedPlan(plan)}
@@ -370,12 +416,12 @@ export const MainWorkspaceView: React.FC = () => {
                     }
 
                     return (
-                      <div key={step.id} className="max-w-4xl mx-auto w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-3.5 space-y-2 shadow-sm">
+                      <div key={step.id} className="max-w-3xl mx-auto w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-3.5 space-y-2 shadow-sm">
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
                             <ShieldCheck className="w-4 h-4 text-[var(--accent-success)]" />
                             <span className="font-semibold text-[var(--text-primary)]">
-                              Workplan Evaluation ({planToRender.classifiedTaskType})
+                              Implementation Plan ({planToRender.classifiedTaskType.replace('_', ' ')})
                             </span>
                           </div>
                           <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded font-bold uppercase border ${
@@ -395,7 +441,7 @@ export const MainWorkspaceView: React.FC = () => {
 
                   if (step.type === 'rejection_feedback') {
                     return (
-                      <div key={step.id} className="max-w-4xl mx-auto w-full bg-red-950/20 border border-red-800/30 rounded-xl p-3.5 space-y-1">
+                      <div key={step.id} className="max-w-3xl mx-auto w-full bg-red-950/20 border border-red-800/30 rounded-xl p-3.5 space-y-1">
                         <div className="flex items-center justify-between text-xs font-semibold text-red-300">
                           <span>User Revision Feedback</span>
                           <span className="font-mono text-[10px] text-red-400">{step.timestamp}</span>
@@ -407,7 +453,7 @@ export const MainWorkspaceView: React.FC = () => {
 
                   if (step.type === 'thought') {
                     return (
-                      <div key={step.id} className="max-w-4xl mx-auto w-full flex items-center gap-2 py-1 px-2 text-xs font-mono text-[var(--text-secondary)]">
+                      <div key={step.id} className="max-w-3xl mx-auto w-full flex items-center gap-2 py-1 px-2 text-xs font-mono text-[var(--text-secondary)]">
                         <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse"></span>
                         <span className="font-semibold text-[var(--text-primary)]">{step.title || 'Agent Thought'}:</span>
                         <span>{step.content}</span>
@@ -416,29 +462,43 @@ export const MainWorkspaceView: React.FC = () => {
                   }
 
                   if (step.type === 'tool_call') {
+                    const isStepError = step.status === 'error';
+                    const isStepSuccess = step.status === 'success';
                     return (
-                      <div key={step.id} className="max-w-4xl mx-auto w-full p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] font-mono text-xs flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Terminal className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-                          <span className="font-bold text-[var(--text-primary)]">{step.toolName}</span>
-                          <span className="text-[var(--text-secondary)] truncate max-w-md">{step.toolArgs?.description}</span>
+                      <div key={step.id} className={`max-w-3xl mx-auto w-full p-3 rounded-xl border font-mono text-xs ${
+                        isStepError 
+                          ? 'bg-rose-950/20 border-rose-800/40 text-rose-300' 
+                          : 'bg-[var(--bg-surface)] border-[var(--border-subtle)]'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Terminal className={`w-3.5 h-3.5 flex-shrink-0 ${isStepError ? 'text-rose-400' : 'text-[var(--accent-primary)]'}`} />
+                            <span className="font-bold text-[var(--text-primary)]">{step.toolName}</span>
+                            <span className="text-[var(--text-secondary)] truncate max-w-md">{step.toolArgs?.description}</span>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-medium flex-shrink-0 ${
+                            isStepSuccess 
+                              ? 'text-[var(--accent-success)] bg-emerald-950/40 border border-emerald-800/40' 
+                              : isStepError
+                                ? 'text-rose-400 bg-rose-950/50 border border-rose-800/50 font-bold'
+                                : 'text-amber-400 bg-amber-950/40 border border-amber-800/40 animate-pulse'
+                          }`}>
+                            {isStepSuccess ? '✓ Executed' : isStepError ? '✗ Failed' : 'Running...'}
+                          </span>
                         </div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${step.status === 'success' ? 'text-[var(--accent-success)] bg-emerald-950/30' : 'text-amber-400 bg-amber-950/30'}`}>
-                          {step.status === 'success' ? '✓ Executed (Zero Egress)' : 'Running...'}
-                        </span>
+                        {isStepError && (step.toolOutput?.error || step.content) && (
+                          <div className="mt-2 pt-2 border-t border-rose-800/30 text-[11px] text-rose-300 font-sans">
+                            {step.toolOutput?.error || step.content}
+                          </div>
+                        )}
                       </div>
                     );
                   }
 
                   if (step.type === 'response') {
                     return (
-                      <div key={step.id} className="max-w-4xl mx-auto w-full flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-sm flex-shrink-0 mt-1">
-                          <img src="/favicon.svg" alt="Lumi" className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <TaskResultView step={step} proposedPlan={activeProposedPlan || undefined} />
-                        </div>
+                      <div key={step.id} className="max-w-3xl mx-auto w-full">
+                        <TaskResultView step={step} proposedPlan={activeProposedPlan || undefined} />
                       </div>
                     );
                   }
@@ -447,10 +507,8 @@ export const MainWorkspaceView: React.FC = () => {
                 })}
 
                 {isExecuting && (
-                  <div className="max-w-4xl mx-auto w-full flex items-center gap-3 p-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl animate-pulse font-mono text-xs text-[var(--text-secondary)]">
-                    <div className="w-6 h-6 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center flex-shrink-0 border border-[var(--border-subtle)]">
-                      <Sparkles className="w-3.5 h-3.5 text-[var(--accent-primary)] animate-spin" />
-                    </div>
+                  <div className="max-w-3xl mx-auto w-full flex items-center gap-3 p-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl animate-pulse font-mono text-xs text-[var(--text-secondary)]">
+                    <Sparkles className="w-4 h-4 text-[var(--accent-primary)] animate-spin" />
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-[var(--text-primary)]">
                         {selectedModel ? selectedModel : 'Local Reasoning Engine'}
@@ -465,7 +523,7 @@ export const MainWorkspaceView: React.FC = () => {
 
               {/* Bottom Input Section */}
               <div className="p-4 bg-[var(--bg-base)] border-t border-[var(--border-subtle)]">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-3xl mx-auto">
                   <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-2 shadow-sm focus-within:border-[var(--text-secondary)] transition-colors">
                     {/* Attached File Pills */}
                     {attachedFiles.length > 0 && (
@@ -494,6 +552,7 @@ export const MainWorkspaceView: React.FC = () => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           if (followUpText.trim()) {
+                            clearAttachments();
                             proposePlanForTask(followUpText.trim());
                             setFollowUpText('');
                           }
@@ -521,6 +580,7 @@ export const MainWorkspaceView: React.FC = () => {
                         <button 
                           onClick={() => {
                             if (followUpText.trim()) {
+                              clearAttachments();
                               proposePlanForTask(followUpText.trim());
                               setFollowUpText('');
                             }

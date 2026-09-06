@@ -53,8 +53,53 @@ export const LOCAL_MODEL_REGISTRY: ModelDescriptor[] = [
 
 export function resolveModelForCapability(
   capability: ModelCapability,
-  preferredModel?: string
+  preferredModel?: string,
+  discoveredModels?: Array<{ role?: string; name: string; ollamaTag?: string }>
 ): ModelDescriptor {
+  // Check user-discovered / loaded models first
+  if (discoveredModels && discoveredModels.length > 0) {
+    if (capability === 'vision') {
+      const match = discoveredModels.find(m => m.role === 'vision' || /vl|vision/i.test(m.name));
+      if (match) {
+        return {
+          tag: match.ollamaTag || match.name.toLowerCase().replace(/\s+/g, '-'),
+          name: match.name,
+          capabilities: ['vision', 'text_reasoning']
+        };
+      }
+    }
+    if (capability === 'code') {
+      const match = discoveredModels.find(m => m.role === 'coder' || /coder|code/i.test(m.name));
+      if (match) {
+        return {
+          tag: match.ollamaTag || match.name.toLowerCase().replace(/\s+/g, '-'),
+          name: match.name,
+          capabilities: ['code', 'text_reasoning']
+        };
+      }
+    }
+    if (capability === 'text_reasoning' || capability === 'document_synthesis') {
+      if (preferredModel) {
+        const match = discoveredModels.find(m => m.ollamaTag === preferredModel || m.name === preferredModel);
+        if (match) {
+          return {
+            tag: match.ollamaTag || match.name.toLowerCase().replace(/\s+/g, '-'),
+            name: match.name,
+            capabilities: ['text_reasoning', 'document_synthesis']
+          };
+        }
+      }
+      const matchReasoning = discoveredModels.find(m => m.role === 'reasoning' || /14b|reason/i.test(m.name));
+      if (matchReasoning) {
+        return {
+          tag: matchReasoning.ollamaTag || matchReasoning.name.toLowerCase().replace(/\s+/g, '-'),
+          name: matchReasoning.name,
+          capabilities: ['text_reasoning', 'document_synthesis']
+        };
+      }
+    }
+  }
+
   if (capability === 'vision') {
     return LOCAL_MODEL_REGISTRY.find(m => m.tag === 'qwen2.5vl:7b') || LOCAL_MODEL_REGISTRY[0];
   }

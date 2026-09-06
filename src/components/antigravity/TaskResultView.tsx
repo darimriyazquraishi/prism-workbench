@@ -158,9 +158,22 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
 
         <div className="flex items-center gap-2 font-mono text-[10px] text-[var(--text-tertiary)] self-end sm:self-center">
           <Clock className="w-3.5 h-3.5" />
-          <span>Completed {step.timestamp || 'just now'}</span>
+          <span>{isFailed ? 'Halted' : 'Completed'} {step.timestamp || 'just now'}</span>
         </div>
       </div>
+
+      {/* ERROR DIAGNOSTICS BANNER IF FAILED */}
+      {isFailed && (
+        <div className="p-3.5 bg-rose-950/30 border border-rose-800/50 rounded-lg space-y-2">
+          <div className="flex items-center gap-2 text-rose-300 font-semibold text-xs">
+            <XCircle className="w-4 h-4 text-rose-400" />
+            <span>Execution Failure Diagnostics</span>
+          </div>
+          <div className="text-[11px] font-mono text-rose-200 bg-[var(--bg-base)] p-2.5 rounded border border-rose-900/40 whitespace-pre-wrap max-h-48 overflow-y-auto">
+            {step.content || 'Task encountered an unhandled exception during local execution. Check model availability and input parameters.'}
+          </div>
+        </div>
+      )}
 
       {/* 2. EXECUTION SUMMARY GRID */}
       <div className="space-y-2">
@@ -174,8 +187,16 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
           <div className="p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] space-y-1">
             <div className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono truncate">Task Analysis</div>
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-xs text-[var(--text-primary)]">Parsed</span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">Completed</span>
+              <span className="font-semibold text-xs text-[var(--text-primary)]">
+                {isFailed ? 'Halted' : 'Parsed'}
+              </span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                isFailed 
+                  ? 'bg-rose-950/40 text-rose-400 border-rose-800/40' 
+                  : 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40'
+              }`}>
+                {isFailed ? 'Failed' : 'Completed'}
+              </span>
             </div>
           </div>
 
@@ -186,7 +207,13 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
               <span className="font-semibold text-[11px] text-[var(--text-primary)] font-mono truncate max-w-[80px]" title={selectedModel || 'Qwen Engine'}>
                 {selectedModel ? selectedModel.split(':')[0] : 'Qwen Local'}
               </span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">Completed</span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                isFailed 
+                  ? 'bg-rose-950/40 text-rose-400 border-rose-800/40' 
+                  : 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40'
+              }`}>
+                {isFailed ? 'Error' : 'Completed'}
+              </span>
             </div>
           </div>
 
@@ -212,9 +239,15 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
             <div className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono truncate">Artifact Generation</div>
             <div className="flex items-center justify-between">
               <span className="font-semibold text-xs text-[var(--text-primary)] uppercase">
-                {artifacts.length > 0 ? artifacts[0].type : 'N/A'}
+                {isFailed ? 'None' : (artifacts.length > 0 ? artifacts[0].type : 'N/A')}
               </span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">Completed</span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                isFailed 
+                  ? 'bg-rose-950/40 text-rose-400 border-rose-800/40' 
+                  : 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40'
+              }`}>
+                {isFailed ? 'Failed' : 'Completed'}
+              </span>
             </div>
           </div>
 
@@ -222,8 +255,16 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
           <div className="p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] space-y-1 col-span-2 sm:col-span-1">
             <div className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono truncate">Contract Validation</div>
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-xs text-emerald-400 font-mono">100% Valid</span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">Passed</span>
+              <span className={`font-semibold text-xs font-mono ${isFailed ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {isFailed ? '0% (Failed)' : '100% Valid'}
+              </span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                isFailed 
+                  ? 'bg-rose-950/40 text-rose-400 border-rose-800/40' 
+                  : 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40'
+              }`}>
+                {isFailed ? 'Failed' : 'Passed'}
+              </span>
             </div>
           </div>
         </div>

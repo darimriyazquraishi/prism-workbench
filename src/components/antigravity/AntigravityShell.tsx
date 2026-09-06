@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AntigravityHeader } from './AntigravityHeader';
 import { AntigravityStatusBar } from './AntigravityStatusBar';
 import { MainWorkspaceView } from '../views/MainWorkspaceView';
@@ -45,6 +45,18 @@ export const AntigravityShell: React.FC = () => {
     deleteSession
   } = useAntigravityStore();
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        setActiveScreen('workspace');
+        createNewSession();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [createNewSession]);
+
   return (
     <div className="h-screen w-screen flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden select-none font-sans">
       {/* 1. Antigravity Top Mission Header */}
@@ -62,13 +74,14 @@ export const AntigravityShell: React.FC = () => {
                 setActiveScreen('workspace');
                 createNewSession();
               }}
-              className="w-full flex items-center justify-between px-3 py-2 bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-full text-sm font-medium transition-colors cursor-pointer text-[var(--text-primary)] shadow-sm"
+              title="Create New Chat (Ctrl + N)"
+              className="w-full flex items-center justify-between px-3 py-2 bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-full text-sm font-medium transition-colors cursor-pointer text-[var(--text-primary)] shadow-sm group"
             >
               <div className="flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[var(--accent-primary)]" />
-                <span>+ New Chat</span>
+                <Plus className="w-4 h-4 text-[var(--accent-primary)] group-hover:scale-110 transition-transform" />
+                <span>New Chat</span>
               </div>
-              <span className="text-[10px] text-[var(--text-secondary)] font-mono font-bold">⌘N</span>
+              <span className="text-[10px] text-[var(--text-secondary)] font-mono font-medium bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]">Ctrl + N</span>
             </button>
           </div>
 
@@ -143,18 +156,16 @@ export const AntigravityShell: React.FC = () => {
                         <span className="text-[9px] font-mono text-[var(--text-tertiary)] group-hover:hidden">
                           {sess.steps.length} msgs
                         </span>
-                        {sessions.length > 1 && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteSession(sess.id);
-                            }}
-                            title="Delete chat"
-                            className="hidden group-hover:flex p-1 rounded hover:bg-rose-950/40 text-[var(--text-tertiary)] hover:text-rose-400 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSession(sess.id);
+                          }}
+                          title="Delete chat from history"
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-950/50 text-[var(--text-secondary)] hover:text-rose-400 transition-all cursor-pointer flex items-center justify-center"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   ))

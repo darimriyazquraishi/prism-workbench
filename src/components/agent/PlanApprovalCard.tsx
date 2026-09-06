@@ -80,164 +80,87 @@ export const PlanApprovalCard: React.FC<PlanApprovalCardProps> = ({
 
   return (
     <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 my-3 font-sans shadow-md space-y-4">
-      {/* Header Badge */}
-      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
-            <Sparkles className="w-4 h-4 text-[var(--accent-primary)]" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
-              Proposed Execution Plan
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] uppercase">
-                {plan.classifiedTaskType.replace('_', ' ')}
-              </span>
-              {plan.revisionCount && plan.revisionCount > 1 && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950/40 text-amber-300 border border-amber-800/40">
-                  Revision #{plan.revisionCount}
-                </span>
-              )}
-            </h3>
-            <p className="text-[11px] text-[var(--text-secondary)]">
-              Air-Gapped Router proposed plan. Review assigned models and sequential trajectory before approval.
-            </p>
-          </div>
+          <Sparkles className="w-4 h-4 text-[var(--accent-primary)]" />
+          <span className="font-semibold text-sm text-[var(--text-primary)]">Implementation Plan</span>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] uppercase">
+            {plan.classifiedTaskType.replace('_', ' ')}
+          </span>
+          {plan.revisionCount && plan.revisionCount > 1 && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950/40 text-amber-300 border border-amber-800/40">
+              Rev #{plan.revisionCount}
+            </span>
+          )}
         </div>
-
-        <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--accent-success)] bg-[var(--bg-base)] px-2.5 py-1 rounded-full border border-[var(--border-subtle)]">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Local Engine (Zero Egress)</span>
+        <div className="flex items-center gap-2">
+          {plan.userUploadFiles && plan.userUploadFiles.length > 0 && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+              {plan.userUploadFiles.length} file{plan.userUploadFiles.length > 1 ? 's' : ''} attached
+            </span>
+          )}
+          <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-800/40">
+            Air-Gapped
+          </span>
         </div>
       </div>
 
-      {/* Task Upload Content & KB Guidance Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-        <div className="p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] flex items-start gap-2">
-          <FileCheck className="w-4 h-4 text-[var(--accent-primary)] mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] text-[var(--text-secondary)] uppercase font-mono">Task Content Inputs (User Uploads)</div>
-            {plan.userUploadFiles && plan.userUploadFiles.length > 0 ? (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {plan.userUploadFiles.map((fname, i) => (
-                  <span key={i} className="text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)]">
-                    📄 {fname}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="text-[11px] text-[var(--text-secondary)] italic mt-0.5">Prompt text input (No files attached)</div>
-            )}
-          </div>
-        </div>
-
-        <div className="p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] flex items-start gap-2">
-          <Layers className="w-4 h-4 text-emerald-400 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] text-[var(--text-secondary)] uppercase font-mono">Knowledge Base Guidance (RAG)</div>
-            {plan.noKbGuidanceFound ? (
-              <div className="text-[11px] text-emerald-400 font-mono mt-0.5">
-                ✓ No relevant KB guidance found (Proceeding with uploads only)
-              </div>
-            ) : plan.relevantKbGuidance && plan.relevantKbGuidance.length > 0 ? (
-              <div className="space-y-1 mt-1">
-                {plan.relevantKbGuidance.map((g) => (
-                  <div key={g.id} className="text-[11px] font-mono text-emerald-300 bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-800/40">
-                    📚 {g.title}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-[11px] text-[var(--text-secondary)] italic mt-0.5">Searching knowledge base...</div>
-            )}
-          </div>
-        </div>
+      {/* Goal / Intent Summary */}
+      <div className="text-xs text-[var(--text-secondary)] leading-relaxed">
+        <span className="font-medium text-[var(--text-primary)]">Goal: </span>
+        {plan.intentSummary || 'Execute task using local specialized models and produce verified deliverables.'}
       </div>
 
-      {/* KB Conflict Alert Banner */}
-      {plan.kbConflictDetected && (
-        <div className="p-3 bg-amber-950/30 border border-amber-700/50 rounded-lg flex items-start gap-2.5 text-xs">
-          <span className="text-base">⚠️</span>
-          <div>
-            <div className="font-semibold text-amber-300 font-mono">Knowledge Base Conflict Surfaced</div>
-            <p className="text-[11px] text-amber-200/90 mt-0.5 leading-snug">
-              {plan.kbConflictSummary || "Conflicting rules were detected between active Knowledge Base documents. The system has surfaced this conflict for user awareness before proceeding."}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Model Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-        <div className="p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-[var(--accent-primary)]" />
-            <div>
-              <div className="text-[10px] text-[var(--text-secondary)] uppercase font-mono">Assigned Execution Model</div>
-              <div className="font-semibold text-[var(--text-primary)] font-mono">{selectedModel || 'Multi-Agent Orchestrator'}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] flex items-center gap-2">
-          <FileCheck className="w-4 h-4 text-[var(--text-secondary)]" />
-          <div>
-            <div className="text-[10px] text-[var(--text-secondary)] uppercase font-mono">Target Deliverables</div>
-            <div className="font-mono text-[11px] text-[var(--text-primary)] truncate">
-              {plan.expectedDeliverables.join(', ')}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trajectory Steps */}
+      {/* Steps List */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase text-[var(--text-secondary)] font-semibold px-1">
-          <span>Execution Trajectory ({editableSteps.length} Steps)</span>
+        <div className="flex items-center justify-between text-[11px] font-medium text-[var(--text-secondary)]">
+          <span>Execution Steps ({editableSteps.length})</span>
           {isEditing && (
             <button 
               onClick={handleAddStep}
-              className="flex items-center gap-1 text-[10px] text-[var(--accent-primary)] hover:underline cursor-pointer"
+              className="flex items-center gap-1 text-[11px] text-[var(--accent-primary)] hover:underline cursor-pointer"
             >
               <Plus className="w-3 h-3" /> Add Step
             </button>
           )}
         </div>
 
-        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+        <div className="space-y-2">
           {editableSteps.map((step, idx) => (
             <div 
               key={step.id} 
-              className="p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] flex items-start justify-between text-xs group"
+              className="flex items-start gap-3 p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] text-xs group"
             >
-              <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                <span className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center text-[10px] font-mono text-[var(--text-secondary)] flex-shrink-0 mt-0.5">
-                  {step.stepNumber}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-[var(--text-secondary)] uppercase bg-[var(--bg-surface)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]">
-                      {step.toolName}
-                    </span>
-                  </div>
-                  {isEditing ? (
-                    <input 
-                      type="text"
-                      value={step.description}
-                      onChange={(e) => handleStepDescriptionChange(idx, e.target.value)}
-                      className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] text-xs rounded px-2 py-1 mt-1 border border-[var(--border-subtle)] focus:outline-none"
-                    />
-                  ) : (
-                    <p className="text-[12px] text-[var(--text-primary)] mt-0.5 leading-snug">
-                      {step.description}
-                    </p>
-                  )}
+              <span className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center text-[10px] font-mono text-[var(--text-secondary)] flex-shrink-0 mt-0.5">
+                {step.stepNumber}
+              </span>
+              <div className="flex-1 min-w-0">
+                {isEditing ? (
+                  <input 
+                    type="text"
+                    value={step.description}
+                    onChange={(e) => handleStepDescriptionChange(idx, e.target.value)}
+                    className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] text-xs rounded px-2 py-1 border border-[var(--border-subtle)] focus:outline-none"
+                  />
+                ) : (
+                  <p className="text-[12px] text-[var(--text-primary)] leading-snug">
+                    {step.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="font-mono text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]">
+                    {step.targetModel || selectedModel || 'qwen2.5-coder-7b'}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+                    {step.toolName}
+                  </span>
                 </div>
               </div>
-
               {isEditing && editableSteps.length > 1 && (
                 <button 
                   onClick={() => handleRemoveStep(idx)}
-                  className="p-1 hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-red-400 rounded transition-colors cursor-pointer ml-2"
+                  className="p-1 hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-red-400 rounded transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -247,14 +170,28 @@ export const PlanApprovalCard: React.FC<PlanApprovalCardProps> = ({
         </div>
       </div>
 
+      {/* Expected Deliverables */}
+      {plan.expectedDeliverables && plan.expectedDeliverables.length > 0 && (
+        <div className="flex items-center gap-2 pt-1 text-xs">
+          <span className="text-[11px] text-[var(--text-secondary)] font-medium">Deliverable:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {plan.expectedDeliverables.map((del, i) => (
+              <span key={i} className="font-mono text-[11px] px-2 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)]">
+                {del}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Rejection Feedback Box */}
       {showRejectBox && (
         <div className="p-3 bg-red-950/20 border border-red-800/40 rounded-lg space-y-2">
-          <div className="text-xs font-semibold text-red-300">Provide Refined Instructions for Revised Workplan:</div>
+          <div className="text-xs font-semibold text-red-300">Feedback for Revised Plan:</div>
           <textarea
             value={rejectFeedback}
             onChange={(e) => setRejectFeedback(e.target.value)}
-            placeholder="e.g., Please focus specifically on section 4 API 570 remaining life calculation..."
+            placeholder="Specify what should be changed in this plan..."
             className="w-full bg-[var(--bg-base)] text-xs text-[var(--text-primary)] border border-red-800/40 rounded p-2 focus:outline-none"
             rows={2}
           />
@@ -269,20 +206,20 @@ export const PlanApprovalCard: React.FC<PlanApprovalCardProps> = ({
               onClick={handleConfirmReject}
               className="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-medium cursor-pointer"
             >
-              Submit Feedback &amp; Regenerate Plan
+              Submit &amp; Regenerate
             </button>
           </div>
         </div>
       )}
 
-      {/* Actions Footer */}
-      <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)]">
+      {/* Footer Actions */}
+      <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
         <button 
           onClick={() => setIsEditing(!isEditing)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] text-xs font-medium transition-colors cursor-pointer"
         >
           <Edit3 className="w-3.5 h-3.5" />
-          <span>{isEditing ? 'Done Editing' : 'Edit Plan'}</span>
+          <span>{isEditing ? 'Done Editing' : 'Edit Steps'}</span>
         </button>
 
         <div className="flex items-center gap-2">
@@ -301,7 +238,7 @@ export const PlanApprovalCard: React.FC<PlanApprovalCardProps> = ({
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 text-xs font-semibold transition-opacity cursor-pointer shadow"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Approve &amp; Execute Plan</span>
+            <span>Proceed</span>
           </button>
         </div>
       </div>
