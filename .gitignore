@@ -42,6 +42,8 @@ llama/
 lib/
 llama_server/*.exe
 LUMI_Desktop/llama_server/*.exe
+llama_server/*.dll
+LUMI_Desktop/llama_server/*.dll
 
 # Caches and runtime
 .cache/

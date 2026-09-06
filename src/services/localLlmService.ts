@@ -99,11 +99,57 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
     const timeout = setTimeout(() => controller.abort(), timeoutDuration);
 
     if (options.images && options.images.length > 0) {
-      console.log(`[LOCAL LLM DIAGNOSTIC] Initiating vision request to '${modelTag}' at ${OLLAMA_BASE}/api/chat`, {
-        imageCount: options.images.length,
-        promptLength: options.userPrompt.length,
-        timeoutMs: timeoutDuration
-      });
+      console.log(`[LOCAL LLM DIAGNOSTIC] Initiating vision request with ${options.images.length} images...`);
+
+      // 1. Try local llama-server on port 8080 (which supports native mmproj vision)
+      try {
+        const llamaRes = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              ...(options.systemPrompt ? [{ role: 'system', content: options.systemPrompt }] : []),
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: options.userPrompt },
+                  ...options.images.map(img => ({
+                    type: 'image_url',
+                    image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}` }
+                  }))
+                ]
+              }
+            ],
+            max_tokens: 3500,
+            temperature: options.temperature ?? 0.2
+          }),
+          signal: controller.signal
+        });
+
+        if (llamaRes.ok) {
+          const llamaData = await llamaRes.json();
+          const visionText = llamaData?.choices?.[0]?.message?.content || '';
+          if (visionText) {
+            clearTimeout(timeout);
+            const durationMs = Math.round(performance.now() - startTime);
+            const bytesRec = new TextEncoder().encode(JSON.stringify(llamaData)).length;
+            useTelemetryStore.getState().recordInference({
+              model: 'qwen3-vl:8b (llama-server)',
+              inferenceTimeMs: durationMs
+            });
+            return {
+              content: visionText.trim(),
+              model: 'qwen3-vl:8b (llama-server)',
+              durationMs,
+              bytesSent,
+              bytesReceived: bytesRec,
+              endpoint: 'http://127.0.0.1:8080/v1/chat/completions'
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('[VISION] llama-server (port 8080) not available, falling back to Ollama 11434:', e);
+      }
     }
 
     const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
