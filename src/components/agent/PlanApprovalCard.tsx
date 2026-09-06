@@ -173,20 +173,7 @@ export const PlanApprovalCard: React.FC<PlanApprovalCardProps> = ({
             <Cpu className="w-4 h-4 text-[var(--accent-primary)]" />
             <div>
               <div className="text-[10px] text-[var(--text-secondary)] uppercase font-mono">Assigned Execution Model</div>
-              {isEditing ? (
-                <select 
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded border border-[var(--border-subtle)] text-xs px-2 py-0.5 mt-0.5 focus:outline-none font-mono"
-                >
-                  <option value={selectedModel || 'Multi-Agent Orchestrator'}>{selectedModel || 'Multi-Agent Orchestrator'}</option>
-                  {availableModels.filter(m => m !== selectedModel).map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className="font-semibold text-[var(--text-primary)] font-mono">{selectedModel}</div>
-              )}
+              <div className="font-semibold text-[var(--text-primary)] font-mono">{selectedModel || 'Multi-Agent Orchestrator'}</div>
             </div>
           </div>
         </div>

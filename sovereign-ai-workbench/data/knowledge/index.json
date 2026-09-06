@@ -1,5 +1,95 @@
 [
   {
+    "id": "kb-doc-safety",
+    "name": "01_Refinery_Safety_Protocol.pdf",
+    "filename": "01_Refinery_Safety_Protocol.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/01_Refinery_Safety_Protocol.pdf",
+    "sizeBytes": 38120,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T14:00:00.000000",
+    "formattedDate": "Sep 06, 2026, 02:00 PM"
+  },
+  {
+    "id": "kb-1788682398067",
+    "name": "02_Inspection_Report_Preparation_Guideline.pdf",
+    "filename": "02_Inspection_Report_Preparation_Guideline.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/02_Inspection_Report_Preparation_Guideline.pdf",
+    "sizeBytes": 36965,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T13:43:18.067787",
+    "formattedDate": "Sep 06, 2026, 01:43 PM"
+  },
+  {
+    "id": "kb-1788682398365",
+    "name": "03_Internal_Approval_Note_Guideline.pdf",
+    "filename": "03_Internal_Approval_Note_Guideline.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/03_Internal_Approval_Note_Guideline.pdf",
+    "sizeBytes": 37496,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T13:43:18.365334",
+    "formattedDate": "Sep 06, 2026, 01:43 PM"
+  },
+  {
+    "id": "kb-1788682437339",
+    "name": "04_Procurement_Evaluation_Guideline.pdf",
+    "filename": "04_Procurement_Evaluation_Guideline.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/04_Procurement_Evaluation_Guideline.pdf",
+    "sizeBytes": 37065,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T13:43:57.339345",
+    "formattedDate": "Sep 06, 2026, 01:43 PM"
+  },
+  {
+    "id": "kb-1788682357414",
+    "name": "05_Information_Classification_Guideline.pdf",
+    "filename": "05_Information_Classification_Guideline.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/05_Information_Classification_Guideline.pdf",
+    "sizeBytes": 37244,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T13:42:37.414791",
+    "formattedDate": "Sep 06, 2026, 01:42 PM"
+  },
+  {
+    "id": "kb-1788682539402",
+    "name": "06_Equipment_Maintenance_Workflow.pdf",
+    "filename": "06_Equipment_Maintenance_Workflow.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/06_Equipment_Maintenance_Workflow.pdf",
+    "sizeBytes": 36369,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T13:45:39.402305",
+    "formattedDate": "Sep 06, 2026, 01:45 PM"
+  },
+  {
+    "id": "kb-1788682596450",
+    "name": "07_Engineering_Calculation_Documentation_Guideline.pdf",
+    "filename": "07_Engineering_Calculation_Documentation_Guideline.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/07_Engineering_Calculation_Documentation_Guideline.pdf",
+    "sizeBytes": 36854,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T13:46:36.450668",
+    "formattedDate": "Sep 06, 2026, 01:46 PM"
+  },
+  {
+    "id": "kb-1788682614084",
+    "name": "08_Internal_AI_Assistant_Usage_Guideline.pdf",
+    "filename": "08_Internal_AI_Assistant_Usage_Guideline.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/08_Internal_AI_Assistant_Usage_Guideline.pdf",
+    "sizeBytes": 37949,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T13:46:54.084649",
+    "formattedDate": "Sep 06, 2026, 01:46 PM"
+  },
+  {
+    "id": "kb-doc-confidential",
+    "name": "09_Confidential_Data_Handling_Procedure.pdf",
+    "filename": "09_Confidential_Data_Handling_Procedure.pdf",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/09_Confidential_Data_Handling_Procedure.pdf",
+    "sizeBytes": 38450,
+    "mimeType": "application/pdf",
+    "uploadedAt": "2026-09-06T14:00:00.000000",
+    "formattedDate": "Sep 06, 2026, 02:00 PM"
+  },
+  {
     "id": "kb-1788638236753",
     "name": "mrpl_presentation_guidelines.pdf",
     "filename": "mrpl_presentation_guidelines.pdf",
@@ -8,5 +98,15 @@
     "mimeType": "application/pdf",
     "uploadedAt": "2026-09-06T01:27:16.753299",
     "formattedDate": "Sep 06, 2026, 01:27 AM"
+  },
+  {
+    "id": "kb-1788683754706",
+    "name": "parsed_knowledge.json",
+    "filename": "parsed_knowledge.json",
+    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/parsed_knowledge.json",
+    "sizeBytes": 17553,
+    "mimeType": "application/octet-stream",
+    "uploadedAt": "2026-09-06T14:05:54.706389",
+    "formattedDate": "Sep 06, 2026, 02:05 PM"
   }
 ]

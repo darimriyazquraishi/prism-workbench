@@ -94,7 +94,17 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000); // 90s ceiling
+    // 120s ceiling to support initial VRAM weight loading for vision models (qwen2.5vl)
+    const timeoutDuration = options.images && options.images.length > 0 ? 120000 : 90000;
+    const timeout = setTimeout(() => controller.abort(), timeoutDuration);
+
+    if (options.images && options.images.length > 0) {
+      console.log(`[LOCAL LLM DIAGNOSTIC] Initiating vision request to '${modelTag}' at ${OLLAMA_BASE}/api/chat`, {
+        imageCount: options.images.length,
+        promptLength: options.userPrompt.length,
+        timeoutMs: timeoutDuration
+      });
+    }
 
     const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
       method: 'POST',
@@ -113,10 +123,18 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
     const data = await res.json();
     responseText = data?.message?.content || '';
     bytesReceived = new TextEncoder().encode(JSON.stringify(data)).length;
+
+    if (options.images && options.images.length > 0) {
+      console.log(`[LOCAL LLM DIAGNOSTIC] Vision request to '${modelTag}' completed successfully`, {
+        durationMs: Math.round(performance.now() - startTime),
+        bytesReceived,
+        outputLength: responseText.length
+      });
+    }
   } catch (err: any) {
     const durationMs = Math.round(performance.now() - startTime);
     if (err.name === 'AbortError') {
-      throw new Error(`Local model execution timed out after 90 seconds on model '${modelTag}'.`);
+      throw new Error(`Local model execution timed out after ${options.images && options.images.length > 0 ? 120 : 90} seconds on model '${modelTag}'. Please ensure Ollama server is responsive.`);
     }
     if (err.message && err.message.includes('fetch failed')) {
       throw new Error(

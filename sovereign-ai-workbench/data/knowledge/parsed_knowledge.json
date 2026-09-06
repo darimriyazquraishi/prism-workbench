@@ -1,0 +1,92 @@
+[
+  {
+    "id": "kb-doc-presentation",
+    "name": "Management Presentation Guideline",
+    "filename": "mrpl_presentation_guidelines.pdf",
+    "document_type": "Corporate Presentation Standard",
+    "category": "Communications",
+    "summary": "Official company standards for management presentations, slide layouts, corporate color schemes, executive summaries, structural requirements, and review approval procedures.",
+    "content": "MANAGEMENT PRESENTATION GUIDELINE\nDocument ID: SOP-CORP-PRE-001 | Revision: 3.0\n\n1. PURPOSE AND SCOPE\nThis document defines the official corporate standards for preparing, structuring, and delivering management presentations across all business units. All internal and external executive decks must comply with these guidelines to ensure consistent branding, visual clarity, and data accuracy.\n\n2. PRESENTATION STRUCTURE REQUIREMENTS\nExecutive presentations must follow a standard structural flow:\n- Title Slide: Executive presentation title, subtitle, presenter name, department, date, and confidentiality classification.\n- Executive Summary / Agenda: High-level overview summarizing core context, key decisions required, and agenda items.\n- Context & Problem Statement: Background information, problem identification, operational impact, and baseline metrics.\n- Analysis & Key Findings: Data-backed evidence, charts, engineering/financial evaluations, and option comparisons.\n- Strategic Recommendations & Action Plan: Clear proposed action items, resource requirements, timelines, and budget impact.\n- Sign-off & Appendix: Supporting data, detailed calculation tables, and formal management approval sign-off block.\n\n3. SLIDE DESIGN & BRANDING STANDARDS\n- Theme & Typography: Use dark or clean charcoal backgrounds with high-contrast typography. Use standard corporate fonts (Inter, Roboto, or Arial).\n- Color Palette: Primary accent colors should be muted corporate blue (#0066CC), teal (#008080), or charcoal gray (#2D3748). Avoid overly vibrant or plain primary colors.\n- Slide Count Limit: Executive briefing decks should ideally range between 4 and 8 slides for concise presentation delivery.\n- Visual Clarity: Limit text density to 3-5 bullet points per slide. Avoid walls of text. Utilize visual metric cards, 2-column comparison tables, and diagrammatic flowcharts.\n\n4. REVIEW AND APPROVAL WORKFLOW\nAll presentations intended for executive leadership, board meetings, or external regulatory stakeholders must undergo technical review by the Lead Engineer / Department Manager prior to distribution. Final slides must contain verified data citations and an explicit sign-off status stamp."
+  },
+  {
+    "id": "kb-doc-safety",
+    "name": "Refinery Safety Protocol",
+    "filename": "01_Refinery_Safety_Protocol.pdf",
+    "document_type": "Safety Protocol",
+    "category": "Safety & HSE",
+    "summary": "Mandatory safety procedures, Personal Protective Equipment (PPE) requirements, Permit to Work (PTW) system, hazardous material handling, and emergency shutdown protocols.",
+    "content": "REFINERY SAFETY PROTOCOL\nDocument ID: SOP-HSE-SAF-001 | Revision: 4.2\n\n1. PURPOSE AND MANDATORY COMPLIANCE\nThis safety protocol establishes non-negotiable safety standards for all personnel operating within refinery operational units, crude distillation units (CDU), hydrocrackers, and tank farms. Zero tolerance is enforced for safety non-compliance.\n\n2. PERSONAL PROTECTIVE EQUIPMENT (PPE) REQUIREMENTS\nAll personnel entering active processing units must wear approved Personal Protective Equipment (PPE):\n- Head & Eye Protection: Hard hats complying with ANSI Z89.1 and safety glasses with side shields complying with ANSI Z87.1.\n- Flame-Resistant Clothing (FRC): Minimum NFPA 2112 certified flame-resistant coveralls worn at all times in operational zones.\n- Footwear: Heavy-duty steel-toe safety boots with oil-resistant and non-slip soles complying with ASTM F2413.\n- Respiratory Protection: N95 or half-mask respirators with organic vapor/acid gas cartridges required when entering areas with potential H2S or VOC exposure.\n- Hearing Protection: Earplugs or earmuffs rated at minimum NRR 25 dB required in high-noise equipment bays (>85 dBA).\n\n3. PERMIT TO WORK (PTW) SYSTEM\nNo maintenance, hot work, confined space entry, or electrical isolation may proceed without a fully executed Permit to Work (PTW):\n- Hot Work Permits: Required for spark-producing activities (welding, grinding, cutting). Continuous gas monitoring for flammable vapors (LEL < 1%) is mandatory.\n- Confined Space Entry Permits: Requires oxygen testing (19.5% - 23.5%), toxic gas isolation, double block and bleed, and active attendant stationed outside.\n- Lockout / Tagout (LOTO): Energy isolation procedures must be verified by zero-energy state test prior to work commencement.\n\n4. HAZARD REPORTING AND EMERGENCY SHUTDOWN\nIn the event of uncontrolled gas release, fire, or major structural failure, personnel must immediately activate the nearest Manual Call Point (MCP) and initiate Emergency Shutdown (ESD) protocols. All minor safety incidents and near-misses must be logged in the Safety Audit Register within 12 hours."
+  },
+  {
+    "id": "kb-doc-inspection",
+    "name": "Inspection Report Preparation Guideline",
+    "filename": "02_Inspection_Report_Preparation_Guideline.pdf",
+    "document_type": "Technical Guideline",
+    "category": "Inspection & Quality",
+    "summary": "Guidelines for conducting ultrasonic wall thickness testing, recording corrosion findings, calculating remaining life, and compiling formal inspection reports.",
+    "content": "INSPECTION REPORT PREPARATION GUIDELINE\nDocument ID: SOP-ENG-INS-002 | Revision: 2.1\n\n1. OBJECTIVE\nTo standardize technical inspection reporting for pressure vessels, process piping, storage tanks, and heat exchangers across refinery facilities in accordance with API 570 and ASME B31.3 codes.\n\n2. ULTRASONIC THICKNESS MEASUREMENT (UTM)\n- Grid Measurements: Perform UTM readings at designated CMLs (Condition Monitoring Locations) along straight pipe runs, elbows, tees, and weld seams.\n- Equipment Calibration: Dual-element transducers calibrated against step block standards prior to each inspection shift.\n- Minimum Allowable Thickness (t_min): Calculate t_min based on internal design pressure, allowable stress, and pipe diameter.\n\n3. CORROSION RATE & REMAINING LIFE CALCULATION\n- Corrosion Rate (CR): CR = (t_previous - t_actual) / time_years (expressed in mm/year).\n- Remaining Service Life (RL): RL = (t_actual - t_retirement) / CR (expressed in years).\n- Mandatory Engineering Action Limit: Any CML recording t_actual < 4.0 mm or remaining life < 3.0 years requires immediate engineering review and issuance of a formal Approval Note for repair or replacement.\n\n4. REPORT DOCUMENTATION STRUCTURE\nInspection reports must contain:\n- Equipment tag number, service fluid, operating temperature, and pressure rating.\n- Tabulated CML thickness values, calculated corrosion rates, and remaining life projections.\n- High-resolution photographic evidence of corrosion pits, cracking, or flange degradation.\n- Formal recommendation block with Lead Inspector sign-off."
+  },
+  {
+    "id": "kb-doc-approval",
+    "name": "Internal Approval Note Guideline",
+    "filename": "03_Internal_Approval_Note_Guideline.pdf",
+    "document_type": "Administrative Guideline",
+    "category": "Governance",
+    "summary": "Procedures for drafting, reviewing, and approving internal technical approval notes, financial authorizations, and plant modification requests.",
+    "content": "INTERNAL APPROVAL NOTE GUIDELINE\nDocument ID: SOP-GOV-APP-003 | Revision: 1.5\n\n1. SCOPE AND APPLICABILITY\nThis guideline applies to all technical approval notes, engineering change requests (ECR), capital expenditure authorizations, and turnaround modification notes requiring managerial sign-off.\n\n2. APPROVAL NOTE STRUCTURE\nAn official Internal Approval Note (.docx format) must contain:\n- Title & Document Header: Reference number, plant unit, equipment tag, date, and requesting department.\n- Problem Statement & Operational Justification: Detailed background explaining equipment degradation, safety risk, or operational bottleneck.\n- Engineering Evaluation & Options Considered: Technical analysis of alternatives (e.g. repair in-situ vs. complete replacement vs. temporary clamp).\n- Cost Estimate & Financial Impact: Itemized breakdown of materials, labor hours, NDT testing, and contingency allowances.\n- Formal Sign-Off Block: Structured sign-off table including Prepared By (Senior Inspector), Verified By (Lead Maintenance Engineer), and Approved By (Plant Manager).\n\n3. DELEGATION OF FINANCIAL AND TECHNICAL AUTHORITY\n- Expenditure < $10,000: Approved by Maintenance Manager.\n- Expenditure $10,000 - $50,000: Approved by Chief Mechanical Engineer & Operations Manager.\n- Expenditure > $50,000 or Safety-Critical Modifications: Requires General Manager approval."
+  },
+  {
+    "id": "kb-doc-procurement",
+    "name": "Procurement Evaluation Guideline",
+    "filename": "04_Procurement_Evaluation_Guideline.pdf",
+    "document_type": "Procurement Standard",
+    "category": "Procurement & Commercial",
+    "summary": "Criteria for commercial and technical evaluation of vendor bids, equipment spare procurement, and contractor selection.",
+    "content": "PROCUREMENT EVALUATION GUIDELINE\nDocument ID: SOP-PRO-EVAL-004 | Revision: 2.0\n\n1. PURPOSE\nEstablishes transparent, rigorous technical and commercial evaluation procedures for procuring industrial equipment, mechanical spares, piping materials, and specialized engineering services.\n\n2. TWO-STAGE BID EVALUATION PROCESS\n- Stage 1: Technical Evaluation (Pass/Fail). Bids must meet all ASME, API, and company engineering material specifications without critical technical exceptions.\n- Stage 2: Commercial Evaluation. Evaluates Total Cost of Ownership (TCO), including base price, freight, customs duties, warranty terms, and spare parts availability.\n\n3. VENDOR AUDIT & QUALITY ASSURANCE\nVendors supplying pressure-retaining components (flanges, valves, pipes, pump impellers) must hold valid ISO 9001 certification and provide Mill Test Certificates (MTC) traceably linked to heat numbers."
+  },
+  {
+    "id": "kb-doc-classification",
+    "name": "Information Classification Guideline",
+    "filename": "05_Information_Classification_Guideline.pdf",
+    "document_type": "Security Policy",
+    "category": "Security & Governance",
+    "summary": "Rules for classifying organizational documents (Public, Internal, Confidential, Restricted) and mandatory data security controls.",
+    "content": "INFORMATION CLASSIFICATION GUIDELINE\nDocument ID: SOP-SEC-CLS-005 | Revision: 3.1\n\n1. PURPOSE\nTo protect organizational information assets against unauthorized disclosure, data leakage, and cybersecurity risks.\n\n2. CLASSIFICATION LEVELS\n- PUBLIC: Information intended for public distribution (press releases, public annual reports).\n- INTERNAL: General operational material accessible to all employees (standard operating policies, internal newsletters).\n- CONFIDENTIAL: Proprietary engineering schematics, refinery inspection logs, financial cost estimates, vendor contracts, and internal approval notes. Access restricted to authorized personnel.\n- RESTRICTED: Highly sensitive strategic plans, trade secrets, unreleased financial audits, and security vulnerability reports. Access strictly limited on a need-to-know basis with encryption.\n\n3. HANDLING & DISCLOSURE RULES\n- Confidential and Restricted materials MUST NOT be uploaded to external public AI tools or unapproved third-party cloud services.\n- All air-gapped workplace processing must ensure data remains isolated within local workstation storage."
+  },
+  {
+    "id": "kb-doc-maintenance",
+    "name": "Equipment Maintenance Workflow",
+    "filename": "06_Equipment_Maintenance_Workflow.pdf",
+    "document_type": "Maintenance Procedure",
+    "category": "Maintenance & Operations",
+    "summary": "Standard procedures for preventive maintenance, centrifugal pump overhauls, MTBF tracking, and vibration analysis.",
+    "content": "EQUIPMENT MAINTENANCE WORKFLOW\nDocument ID: SOP-MNT-WRK-006 | Revision: 2.4\n\n1. OBJECTIVE\nDefines routine preventive maintenance (PM) workflows and corrective repair protocols for rotating equipment (centrifugal pumps, compressors, blowers, steam turbines).\n\n2. ROTATING EQUIPMENT (PUMP-102 SERIES) PM ROUTINE\n- Weekly Inspection: Check lube oil levels, bearing housing temperatures (<70°C), and mechanical seal flush pressure.\n- Monthly Vibration Monitoring: Measure overall vibration velocity (RMS in mm/s). Alarm threshold: 4.5 mm/s RMS; Shutdown limit: 7.1 mm/s RMS.\n- Mean Time Between Failures (MTBF): Calculate MTBF = Operating Hours / Number of Failures. Fleet MTBF target is >4,000 hours.\n\n3. OVERHAUL & REPAIR WORKFLOW\n- Work Order Creation: Generate CMMS work order linking equipment tag, symptom, and priority level.\n- Isolation & Decontamination: Operations performs LOTO, draining, nitrogen purging, and gas testing.\n- Mechanical Overhaul: Replace wearing rings, impellers, mechanical seals, and sleeve bearings according to OEM tolerances."
+  },
+  {
+    "id": "kb-doc-engineering-calc",
+    "name": "Engineering Calculation Documentation Guideline",
+    "filename": "07_Engineering_Calculation_Documentation_Guideline.pdf",
+    "document_type": "Engineering Standard",
+    "category": "Engineering",
+    "summary": "Standard requirements for performing, documenting, and independently verifying engineering calculations, corrosion rates, and MTBF models.",
+    "content": "ENGINEERING CALCULATION DOCUMENTATION GUIDELINE\nDocument ID: SOP-ENG-CALC-007 | Revision: 1.8\n\n1. PURPOSE AND MANDATORY VERIFICATION\nAll engineering calculations (structural load, piping wall thickness, relief valve sizing, pump MTBF statistics) must be documented deterministically and independently verified by a qualified Lead Engineer prior to implementation.\n\n2. CALCULATION DOCUMENTATION STRUCTURE\nEvery calculation brief or Python calculation script must state:\n- Objective and Governing Code (e.g. ASME B31.3, API 570, Weibull Reliability Analysis).\n- Input Parameters: Explicit source identification (e.g. UT measurement log, DCS historian data).\n- Explicit Equations & Units: Write out complete mathematical formulas with dimensional units.\n- Deterministic Python Execution: Code scripts must be deterministic, reproducible, and executed in an isolated sandbox with fixed seed.\n- Verification & Sign-off: Independent review statement confirming formulas, boundary inputs, and output sanity."
+  },
+  {
+    "id": "kb-doc-ai-assistant",
+    "name": "Internal AI Assistant Usage Guideline",
+    "filename": "08_Internal_AI_Assistant_Usage_Guideline.pdf",
+    "document_type": "IT & AI Policy",
+    "category": "IT & Governance",
+    "summary": "Rules for using on-premise local AI models (Lumi Workbench), prompt engineering, air-gap enforcement, and factual grounding.",
+    "content": "INTERNAL AI ASSISTANT USAGE GUIDELINE\nDocument ID: SOP-IT-AI-008 | Revision: 2.0\n\n1. PURPOSE AND AIR-GAP COMPLIANCE\nThis guideline defines acceptable use parameters for local on-premise AI assistants (Lumi Workbench) running open-weight LLMs (Qwen3, Qwen2.5-Coder, Qwen2.5-VL).\n\n2. ZERO-EGRESS AIR-GAP POLICY\n- All model inference, RAG retrieval, OCR, and script execution must occur 100% locally on workstation hardware (127.0.0.1).\n- No organizational document, prompt, or inspection reading may be transmitted to external cloud APIs or public AI platforms.\n\n3. GROUNDING AND FACTUAL INTEGRITY\n- AI assistants must ground responses strictly in retrieved Knowledge Base guidance and user-uploaded task files.\n- Users must inspect generated engineering deliverables (PPTX, DOCX, XLSX, Python scripts) for accuracy prior to official sign-off."
+  },
+  {
+    "id": "kb-doc-confidential-data",
+    "name": "Confidential Data Handling Procedure",
+    "filename": "09_Confidential_Data_Handling_Procedure.pdf",
+    "document_type": "Data Privacy & Protection Policy",
+    "category": "Security & Governance",
+    "summary": "Detailed procedures for handling confidential information, proprietary engineering blueprints, AI processing guidelines, and data sanitization.",
+    "content": "CONFIDENTIAL DATA HANDLING PROCEDURE\nDocument ID: SOP-SEC-DAT-009 | Revision: 1.2\n\n1. PURPOSE\nDefines protocol for protecting confidential engineering data, inspection readings, financial budgets, and proprietary AI knowledge base documents against unauthorized access or inadvertent leak.\n\n2. CONFIDENTIAL INFORMATION IDENTIFICATION\nConfidential data includes:\n- Plant inspection measurements, ultrasonic wall thickness logs, and remaining life estimates.\n- Engineering drawings, P&ID CAD files, process flow diagrams, and piping ISOs.\n- Vendor commercial bids, procurement evaluations, and cost estimation spreadsheets.\n- Internal approval notes, executive briefing decks, and management presentation drafts.\n\n3. SECURE PROCESSING AND AI USAGE RULES\n- Confidential documents may only be processed using local, self-hosted, air-gapped AI tools (Lumi Sovereign AI Workbench).\n- Transmission of confidential text or images via public internet endpoints, unencrypted email, or third-party web portals is strictly prohibited.\n- Removable storage media carrying confidential data must be encrypted with AES-256."
+  }
+]

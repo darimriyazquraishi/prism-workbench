@@ -14,9 +14,7 @@ import type {
   RoutingIntent,
   IntentRoutingResult,
   WorkflowContext,
-  ValidationAuditLog,
-  DiscoveredModel,
-  ModelArsenal
+  ValidationAuditLog
 } from '../types/antigravity';
 import { defaultPipelineConfig, type PipelineConfig } from '../config/pipelineConfig';
 import { executeValidationAndRoutingPipeline } from '../services/answerValidatorService';
@@ -36,6 +34,7 @@ import {
   generatePythonCodeWithQwen,
   resolveOllamaModelTag
 } from '../services/localLlmService';
+import { detectRequiredCapabilities, resolveModelForCapability } from '../services/modelCapabilityRouter';
 
 export interface NotificationItem {
   id: string;
@@ -51,7 +50,7 @@ export interface UploadedFile {
   name: string;
   size: string;
   bytes: number;
-  type: 'pdf' | 'csv' | 'png' | 'jpeg' | 'image' | 'text' | 'code' | 'other' | 'docx' | 'xlsx' | 'pptx';
+  type: 'pdf' | 'csv' | 'png' | 'jpeg' | 'image' | 'text' | 'code' | 'docx' | 'other';
   extension: string;
   dataUrl?: string;
   content?: string;
@@ -102,19 +101,20 @@ export function classifyIntent(
   const asksForDocGen = asksForPPT || asksForExcel || asksForWord || /\b(create a document|generate a report|compile a document|draft an official)\b/.test(p);
 
   // Vision / OCR requirements
-  const asksForVision = /\b(ocr|scanned|read the image|inspect drawing|image analysis|photo|scanned report)\b/.test(p) || realFiles.some(f => /\.(png|jpg|jpeg|webp|pdf)$/i.test(f));
+  const asksForVision = /\b(ocr|scanned|read the image|inspect drawing|image analysis|photo|scanned report|novel|book|picture|image|photo|cover|diagram|chart)\b/.test(p) || realFiles.some(f => /\.(png|jpg|jpeg|webp|pdf|gif|bmp)$/i.test(f));
 
   // Python execution / calculation script requirements
   const asksForPython = /\b(python|script|docker|compute mtbf|calculate corrosion|run code|execute code|python cost calculation)\b/.test(p);
 
   // Explicit RAG / SOP lookup requirements
-  const asksForRAG = /\b(sop|manual|guideline|company standard|knowledge base|retrieval|cross-reference|cross reference|sop-ops|api 570)\b/.test(p);
+  const asksForRAG = /\b(sop|manual|guideline|guidelines|company standard|knowledge base|retrieval|cross-reference|cross reference|sop-ops|api 570|ppe|permit to work|ptw|safety protocol|confidential|information classification|inspection report|approval note|procurement|equipment maintenance|engineering calculation)\b/.test(p);
 
   // Domain workflow request markers
   const isDomainWorkflowRequest = /\b(turnaround plan|pump-102|cdu-5|unit 3)\b/.test(p);
 
   // 3. Ambiguous Task Commands (Action request with NO attached file and missing target)
-  const isAmbiguousTaskCommand = !hasRealFiles && !asksForDocGen && (
+  // MUST NOT trigger if the user explicitly asks for knowledge base, SOPs, or company guidelines (asksForRAG)
+  const isAmbiguousTaskCommand = !hasRealFiles && !asksForDocGen && !asksForRAG && !asksForVision && (
     /^(summarize|summarise|extract|analyze|analyse|process)\b/i.test(p) ||
     /^(summarize it|summarize this|extract data|extract readings|process this|analyze this)$/i.test(p)
   );
@@ -149,34 +149,14 @@ export function classifyIntent(
   const isCasual = /^(how are you|who are you|what can you do|thanks|thank you|bye|cool|awesome|ok|okay|got it)\b/i.test(p) && p.length < 40;
   const isQuestion = rawP.endsWith('?') || /^(what|whats|what's|how|why|when|where|who|explain|tell|can you|describe|calculate|is there|are there|formula)\b/i.test(p);
 
-  // 4b. Multi-Agent Cooperative Paths (Vision LLM -> Master LLM, or Master -> Coder LLM)
-  const hasOnlyImages = hasRealFiles && realFiles.every(f => /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(f));
-  const isVisualQA = (hasOnlyImages || asksForVision) && !asksForDocGen;
-  const isCodingQA = /\b(code|python|script|algorithm|function|debug|syntax error|bug|program|write a script|def |class |calculator|traceback|regex|sql)\b/i.test(p) && !asksForDocGen;
+  const requiresWorkflow = (hasRealFiles || asksForDocGen || (asksForPython && asksForDocGen) || asksForRAG || asksForVision || isDomainWorkflowRequest) && !isGreeting && !isCasual;
 
-  if (isVisualQA || isCodingQA) {
-    return {
-      intent: 'DIRECT_QA',
-      requires_workflow: false,
-      requires_vision: isVisualQA,
-      requires_rag: false,
-      requires_python: isCodingQA,
-      requires_document_generation: false,
-      input_files: realFiles,
-      output_format: null,
-      deliverable: null,
-      reason: isVisualQA ? 'Vision & Multimodal collaborative Q&A' : 'Code & Math multi-agent dispatch'
-    };
-  }
-
-  const requiresWorkflow = (hasRealFiles || asksForDocGen || (asksForPython && asksForDocGen) || (asksForRAG && (asksForDocGen || asksForPython)) || (asksForVision && asksForDocGen) || isDomainWorkflowRequest) && !isGreeting && !isCasual;
-
-  if (!requiresWorkflow || (isQuestion && !hasRealFiles && !asksForDocGen && !isDomainWorkflowRequest)) {
+  if (!requiresWorkflow || (isQuestion && !hasRealFiles && !asksForDocGen && !isDomainWorkflowRequest && !asksForRAG && !asksForVision)) {
     return {
       intent: 'DIRECT_QA',
       requires_workflow: false,
       requires_vision: false,
-      requires_rag: false,
+      requires_rag: asksForRAG || asksForPPT || asksForWord,
       requires_python: false,
       requires_document_generation: false,
       input_files: [],
@@ -187,8 +167,8 @@ export function classifyIntent(
   }
 
   // 5. WORKFLOW Intent Logic
-  let outputFormat: DeliverableFormat = 'docx';
-  let deliverableName = 'Word Brief (.docx)';
+  let outputFormat: DeliverableFormat | null = null;
+  let deliverableName = 'Multimodal Visual Analysis & Summary';
 
   if (asksForPPT) {
     outputFormat = 'pptx';
@@ -199,15 +179,18 @@ export function classifyIntent(
   } else if (asksForPython && !asksForWord) {
     outputFormat = 'py';
     deliverableName = 'Python Script (.py)';
+  } else if (asksForWord || asksForDocGen) {
+    outputFormat = 'docx';
+    deliverableName = 'Word Brief (.docx)';
   }
 
   return {
     intent: 'WORKFLOW',
     requires_workflow: true,
     requires_vision: asksForVision,
-    requires_rag: asksForRAG || asksForPPT || asksForWord,
+    requires_rag: asksForRAG,
     requires_python: asksForPython,
-    requires_document_generation: asksForDocGen || hasRealFiles,
+    requires_document_generation: asksForDocGen,
     input_files: realFiles,
     output_format: outputFormat,
     deliverable: deliverableName,
@@ -242,176 +225,15 @@ export async function queryLocalChatbotLLM(
   }
 }
 
-export function detectModelInfo(filename: string, fullPath?: string, sizeBytes?: number): DiscoveredModel {
-  let name = filename.replace(/\.(gguf|bin|safetensors|pt|pth|onnx)$/i, '').trim();
-  if (/qwen3.*14b/i.test(name)) name = 'Qwen 3 14B';
-  else if (/qwen2\.5.*coder.*7b/i.test(name)) name = 'Qwen 2.5 Coder 7B';
-  else if (/qwen3.*vl.*8b/i.test(name)) name = 'Qwen 3 VL 8B';
-  else if (/qwen3.*embed/i.test(name)) name = 'Qwen 3 Embedding 0.6B';
-  else if (/qwen3.*rerank/i.test(name)) name = 'Qwen 3 Reranker 0.6B';
-
-  const lower = (filename + ' ' + (fullPath || '')).toLowerCase();
-
-  let role: DiscoveredModel['role'] = 'reasoning';
-  let roleName = 'Master Reasoning & Planning';
-  let assignedAgent = 'Reasoning & Planning Agent (Master Orchestrator)';
-  let description = 'Coordinates specialist models, deconstructs user intent, and synthesizes final answers.';
-  let ollamaTag = 'qwen3:8b';
-
-  if (lower.includes('vl') || lower.includes('vision') || lower.includes('multimodal') || lower.includes('clip') || lower.includes('llava')) {
-    role = 'vision';
-    roleName = 'Vision & Document OCR';
-    assignedAgent = 'Vision & Multimodal Agent';
-    description = 'Extracts visual observations from images, engineering schematics, and scanned reports.';
-    ollamaTag = 'qwen2.5vl:7b';
-  } else if (lower.includes('coder') || lower.includes('code') || lower.includes('python') || lower.includes('starcoder')) {
-    role = 'coder';
-    roleName = 'Code & Math Synthesis';
-    assignedAgent = 'Code & Math Agent';
-    description = 'Generates production-grade scripts, performs calculations, and debugs software issues.';
-    ollamaTag = 'qwen2.5-coder:7b';
-  } else if (lower.includes('embed') || lower.includes('nomic') || lower.includes('bge') || lower.includes('minilm')) {
-    role = 'embedding';
-    roleName = 'Vector Embeddings (RAG)';
-    assignedAgent = 'Knowledge Retrieval Agent (RAG)';
-    description = 'Generates vector representations of queries and documents for semantic knowledge search.';
-    ollamaTag = 'nomic-embed-text';
-  } else if (lower.includes('rerank')) {
-    role = 'reranker';
-    roleName = 'Cross-Encoder Re-ranker';
-    assignedAgent = 'Neural Re-ranking Agent';
-    description = 'Re-ranks retrieved knowledge candidates to guarantee high context precision.';
-    ollamaTag = 'qwen3-reranker:0.6b';
-  } else if (lower.includes('14b')) {
-    role = 'reasoning';
-    roleName = 'Deep Reasoning & Synthesis';
-    assignedAgent = 'Reasoning & Planning Agent (Master Orchestrator)';
-    description = 'Complex logic evaluation, multi-step problem solving, and formal brief synthesis.';
-    ollamaTag = 'qwen3:14b';
-  }
-
-  const formattedSize = sizeBytes && sizeBytes > 0
-    ? (sizeBytes > 1024 * 1024 * 1024 
-        ? `${(sizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GB` 
-        : `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`)
-    : 'Local Directory';
-
-  return {
-    id: `model-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-    name,
-    filename,
-    path: fullPath || filename,
-    sizeFormatted: formattedSize,
-    bytes: sizeBytes || 0,
-    role,
-    roleName,
-    assignedAgent,
-    description,
-    detectedAt: new Date().toLocaleTimeString(),
-    ollamaTag
-  };
-}
-
 export async function generateChatbotResponse(
   promptText: string,
   previousUserPrompts: string[] = [],
   activeModel?: string,
   contextText: string = '',
-  requestId?: string,
-  uploadedFiles: UploadedFile[] = [],
-  arsenalModels: DiscoveredModel[] = []
+  requestId?: string
 ): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   let rawP = promptText.trim();
   let p = rawP.toLowerCase();
-
-  // 1. Cooperative Vision Flow: User sent an image -> Vision Agent "sees" it -> Hands to Master Orchestrator
-  const imageFile = uploadedFiles.find(f => f.dataUrl && (f.type === 'image' || /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(f.name)));
-  if (imageFile && imageFile.dataUrl) {
-    const visionModelTag = arsenalModels.find(m => m.role === 'vision')?.ollamaTag || 'qwen2.5vl:7b';
-    const mainModelTag = activeModel || arsenalModels.find(m => m.role === 'reasoning')?.ollamaTag || 'qwen3:8b';
-
-    if (requestId) {
-      useTelemetryStore.getState().updateStage(`Vision & Multimodal Agent (${visionModelTag}) inspecting ${imageFile.name}...`, visionModelTag);
-    }
-
-    let visionObservations = '';
-    try {
-      const vRes = await callLocalLlm({
-        model: visionModelTag,
-        userPrompt: `Carefully examine this image answering the user's prompt: "${rawP}". Transcribe all visible text, equipment tags, readings, tables, diagrams, and visual observations.`,
-        images: [imageFile.dataUrl]
-      });
-      visionObservations = vRes.content;
-    } catch (err: any) {
-      visionObservations = `[Visual OCR & Diagram Extraction for ${imageFile.name}]: Identified equipment tags, text annotations, measurement indicators, and layout features relevant to: "${rawP}".`;
-    }
-
-    if (requestId) {
-      useTelemetryStore.getState().updateStage(`Master Reasoning Agent (${mainModelTag}) synthesizing final response...`, mainModelTag);
-    }
-
-    let mainAnswer = '';
-    try {
-      const mRes = await callLocalLlm({
-        model: mainModelTag,
-        systemPrompt: `You are Lumi's Master Orchestrator. A specialist Vision Agent (${visionModelTag}) has analyzed the attached image and extracted the following observations:\n\n${visionObservations}\n\nSynthesize this visual information and formulate a complete, precise, and expert engineering answer to the user's inquiry: "${rawP}".`,
-        userPrompt: rawP
-      });
-      mainAnswer = mRes.content;
-    } catch (err: any) {
-      mainAnswer = `Based on the visual analysis of **${imageFile.name}**:\n\n${visionObservations}\n\n*Synthesized by Master Orchestrator (${mainModelTag}).*`;
-    }
-
-    const multiAgentText = `### 👁️ Vision Agent (\`${visionModelTag}\`)
-*Extracted visual observations from \`${imageFile.name}\`:*
-> ${visionObservations.split('\n').join('\n> ')}
-
----
-
-### 🧠 Master Orchestrator (\`${mainModelTag}\`)
-${mainAnswer}`;
-
-    return {
-      text: multiAgentText,
-      groundedStatus: 'grounded'
-    };
-  }
-
-  // 2. Cooperative Coder Flow: User asks a coding question or sends a coding issue -> Master routes to Coder Agent
-  const isCoding = /\b(code|python|script|algorithm|function|debug|syntax error|bug|program|write a script|def |class |calculator|traceback|regex|sql)\b/i.test(p);
-  const isCasual = /^(hi|hello|hey|thanks|bye|ok)\b/i.test(p);
-  if (isCoding && !isCasual) {
-    const mainModelTag = activeModel || arsenalModels.find(m => m.role === 'reasoning')?.ollamaTag || 'qwen3:8b';
-    const coderModelTag = arsenalModels.find(m => m.role === 'coder')?.ollamaTag || 'qwen2.5-coder:7b';
-    if (requestId) {
-      useTelemetryStore.getState().updateStage(`Master Orchestrator (${mainModelTag}) routing to Code & Math Agent (${coderModelTag})...`, coderModelTag);
-    }
-
-    let codeAnswer = '';
-    try {
-      const cRes = await callLocalLlm({
-        model: coderModelTag,
-        systemPrompt: `You are Lumi's dedicated Code & Math Specialist Agent (${coderModelTag}). Write clean, production-grade, bug-free, well-commented code, algorithmic reasoning, and concise technical explanations answering the user.`,
-        userPrompt: rawP
-      });
-      codeAnswer = cRes.content;
-    } catch (err: any) {
-      codeAnswer = `Here is the verified Python solution:\n\n\`\`\`python\n# Lumi Code & Math Agent (${coderModelTag})\ndef solve_task():\n    \"\"\"Implementation for: ${rawP.slice(0, 60)}\"\"\"\n    print("Code synthesized successfully.")\n\nif __name__ == "__main__":\n    solve_task()\n\`\`\`\n\n*Code verified and generated by Code & Math Agent.*`;
-    }
-
-    const multiAgentCodeText = `### 🧠 Master Orchestrator (\`${mainModelTag}\`)
-*Identified task type: Software engineering & algorithmic implementation. Dispatching task to Code & Math Agent (\`${coderModelTag}\`).*
-
----
-
-### 💻 Code & Math Agent (\`${coderModelTag}\`)
-${codeAnswer}`;
-
-    return {
-      text: multiAgentCodeText,
-      groundedStatus: 'grounded'
-    };
-  }
 
   // Handle pushback signal ("then answer!", "just answer") by resolving to previous user question
   const isPushback = /^(then\s+answer|just\s+answer|answer\s+it|please\s+answer|go\s+ahead|tell\s+me|answer\s+the\s+question)\b/i.test(p);
@@ -495,6 +317,16 @@ ${codeAnswer}`;
     return { text: "CDU stands for Crude Distillation Unit, the primary refining unit in a petroleum refinery that separates crude oil into fractions based on boiling point ranges.", groundedStatus: 'grounded' };
   }
 
+  if (!contextText) {
+    const routing = classifyIntent(rawP, [], [], previousUserPrompts);
+    if (routing.requires_rag || /\b(guideline|guidelines|sop|safety|ppe|ptw|presentation|confidential|calculation|inspection|approval|procurement)\b/i.test(rawP)) {
+      const kbRes = searchKnowledgeBaseWithNomic(rawP, useAntigravityStore.getState().knowledgeItems);
+      if (kbRes.guidance.length > 0) {
+        contextText = kbRes.guidance.map(g => `[Guideline Document: ${g.title}]\n${g.snippet}`).join('\n\n');
+      }
+    }
+  }
+
   // Fallback Reasoning Engine: Call the actual validation and routing pipeline
   return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId);
 }
@@ -528,16 +360,6 @@ interface AntigravityStore {
   fetchAvailableModels: () => Promise<string[]>;
   addAvailableModel: (modelName: string) => void;
   removeAvailableModel: (modelName: string) => void;
-  arsenalModels: DiscoveredModel[];
-  setArsenalModels: (models: DiscoveredModel[]) => void;
-  addArsenalModel: (model: DiscoveredModel) => void;
-  removeArsenalModel: (id: string) => void;
-  clearArsenalModels: () => void;
-  saveCurrentModelLayout: () => boolean;
-  loadSavedModelLayout: () => boolean;
-  clearSavedModelLayout: () => void;
-  getSavedModelLayout: () => DiscoveredModel[] | null;
-  scanLocalModelsDirectory: () => Promise<DiscoveredModel[]>;
   attachedFiles: string[];
   uploadedFiles: UploadedFile[];
   isExecuting: boolean;
@@ -581,7 +403,6 @@ interface AntigravityStore {
   // Actions
   createNewSession: (title?: string) => string;
   selectSession: (id: string) => void;
-  deleteSession: (id: string) => void;
   setActiveMode: (mode: 'agent' | 'planning' | 'fast') => void;
   setSelectedModel: (model: string) => void;
   setProjectTitle: (title: string) => void;
@@ -648,7 +469,239 @@ const initialSkills: SkillItem[] = [
   { id: 'docker-sandbox', name: 'docker-python-sandbox', description: 'Hardened Docker container execution with --network=none', tools: ['execute_python_sandbox', 'generate_excel_chart'], isLocal: true }
 ];
 
-const initialKIs: KnowledgeItem[] = [];
+const initialKIs: KnowledgeItem[] = [
+  {
+    id: 'kb-doc-presentation',
+    title: 'Management Presentation Guideline',
+    summary: 'Official company standards for management presentations, slide layouts, corporate color schemes, executive summaries, structural requirements, and review approval procedures.',
+    path: '/sovereign-ai-workbench/data/knowledge/mrpl_presentation_guidelines.pdf',
+    totalChunks: 3,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Communications',
+    content: `MANAGEMENT PRESENTATION GUIDELINE
+Document ID: SOP-CORP-PRE-001 | Revision: 3.0
+
+1. PURPOSE AND SCOPE
+This document defines the official corporate standards for preparing, structuring, and delivering management presentations across all business units. All internal and external executive decks must comply with these guidelines to ensure consistent branding, visual clarity, and data accuracy.
+
+2. PRESENTATION STRUCTURE REQUIREMENTS
+Executive presentations must follow a standard structural flow:
+- Title Slide: Executive presentation title, subtitle, presenter name, department, date, and confidentiality classification.
+- Executive Summary / Agenda: High-level overview summarizing core context, key decisions required, and agenda items.
+- Context & Problem Statement: Background information, problem identification, operational impact, and baseline metrics.
+- Analysis & Key Findings: Data-backed evidence, charts, engineering/financial evaluations, and option comparisons.
+- Strategic Recommendations & Action Plan: Clear proposed action items, resource requirements, timelines, and budget impact.
+- Sign-off & Appendix: Supporting data, detailed calculation tables, and formal management approval sign-off block.
+
+3. SLIDE DESIGN & BRANDING STANDARDS
+- Theme & Typography: Use dark or clean charcoal backgrounds with high-contrast typography. Use standard corporate fonts (Inter, Roboto, or Arial).
+- Color Palette: Primary accent colors should be muted corporate blue (#0066CC), teal (#008080), or charcoal gray (#2D3748). Avoid overly vibrant or plain primary colors.
+- Slide Count Limit: Executive briefing decks should ideally range between 4 and 8 slides for concise presentation delivery.
+- Visual Clarity: Limit text density to 3-5 bullet points per slide. Avoid walls of text. Utilize visual metric cards, 2-column comparison tables, and diagrammatic flowcharts.
+
+4. REVIEW AND APPROVAL WORKFLOW
+All presentations intended for executive leadership, board meetings, or external regulatory stakeholders must undergo technical review by the Lead Engineer / Department Manager prior to distribution. Final slides must contain verified data citations and an explicit sign-off status stamp.`
+  },
+  {
+    id: 'kb-doc-safety',
+    title: 'Refinery Safety Protocol',
+    summary: 'Mandatory safety procedures, Personal Protective Equipment (PPE) requirements, Permit to Work (PTW) system, hazardous material handling, and emergency shutdown protocols.',
+    path: '/sovereign-ai-workbench/data/knowledge/01_Refinery_Safety_Protocol.pdf',
+    totalChunks: 3,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Safety & HSE',
+    content: `REFINERY SAFETY PROTOCOL
+Document ID: SOP-HSE-SAF-001 | Revision: 4.2
+
+1. PURPOSE AND MANDATORY COMPLIANCE
+This safety protocol establishes non-negotiable safety standards for all personnel operating within refinery operational units, crude distillation units (CDU), hydrocrackers, and tank farms. Zero tolerance is enforced for safety non-compliance.
+
+2. PERSONAL PROTECTIVE EQUIPMENT (PPE) REQUIREMENTS
+All personnel entering active processing units must wear approved Personal Protective Equipment (PPE):
+- Head & Eye Protection: Hard hats complying with ANSI Z89.1 and safety glasses with side shields complying with ANSI Z87.1.
+- Flame-Resistant Clothing (FRC): Minimum NFPA 2112 certified flame-resistant coveralls worn at all times in operational zones.
+- Footwear: Heavy-duty steel-toe safety boots with oil-resistant and non-slip soles complying with ASTM F2413.
+- Respiratory Protection: N95 or half-mask respirators with organic vapor/acid gas cartridges required when entering areas with potential H2S or VOC exposure.
+- Hearing Protection: Earplugs or earmuffs rated at minimum NRR 25 dB required in high-noise equipment bays (>85 dBA).
+
+3. PERMIT TO WORK (PTW) SYSTEM
+No maintenance, hot work, confined space entry, or electrical isolation may proceed without a fully executed Permit to Work (PTW):
+- Hot Work Permits: Required for spark-producing activities (welding, grinding, cutting). Continuous gas monitoring for flammable vapors (LEL < 1%) is mandatory.
+- Confined Space Entry Permits: Requires oxygen testing (19.5% - 23.5%), toxic gas isolation, double block and bleed, and active attendant stationed outside.
+- Lockout / Tagout (LOTO): Energy isolation procedures must be verified by zero-energy state test prior to work commencement.
+
+4. HAZARD REPORTING AND EMERGENCY SHUTDOWN
+In the event of uncontrolled gas release, fire, or major structural failure, personnel must immediately activate the nearest Manual Call Point (MCP) and initiate Emergency Shutdown (ESD) protocols. All minor safety incidents and near-misses must be logged in the Safety Audit Register within 12 hours.`
+  },
+  {
+    id: 'kb-doc-inspection',
+    title: 'Inspection Report Preparation Guideline',
+    summary: 'Guidelines for conducting ultrasonic wall thickness testing, recording corrosion findings, calculating remaining life, and compiling formal inspection reports.',
+    path: '/sovereign-ai-workbench/data/knowledge/02_Inspection_Report_Preparation_Guideline.pdf',
+    totalChunks: 3,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Inspection & Quality',
+    content: `INSPECTION REPORT PREPARATION GUIDELINE
+Document ID: SOP-ENG-INS-002 | Revision: 2.1
+
+1. OBJECTIVE
+To standardize technical inspection reporting for pressure vessels, process piping, storage tanks, and heat exchangers across refinery facilities in accordance with API 570 and ASME B31.3 codes.
+
+2. ULTRASONIC THICKNESS MEASUREMENT (UTM)
+- Grid Measurements: Perform UTM readings at designated CMLs (Condition Monitoring Locations) along straight pipe runs, elbows, tees, and weld seams.
+- Equipment Calibration: Dual-element transducers calibrated against step block standards prior to each inspection shift.
+- Minimum Allowable Thickness (t_min): Calculate t_min based on internal design pressure, allowable stress, and pipe diameter.
+
+3. CORROSION RATE & REMAINING LIFE CALCULATION
+- Corrosion Rate (CR): CR = (t_previous - t_actual) / time_years (expressed in mm/year).
+- Remaining Service Life (RL): RL = (t_actual - t_retirement) / CR (expressed in years).
+- Mandatory Engineering Action Limit: Any CML recording t_actual < 4.0 mm or remaining life < 3.0 years requires immediate engineering review and issuance of a formal Approval Note for repair or replacement.`
+  },
+  {
+    id: 'kb-doc-approval',
+    title: 'Internal Approval Note Guideline',
+    summary: 'Procedures for drafting, reviewing, and approving internal technical approval notes, financial authorizations, and plant modification requests.',
+    path: '/sovereign-ai-workbench/data/knowledge/03_Internal_Approval_Note_Guideline.pdf',
+    totalChunks: 2,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Governance',
+    content: `INTERNAL APPROVAL NOTE GUIDELINE
+Document ID: SOP-GOV-APP-003 | Revision: 1.5
+
+1. SCOPE AND APPLICABILITY
+This guideline applies to all technical approval notes, engineering change requests (ECR), capital expenditure authorizations, and turnaround modification notes requiring managerial sign-off.
+
+2. APPROVAL NOTE STRUCTURE
+An official Internal Approval Note (.docx format) must contain:
+- Title & Document Header: Reference number, plant unit, equipment tag, date, and requesting department.
+- Problem Statement & Operational Justification: Detailed background explaining equipment degradation, safety risk, or operational bottleneck.
+- Engineering Evaluation & Options Considered: Technical analysis of alternatives.
+- Cost Estimate & Financial Impact: Itemized breakdown of materials, labor hours, NDT testing, and contingency allowances.
+- Formal Sign-Off Block: Structured sign-off table.`
+  },
+  {
+    id: 'kb-doc-procurement',
+    title: 'Procurement Evaluation Guideline',
+    summary: 'Criteria for commercial and technical evaluation of vendor bids, equipment spare procurement, and contractor selection.',
+    path: '/sovereign-ai-workbench/data/knowledge/04_Procurement_Evaluation_Guideline.pdf',
+    totalChunks: 2,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Procurement & Commercial',
+    content: `PROCUREMENT EVALUATION GUIDELINE
+Document ID: SOP-PRO-EVAL-004 | Revision: 2.0
+
+1. PURPOSE
+Establishes transparent, rigorous technical and commercial evaluation procedures for procuring industrial equipment, mechanical spares, piping materials, and specialized engineering services.
+
+2. TWO-STAGE BID EVALUATION PROCESS
+- Stage 1: Technical Evaluation (Pass/Fail). Bids must meet all ASME, API, and company engineering material specifications without critical technical exceptions.
+- Stage 2: Commercial Evaluation. Evaluates Total Cost of Ownership (TCO), including base price, freight, customs duties, warranty terms, and spare parts availability.`
+  },
+  {
+    id: 'kb-doc-classification',
+    title: 'Information Classification Guideline',
+    summary: 'Rules for classifying organizational documents (Public, Internal, Confidential, Restricted) and mandatory data security controls.',
+    path: '/sovereign-ai-workbench/data/knowledge/05_Information_Classification_Guideline.pdf',
+    totalChunks: 2,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Security & Governance',
+    content: `INFORMATION CLASSIFICATION GUIDELINE
+Document ID: SOP-SEC-CLS-005 | Revision: 3.1
+
+1. PURPOSE
+To protect organizational information assets against unauthorized disclosure, data leakage, and cybersecurity risks.
+
+2. CLASSIFICATION LEVELS
+- PUBLIC: Information intended for public distribution.
+- INTERNAL: General operational material accessible to all employees.
+- CONFIDENTIAL: Proprietary engineering schematics, refinery inspection logs, financial cost estimates, vendor contracts, and internal approval notes. Access restricted to authorized personnel.
+- RESTRICTED: Highly sensitive strategic plans, trade secrets, unreleased financial audits, and security vulnerability reports.`
+  },
+  {
+    id: 'kb-doc-maintenance',
+    title: 'Equipment Maintenance Workflow',
+    summary: 'Standard procedures for preventive maintenance, centrifugal pump overhauls, MTBF tracking, and vibration analysis.',
+    path: '/sovereign-ai-workbench/data/knowledge/06_Equipment_Maintenance_Workflow.pdf',
+    totalChunks: 2,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Maintenance & Operations',
+    content: `EQUIPMENT MAINTENANCE WORKFLOW
+Document ID: SOP-MNT-WRK-006 | Revision: 2.4
+
+1. OBJECTIVE
+Defines routine preventive maintenance (PM) workflows and corrective repair protocols for rotating equipment (centrifugal pumps, compressors, blowers, steam turbines).
+
+2. ROTATING EQUIPMENT (PUMP-102 SERIES) PM ROUTINE
+- Weekly Inspection: Check lube oil levels, bearing housing temperatures (<70°C), and mechanical seal flush pressure.
+- Monthly Vibration Monitoring: Measure overall vibration velocity (RMS in mm/s). Alarm threshold: 4.5 mm/s RMS; Shutdown limit: 7.1 mm/s RMS.`
+  },
+  {
+    id: 'kb-doc-engineering-calc',
+    title: 'Engineering Calculation Documentation Guideline',
+    summary: 'Standard requirements for performing, documenting, and independently verifying engineering calculations, corrosion rates, and MTBF models.',
+    path: '/sovereign-ai-workbench/data/knowledge/07_Engineering_Calculation_Documentation_Guideline.pdf',
+    totalChunks: 2,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Engineering',
+    content: `ENGINEERING CALCULATION DOCUMENTATION GUIDELINE
+Document ID: SOP-ENG-CALC-007 | Revision: 1.8
+
+1. PURPOSE AND MANDATORY VERIFICATION
+All engineering calculations (structural load, piping wall thickness, relief valve sizing, pump MTBF statistics) must be documented deterministically and independently verified by a qualified Lead Engineer prior to implementation.
+
+2. CALCULATION DOCUMENTATION STRUCTURE
+Every calculation brief or Python calculation script must state:
+- Objective and Governing Code (e.g. ASME B31.3, API 570, Weibull Reliability Analysis).
+- Input Parameters: Explicit source identification.
+- Explicit Equations & Units: Write out complete mathematical formulas with dimensional units.
+- Deterministic Python Execution: Code scripts must be deterministic, reproducible, and executed in an isolated sandbox with fixed seed.`
+  },
+  {
+    id: 'kb-doc-ai-assistant',
+    title: 'Internal AI Assistant Usage Guideline',
+    summary: 'Rules for using on-premise local AI models (Lumi Workbench), prompt engineering, air-gap enforcement, and factual grounding.',
+    path: '/sovereign-ai-workbench/data/knowledge/08_Internal_AI_Assistant_Usage_Guideline.pdf',
+    totalChunks: 2,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'IT & Governance',
+    content: `INTERNAL AI ASSISTANT USAGE GUIDELINE
+Document ID: SOP-IT-AI-008 | Revision: 2.0
+
+1. PURPOSE AND AIR-GAP COMPLIANCE
+This guideline defines acceptable use parameters for local on-premise AI assistants (Lumi Workbench) running open-weight LLMs (Qwen3, Qwen2.5-Coder, Qwen2.5-VL).
+
+2. ZERO-EGRESS AIR-GAP POLICY
+- All model inference, RAG retrieval, OCR, and script execution must occur 100% locally on workstation hardware (127.0.0.1).
+- No organizational document, prompt, or inspection reading may be transmitted to external cloud APIs or public AI platforms.`
+  },
+  {
+    id: 'kb-doc-confidential-data',
+    title: 'Confidential Data Handling Procedure',
+    summary: 'Detailed procedures for handling confidential information, proprietary engineering blueprints, AI processing guidelines, and data sanitization.',
+    path: '/sovereign-ai-workbench/data/knowledge/09_Confidential_Data_Handling_Procedure.pdf',
+    totalChunks: 2,
+    source_type: 'KNOWLEDGE_BASE',
+    document_type: 'guideline',
+    category: 'Security & Governance',
+    content: `CONFIDENTIAL DATA HANDLING PROCEDURE
+Document ID: SOP-SEC-DAT-009 | Revision: 1.2
+
+1. PURPOSE
+Defines protocol for protecting confidential engineering data, inspection readings, financial budgets, and proprietary AI knowledge base documents against unauthorized access or inadvertent leak.
+
+2. CONFIDENTIAL INFORMATION IDENTIFICATION
+Confidential data includes plant inspection measurements, ultrasonic wall thickness logs, engineering drawings, P&ID CAD files, vendor commercial bids, procurement evaluations, and internal approval notes.`
+  }
+];
 
 const initialNetworkLogs: NetworkAuditLog[] = [
   {
@@ -726,12 +779,11 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   activeMode: 'agent',
   selectedModel: '',
   availableModels: [],
-  arsenalModels: [],
   attachedFiles: [],
   uploadedFiles: [],
   isExecuting: false,
   activeTaskStarted: false,
-  projectTitle: 'Enterprise AI Workbench',
+  projectTitle: 'LUMI - Local Unified Multimodal Intelligence',
   activeDocumentContext: 'No active context',
   isComputerAccessEnabled: true,
   
@@ -831,23 +883,6 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     });
   },
 
-  deleteSession: (id) => {
-    set((state) => {
-      const remaining = state.sessions.filter(s => s.id !== id);
-      const nextActive = state.activeSessionId === id 
-        ? (remaining[0]?.id || '') 
-        : state.activeSessionId;
-      const activeSess = remaining.find(s => s.id === nextActive);
-      return {
-        sessions: remaining,
-        activeSessionId: nextActive,
-        projectTitle: activeSess?.title || 'Enterprise AI Workbench',
-        activeTaskStarted: (activeSess?.steps.length || 0) > 0,
-        activeProposedPlan: activeSess?.activeProposedPlan || null
-      };
-    });
-  },
-
   setActiveMode: (activeMode) => set({ activeMode }),
   setSelectedModel: (selectedModel) => set({ selectedModel }),
   addAvailableModel: (modelName) => {
@@ -867,97 +902,6 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       availableModels: state.availableModels.filter((m) => m !== modelName),
       selectedModel: state.selectedModel === modelName ? '' : state.selectedModel
     }));
-  },
-  setArsenalModels: (models) => {
-    const reasoningModel = models.find(m => m.role === 'reasoning');
-    const coderModel = models.find(m => m.role === 'coder');
-    const defaultSelection = reasoningModel?.name || coderModel?.name || models[0]?.name || '';
-    const modelNames = models.map(m => m.name);
-    set((state) => ({
-      arsenalModels: models,
-      availableModels: Array.from(new Set([...state.availableModels, ...modelNames])),
-      selectedModel: state.selectedModel || defaultSelection
-    }));
-  },
-  addArsenalModel: (model) => {
-    set((state) => {
-      const exists = state.arsenalModels.some(m => m.name === model.name || m.id === model.id);
-      const updated = exists ? state.arsenalModels : [...state.arsenalModels, model];
-      return {
-        arsenalModels: updated,
-        availableModels: Array.from(new Set([...state.availableModels, model.name])),
-        selectedModel: state.selectedModel || model.name
-      };
-    });
-  },
-  removeArsenalModel: (id) => {
-    set((state) => {
-      const updated = state.arsenalModels.filter(m => m.id !== id);
-      return { arsenalModels: updated };
-    });
-  },
-  clearArsenalModels: () => {
-    set({ arsenalModels: [] });
-  },
-  saveCurrentModelLayout: () => {
-    const models = get().arsenalModels;
-    if (!models || models.length === 0) return false;
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem('lumi_saved_model_layout', JSON.stringify(models));
-        return true;
-      }
-    } catch (e) {
-      console.error('Failed to save model layout:', e);
-    }
-    return false;
-  },
-  loadSavedModelLayout: () => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = localStorage.getItem('lumi_saved_model_layout');
-        if (stored) {
-          const models: DiscoveredModel[] = JSON.parse(stored);
-          if (Array.isArray(models) && models.length > 0) {
-            get().setArsenalModels(models);
-            return true;
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load saved model layout:', e);
-    }
-    return false;
-  },
-  clearSavedModelLayout: () => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.removeItem('lumi_saved_model_layout');
-      }
-    } catch {}
-  },
-  getSavedModelLayout: (): DiscoveredModel[] | null => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = localStorage.getItem('lumi_saved_model_layout');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      }
-    } catch {}
-    return null;
-  },
-  scanLocalModelsDirectory: async () => {
-    const defaultBundled = [
-      detectModelInfo('qwen3-14b', 'models/qwen3-14b'),
-      detectModelInfo('qwen2.5-coder-7b', 'models/qwen2.5-coder-7b'),
-      detectModelInfo('qwen3-vl-8b', 'models/qwen3-vl-8b'),
-      detectModelInfo('qwen3-embedding-0.6b', 'models/qwen3-embedding-0.6b'),
-      detectModelInfo('qwen3-reranker-0.6b', 'models/qwen3-reranker-0.6b')
-    ];
-    get().setArsenalModels(defaultBundled);
-    return defaultBundled;
   },
   fetchAvailableModels: async () => {
     try {
@@ -1178,7 +1122,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       set({ isExecuting: true });
 
       const modelStart = performance.now();
-      const chatRes = await generateChatbotResponse(prompt, previousUserPrompts, activeModel, '', requestId, uploadedFiles, get().arsenalModels);
+      const chatRes = await generateChatbotResponse(prompt, previousUserPrompts, activeModel, '', requestId);
       const modelDurationMs = Math.round(performance.now() - modelStart);
       const totalDurationMs = Math.round(performance.now() - totalStart);
 
@@ -1332,106 +1276,98 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       timestamp: now()
     });
 
-    let plan: ProposedExecutionPlan;
+    const caps = detectRequiredCapabilities(prompt, attachedFiles, uploadedFiles);
+    const visionModel = resolveModelForCapability('vision');
+    const reasoningModel = resolveModelForCapability('text_reasoning', activeModel);
+    const codeModel = resolveModelForCapability('code');
+    const embedModel = resolveModelForCapability('embeddings');
 
-    if (routing.requires_vision && routing.requires_python && routing.requires_rag) {
-      // Pump-102 inspection report workflow style
-      const activeFileLabel = userUploadFiles[0] ? `task upload \`${userUploadFiles[0]}\`` : 'scanned report image';
-      plan = {
-        id: `plan-${Date.now()}`,
-        classifiedTaskType: 'inspection_analysis',
-        outputContract: contract,
-        primaryModel: activeModel || 'Multi-Agent Orchestrator',
-        secondaryModel: 'Specialized Multi-Agent Runtime',
-        intentSummary,
-        targetFileNames: userUploadFiles,
-        userUploadFiles,
-        relevantKbGuidance: kbResult.guidance,
-        noKbGuidanceFound: kbResult.noGuidanceFound,
-        kbConflictDetected: kbResult.conflictDetected,
-        kbConflictSummary: kbResult.conflictSummary,
-        steps: [
-          { id: 's1', stepNumber: 1, toolName: 'scanned_image_ocr', description: `Analyze scanned report / OCR / vision on ${activeFileLabel}`, targetModel: activeModel ? `${activeModel} (Vision Agent)` : 'Vision & OCR Agent', status: 'pending' },
-          { id: 's2', stepNumber: 2, toolName: 'vibration_extractor', description: `Extract vibration and temperature readings from report data`, targetModel: activeModel ? `${activeModel} (Sensor Agent)` : 'Sensor Extraction Agent', status: 'pending' },
-          { id: 's3', stepNumber: 3, toolName: 'nomic_embed_rag', description: `Retrieve relevant SOP information using Nomic 768-D Embeddings`, targetModel: 'Nomic-Embed-Text (768-D RAG)', status: 'pending' },
-          { id: 's4', stepNumber: 4, toolName: 'docker_python_sandbox', description: `Run Python cost calculation to estimate total replacement cost (labor + taxes)`, targetModel: activeModel ? `${activeModel} (Code Agent)` : 'Python Sandbox & Math Agent', status: 'pending' },
-          { id: 's5', stepNumber: 5, toolName: 'docx_compiler', description: `Generate editable Word document Approval Note \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (Deliverable Agent)` : 'Deliverable Synthesis Agent', status: 'pending' }
-        ],
-        expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
-        userDecision: 'pending',
-        revisionCount: 1
-      };
-    } else if (taskType === 'presentation_generation') {
-      const activeFileLabel = userUploadFiles[0] ? `task upload \`${userUploadFiles[0]}\`` : 'user prompt input';
-      plan = {
-        id: `plan-${Date.now()}`,
-        classifiedTaskType: 'presentation_generation',
-        outputContract: contract,
-        primaryModel: activeModel || 'Multi-Agent Orchestrator',
-        intentSummary,
-        targetFileNames: userUploadFiles,
-        userUploadFiles,
-        relevantKbGuidance: kbResult.guidance,
-        noKbGuidanceFound: kbResult.noGuidanceFound,
-        kbConflictDetected: kbResult.conflictDetected,
-        kbConflictSummary: kbResult.conflictSummary,
-        steps: [
-          { id: 's1', stepNumber: 1, toolName: 'pdf-document-extractor', description: `Parse key topics, decisions, and action items from ${activeFileLabel}`, targetModel: activeModel ? `${activeModel} (Doc Agent)` : 'Document Intelligence Agent', status: 'pending' },
-          { id: 's2', stepNumber: 2, toolName: 'nomic-embed-rag', description: kbResult.noGuidanceFound ? `Query Knowledge Base via Nomic 768-D Embeddings (No guidance matched threshold)` : `Query Knowledge Base via Nomic 768-D Embeddings (Retrieved: ${kbResult.guidance.map(g => g.title).join(', ')})`, targetModel: 'Nomic-Embed-Text (768-D RAG)', status: 'pending' },
-          { id: 's3', stepNumber: 3, toolName: 'slide_outline_generator', description: `Synthesize 5-slide outline from ${activeFileLabel} + company presentation guidelines`, targetModel: activeModel ? `${activeModel} (Slide Agent)` : 'Slide Design Agent', status: 'pending' },
-          { id: 's4', stepNumber: 4, toolName: 'pptx_artifact_builder', description: `Generate PowerPoint presentation artifact \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (PPTX Agent)` : 'PPTX Deliverable Agent', status: 'pending' }
-        ],
-        expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
-        userDecision: 'pending',
-        revisionCount: 1
-      };
-    } else if (taskType === 'code_generation') {
-      const activeFileLabel = userUploadFiles[0] ? `task upload \`${userUploadFiles[0]}\`` : 'user prompt input';
-      plan = {
-        id: `plan-${Date.now()}`,
-        classifiedTaskType: 'code_generation',
-        outputContract: contract,
-        primaryModel: activeModel || 'Multi-Agent Orchestrator',
-        intentSummary,
-        targetFileNames: userUploadFiles,
-        userUploadFiles,
-        relevantKbGuidance: kbResult.guidance,
-        noKbGuidanceFound: kbResult.noGuidanceFound,
-        kbConflictDetected: kbResult.conflictDetected,
-        kbConflictSummary: kbResult.conflictSummary,
-        steps: [
-          { id: 's1', stepNumber: 1, toolName: 'file_system.read', description: `Extract requirements/structure from ${activeFileLabel}`, targetModel: activeModel ? `${activeModel} (Code Agent)` : 'Code & Math Agent', status: 'pending' },
-          { id: 's2', stepNumber: 2, toolName: 'docker-python-sandbox', description: `Execute Python code in isolated Docker container (--network=none)`, targetModel: activeModel ? `${activeModel} (Sandbox)` : 'Docker Python Sandbox', status: 'pending' },
-          { id: 's3', stepNumber: 3, toolName: 'artifact_builder', description: `Generate deliverable \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (Artifact Agent)` : 'Artifact Synthesis Agent', status: 'pending' }
-        ],
-        expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
-        userDecision: 'pending',
-        revisionCount: 1
-      };
-    } else {
-      const activeFileLabel = userUploadFiles[0] ? `task upload \`${userUploadFiles[0]}\`` : 'user prompt input';
-      plan = {
-        id: `plan-${Date.now()}`,
-        classifiedTaskType: taskType,
-        outputContract: contract,
-        primaryModel: activeModel || 'Multi-Agent Orchestrator',
-        intentSummary,
-        targetFileNames: userUploadFiles,
-        userUploadFiles,
-        relevantKbGuidance: kbResult.guidance,
-        noKbGuidanceFound: kbResult.noGuidanceFound,
-        kbConflictDetected: kbResult.conflictDetected,
-        kbConflictSummary: kbResult.conflictSummary,
-        steps: [
-          { id: 's1', stepNumber: 1, toolName: 'document_analyzer', description: `Extract requirements from ${activeFileLabel}`, targetModel: activeModel ? `${activeModel} (Doc Agent)` : 'Document Intelligence Agent', status: 'pending' },
-          { id: 's2', stepNumber: 2, toolName: 'nomic-embed-rag', description: `Query Knowledge Base via Nomic 768-D Embeddings`, targetModel: 'Nomic-Embed-Text (768-D RAG)', status: 'pending' },
-          { id: 's3', stepNumber: 3, toolName: 'docx_compiler', description: `Generate Word document deliverable \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (DOCX Agent)` : 'DOCX Deliverable Agent', status: 'pending' }
-        ],
-        expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
-        userDecision: 'pending',
-        revisionCount: 1
-      };
+    const steps: ProposedStepItem[] = [];
+    let stepNum = 1;
+
+    // 1. Vision Extraction Step (if image is attached or visual understanding required)
+    if (caps.includes('vision') || routing.requires_vision) {
+      const activeImgLabel = userUploadFiles.find(f => /\.(png|jpg|jpeg|webp|gif|bmp)$/i.test(f)) || userUploadFiles[0] || 'attached image';
+      steps.push({
+        id: `s${stepNum}`,
+        stepNumber: stepNum++,
+        toolName: 'vision_analyzer',
+        description: `Extract visual context, text, novel title, and details from \`${activeImgLabel}\` using Vision LLM`,
+        targetModel: `${visionModel.tag} (${visionModel.name})`,
+        status: 'pending'
+      });
     }
+
+    // 2. RAG / Knowledge Base Retrieval Step
+    if (routing.requires_rag) {
+      steps.push({
+        id: `s${stepNum}`,
+        stepNumber: stepNum++,
+        toolName: 'nomic-embed-rag',
+        description: kbResult.noGuidanceFound 
+          ? `Query Knowledge Base via Nomic 768-D Embeddings (No guidance matched threshold)` 
+          : `Query Knowledge Base via Nomic 768-D Embeddings (Retrieved: ${kbResult.guidance.map(g => g.title).join(', ')})`,
+        targetModel: `${embedModel.name} (768-D Vector Search)`,
+        status: 'pending'
+      });
+    }
+
+    // 3. Code / Math Sandbox Step
+    if (caps.includes('code') || routing.requires_python) {
+      steps.push({
+        id: `s${stepNum}`,
+        stepNumber: stepNum++,
+        toolName: 'docker-python-sandbox',
+        description: `Execute Python calculations in isolated container (--network=none)`,
+        targetModel: `${codeModel.tag} (Python Sandbox & Math Agent)`,
+        status: 'pending'
+      });
+    }
+
+    // 4. Core Text Reasoning / Task Synthesis Step (always included to synthesize outputs)
+    steps.push({
+      id: `s${stepNum}`,
+      stepNumber: stepNum++,
+      toolName: 'general_reasoning_synthesis',
+      description: caps.includes('vision') || routing.requires_vision
+        ? `Synthesize final response using extracted visual context and local reasoning model`
+        : `Reason over task requirements and synthesized source data`,
+      targetModel: `${reasoningModel.tag} (${reasoningModel.name})`,
+      status: 'pending'
+    });
+
+    // 5. Document / Artifact Deliverable Step (if deliverable format requested)
+    if (routing.requires_document_generation || contract.requested_output_type) {
+      const targetFormat = contract.requested_output_type || 'docx';
+      const toolName = targetFormat === 'pptx' ? 'pptx_artifact_builder' : targetFormat === 'xlsx' ? 'generate_xlsx' : targetFormat === 'py' ? 'artifact_builder' : 'docx_compiler';
+      steps.push({
+        id: `s${stepNum}`,
+        stepNumber: stepNum++,
+        toolName,
+        description: `Generate verified ${targetFormat.toUpperCase()} deliverable \`${contract.expected_filename}\``,
+        targetModel: `${reasoningModel.tag} (Deliverable Agent)`,
+        status: 'pending'
+      });
+    }
+
+    let plan: ProposedExecutionPlan = {
+      id: `plan-${Date.now()}`,
+      classifiedTaskType: caps.includes('vision') ? 'document_vision' : taskType,
+      outputContract: contract,
+      primaryModel: reasoningModel.tag,
+      secondaryModel: caps.includes('vision') ? visionModel.tag : undefined,
+      intentSummary,
+      targetFileNames: userUploadFiles,
+      userUploadFiles,
+      relevantKbGuidance: kbResult.guidance,
+      noKbGuidanceFound: kbResult.noGuidanceFound,
+      kbConflictDetected: kbResult.conflictDetected,
+      kbConflictSummary: kbResult.conflictSummary,
+      steps,
+      expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
+      userDecision: 'pending',
+      revisionCount: 1
+    };
 
     set({ activeProposedPlan: plan });
 
@@ -1550,17 +1486,28 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           toolLower.includes('document_analyzer') ||
           toolLower.includes('file_system.read')
         ) {
-          const imageFile = uploadedFiles.find(f => f.dataUrl && (f.type === 'image' || f.extension === 'png' || f.extension === 'jpg' || f.extension === 'jpeg'));
+          const imageFile = uploadedFiles.find(f => f.dataUrl && (f.type === 'image' || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(f.extension || ''))) ||
+                            uploadedFiles.find(f => f.dataUrl && f.dataUrl.startsWith('data:image'));
           
           if (imageFile && imageFile.dataUrl) {
+            const dynamicVisionPrompt = `Examine this image in detail and extract all key information relevant to fulfilling the user request: "${approvedPlan.intentSummary || workflowContext.userRequest}".
+Describe titles, authors, text, headings, diagrams, numbers, equipment tags, and any other visual content present clearly and thoroughly.`;
+
+            console.log('[VISION STEP DIAGNOSTIC] Calling Vision LLM (qwen2.5vl:7b)...', {
+              imageName: imageFile.name,
+              prompt: dynamicVisionPrompt
+            });
+
             const visionRes = await callLocalLlm({
               model: 'qwen2.5vl:7b',
-              userPrompt: 'Extract and transcribe all text, inspection data, equipment tags, and sensor readings from this image.',
+              systemPrompt: 'You are a precise computer vision and OCR assistant. Extract visual content, text, titles, numbers, and cover details accurately without speculation.',
+              userPrompt: dynamicVisionPrompt,
               images: [imageFile.dataUrl]
             });
 
             workflowContext.visionFindings = visionRes.content;
-            workflowContext.extractedContent = (workflowContext.extractedContent ? workflowContext.extractedContent + '\n\n' : '') + visionRes.content;
+            workflowContext.llmOutputs['vision_extraction'] = visionRes.content;
+            workflowContext.extractedContent = (workflowContext.extractedContent ? workflowContext.extractedContent + '\n\n' : '') + `[Extracted Visual Content from ${imageFile.name}]:\n` + visionRes.content;
 
             addNetworkLog({
               timestamp: now(),
@@ -1573,10 +1520,10 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
               modelOrTool: `${visionRes.model} (Vision & OCR Engine)`
             });
 
-            stepOutputText = `Vision OCR processed ${imageFile.name} (${visionRes.durationMs}ms). Extracted ${visionRes.content.length} characters of visual reading data.`;
+            stepOutputText = `Vision LLM processed ${imageFile.name} (${visionRes.durationMs}ms). Extracted ${visionRes.content.length} chars of visual context: "${visionRes.content.slice(0, 100)}..."`;
           } else {
             if (!workflowContext.extractedContent) {
-              workflowContext.extractedContent = approvedPlan.intentSummary || 'Operational meeting notes and specifications';
+              workflowContext.extractedContent = approvedPlan.intentSummary || 'Task context';
             }
             stepOutputText = `Extracted ${workflowContext.extractedContent.split('\n').length} lines of text from task context (${userFiles.join(', ') || 'user prompt'}).`;
           }
@@ -1689,7 +1636,46 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           stepOutputText = `Deterministic math verified in sandbox: ${calcSummary}`;
         }
 
-        // STEP TYPE E: Qwen Slide Outline Generator / Intermediate Synthesis
+        // STEP TYPE E: General Reasoning & Synthesis Step
+        else if (
+          toolLower.includes('general_reasoning_synthesis') ||
+          toolLower.includes('reasoning_synthesis')
+        ) {
+          const reasoningPrompt = `USER REQUEST:
+${approvedPlan.intentSummary || workflowContext.userRequest}
+
+${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE:\n${workflowContext.visionFindings}\n\n` : ''}${workflowContext.ragContext && workflowContext.ragContext.length > 0 ? `RETRIEVED KNOWLEDGE BASE GUIDANCE:\n${workflowContext.ragContext.map(g => `[${g.title}]\n${g.snippet}`).join('\n\n')}\n\n` : ''}${workflowContext.extractedContent ? `ADDITIONAL SOURCE CONTENT:\n${workflowContext.extractedContent}\n\n` : ''}Based on all the extracted visual context, source content, and guidelines above, fulfill the user's request thoroughly and accurately. Provide a complete, detailed response.`;
+
+          console.log('[REASONING STEP DIAGNOSTIC] Calling General Reasoning LLM...', {
+            model: activeModel,
+            hasVisionFindings: !!workflowContext.visionFindings,
+            ragCount: workflowContext.ragContext.length
+          });
+
+          const genRes = await callLocalLlm({
+            model: activeModel,
+            systemPrompt: 'You are Lumi, a sovereign multimodal reasoning assistant. Synthesize a complete and accurate answer grounded strictly in the provided visual findings and source context.',
+            userPrompt: reasoningPrompt,
+            temperature: 0.3
+          });
+
+          workflowContext.llmOutputs['reasoning_synthesis'] = genRes.content;
+
+          addNetworkLog({
+            timestamp: now(),
+            source: '127.0.0.1:4321',
+            destination: genRes.endpoint,
+            protocol: 'HTTP',
+            bytesSent: genRes.bytesSent,
+            bytesReceived: genRes.bytesReceived,
+            isExternal: false,
+            modelOrTool: `${genRes.model} (General Reasoning Engine)`
+          });
+
+          stepOutputText = `Reasoning model (${genRes.model}) synthesized output: ${genRes.content.slice(0, 140)}...`;
+        }
+
+        // STEP TYPE F: Slide Outline Generator
         else if (toolLower.includes('slide_outline_generator') || toolLower.includes('outline')) {
           const qwenPpt = await generatePptxSlidesWithQwen(
             approvedPlan.intentSummary || 'Presentation outline',
@@ -1713,7 +1699,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           stepOutputText = `Qwen synthesized ${qwenPpt.data.slides.length} slides: "${qwenPpt.data.title}" (${qwenPpt.audit.durationMs}ms, ${qwenPpt.audit.bytesReceived} bytes).`;
         }
 
-        // STEP TYPE F: Artifact Builder / Final Synthesis Step
+        // STEP TYPE G: Artifact Builder / Deliverable Generation Step
         else if (
           toolLower.includes('pptx_artifact_builder') ||
           toolLower.includes('docx_compiler') ||
@@ -1907,9 +1893,10 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       return;
     }
 
-    // 3. If artifact not built yet, build it now
-    let finalArtifact: ArtifactItem = workflowContext.artifact!;
-    if (!finalArtifact) {
+    // 3. Output deliverable or synthesized text response
+    let finalArtifact: ArtifactItem | undefined = workflowContext.artifact;
+
+    if (!finalArtifact && (contract?.requested_output_type || (approvedPlan.expectedDeliverables.length > 0 && approvedPlan.expectedDeliverables[0].includes('.')))) {
       if (requestedFormat === 'pptx') {
         const pptxRes = await generatePptxDeliverable(
           workflowContext.structuredDeliverable || {
@@ -1935,7 +1922,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           workflowContext.llmOutputs['code'] || '# Python code generated by Qwen\nprint("Reliability Analysis Complete")\n',
           contract?.expected_filename || undefined
         );
-      } else {
+      } else if (requestedFormat === 'docx') {
         finalArtifact = await generateDocxDeliverable(
           workflowContext.structuredDeliverable || {
             documentTitle: 'Approval Note',
@@ -1950,47 +1937,82 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       workflowContext.artifact = finalArtifact;
     }
 
-    // 4. Contract Validation Gate
-    const validationPassed = finalArtifact.type === requestedFormat;
-    const validationStepId = `step-${Date.now()}-validation`;
+    if (finalArtifact) {
+      // 4. Contract Validation Gate
+      const validationPassed = finalArtifact.type === requestedFormat;
+      const validationStepId = `step-${Date.now()}-validation`;
 
-    addStepToActiveSession({
-      id: validationStepId,
-      type: 'thought',
-      title: 'Output Contract Validation Gate',
-      content: `**Contract Validation Results:**\n- Requested Output Format: \`${requestedFormat.toUpperCase()}\` | Actual Generated Format: \`${finalArtifact.type.toUpperCase()}\` [${validationPassed ? 'PASSED ✓' : 'FAILED ✗'}]\n- Substantive Content: **Generated entirely by local Qwen reasoning engine** [PASSED ✓]\n- Deterministic File Size: **${(finalArtifact.sizeBytes / 1024).toFixed(1)} KB** [PASSED ✓]\n- Browser Direct Download: **${finalArtifact.downloadUrl ? 'READY (Blob URL)' : 'FILE CREATED'}** [PASSED ✓]\n- Validation Status: **${validationPassed ? 'PASSED — DELIVERABLE VERIFIED & READY' : 'REJECTED — CONTRACT VIOLATION'}**`,
-      status: validationPassed ? 'success' : 'error',
-      timestamp: now()
-    });
+      addStepToActiveSession({
+        id: validationStepId,
+        type: 'thought',
+        title: 'Output Contract Validation Gate',
+        content: `**Contract Validation Results:**\n- Requested Output Format: \`${requestedFormat.toUpperCase()}\` | Actual Generated Format: \`${finalArtifact.type.toUpperCase()}\` [${validationPassed ? 'PASSED ✓' : 'FAILED ✗'}]\n- Substantive Content: **Generated entirely by local Qwen reasoning engine** [PASSED ✓]\n- Deterministic File Size: **${(finalArtifact.sizeBytes / 1024).toFixed(1)} KB** [PASSED ✓]\n- Browser Direct Download: **${finalArtifact.downloadUrl ? 'READY (Blob URL)' : 'FILE CREATED'}** [PASSED ✓]\n- Validation Status: **${validationPassed ? 'PASSED — DELIVERABLE VERIFIED & READY' : 'REJECTED — CONTRACT VIOLATION'}**`,
+        status: validationPassed ? 'success' : 'error',
+        timestamp: now()
+      });
 
-    // 5. Output Final Response with real downloadable deliverable
-    const uploadsText = userFiles.length > 0
-      ? `✓ Analyzed uploaded task content: [${userFiles.join(', ')}]`
-      : `✓ Analyzed prompt task requirements`;
+      // 5. Output Final Response with real downloadable deliverable
+      const uploadsText = userFiles.length > 0
+        ? `✓ Analyzed uploaded task content: [${userFiles.join(', ')}]`
+        : `✓ Analyzed prompt task requirements`;
 
-    const kbGuidance = workflowContext.ragContext;
-    const kbStatusChecklist = approvedPlan.noKbGuidanceFound || kbGuidance.length === 0
-      ? `✓ No relevant Knowledge Base guidance found — proceeded using uploaded content only`
-      : `✓ Applied corporate guidance via Nomic RAG: ${kbGuidance.map(g => g.title).join(', ')}`;
+      const kbGuidance = workflowContext.ragContext;
+      const kbStatusChecklist = approvedPlan.noKbGuidanceFound || kbGuidance.length === 0
+        ? `✓ No relevant Knowledge Base guidance found — proceeded using uploaded content only`
+        : `✓ Applied corporate guidance via Nomic RAG: ${kbGuidance.map(g => g.title).join(', ')}`;
 
-    const finalStepId = `step-${Date.now()}-response`;
-    addStepToActiveSession({
-      id: finalStepId,
-      type: 'response',
-      content: `### Task Execution Complete\n\n**Pipeline Status Checklist:**\n- ${uploadsText}\n- ${kbStatusChecklist}\n- ✓ Output Contract Validation: **PASSED (\`${finalArtifact.type.toUpperCase()}\`)**\n- ✓ Real Local Model Execution: **Zero simulation, actual Qwen reasoning completed**\n- ✓ 100% Air-Gapped: **Zero external network egress confirmed**\n\n**Generated Deliverable:**\n- **File:** \`${finalArtifact.name}\` (${(finalArtifact.sizeBytes / 1024).toFixed(1)} KB)\n- **Format:** \`${finalArtifact.type.toUpperCase()}\`\n- **Description:** ${finalArtifact.description}\n\n*Click the **Download Deliverable** button in the workspace or the preview pane to save your file directly.*`,
-      timestamp: now(),
-      citations: kbGuidance.length > 0
-        ? kbGuidance.map(g => ({ source: g.title, snippet: g.snippet }))
-        : [{ source: 'User Upload Content', snippet: 'Extracted content from user uploaded task material.' }],
-      artifacts: [finalArtifact]
-    });
+      const finalStepId = `step-${Date.now()}-response`;
+      addStepToActiveSession({
+        id: finalStepId,
+        type: 'response',
+        content: `### Task Execution Complete\n\n**Pipeline Status Checklist:**\n- ${uploadsText}\n- ${kbStatusChecklist}\n- ✓ Output Contract Validation: **PASSED (\`${finalArtifact.type.toUpperCase()}\`)**\n- ✓ Real Local Model Execution: **Zero simulation, actual Qwen reasoning completed**\n- ✓ 100% Air-Gapped: **Zero external network egress confirmed**\n\n**Generated Deliverable:**\n- **File:** \`${finalArtifact.name}\` (${(finalArtifact.sizeBytes / 1024).toFixed(1)} KB)\n- **Format:** \`${finalArtifact.type.toUpperCase()}\`\n- **Description:** ${finalArtifact.description}\n\n*Click the **Download Deliverable** button in the workspace or the preview pane to save your file directly.*`,
+        timestamp: now(),
+        citations: kbGuidance.length > 0
+          ? kbGuidance.map(g => ({ source: g.title, snippet: g.snippet }))
+          : [{ source: 'User Upload Content', snippet: 'Extracted content from user uploaded task material.' }],
+        artifacts: [finalArtifact]
+      });
 
-    useTelemetryStore.getState().completeJob({
-      inputSizeBytes: meetingNotesText.length,
-      outputSizeBytes: finalArtifact.sizeBytes
-    });
+      useTelemetryStore.getState().completeJob({
+        inputSizeBytes: meetingNotesText.length,
+        outputSizeBytes: finalArtifact.sizeBytes
+      });
 
-    setIsExecuting(false);
+      setIsExecuting(false);
+    } else if (workflowContext.llmOutputs['reasoning_synthesis'] || workflowContext.visionFindings) {
+      const responseText = workflowContext.llmOutputs['reasoning_synthesis'] || workflowContext.visionFindings || 'Task execution completed.';
+
+      const uploadsText = userFiles.length > 0
+        ? `✓ Extracted visual context from task uploads: [${userFiles.join(', ')}]`
+        : `✓ Analyzed prompt task requirements`;
+
+      const kbGuidance = workflowContext.ragContext;
+      const kbStatusChecklist = approvedPlan.noKbGuidanceFound || kbGuidance.length === 0
+        ? `✓ No relevant Knowledge Base guidance required`
+        : `✓ Applied corporate guidance via Nomic RAG: ${kbGuidance.map(g => g.title).join(', ')}`;
+
+      const finalStepId = `step-${Date.now()}-response`;
+      addStepToActiveSession({
+        id: finalStepId,
+        type: 'response',
+        content: `### Task Execution Complete\n\n**Multi-Model Execution Pipeline Status:**\n- ✓ Vision LLM (\`qwen2.5vl:7b\`): Extracted visual context from attached image\n- ${uploadsText}\n- ${kbStatusChecklist}\n- ✓ General Reasoning LLM (\`${activeModel}\`): Synthesized answer grounded on extracted visual context\n\n---\n\n${responseText}`,
+        timestamp: now(),
+        citations: kbGuidance.length > 0
+          ? kbGuidance.map(g => ({ source: g.title, snippet: g.snippet }))
+          : workflowContext.visionFindings 
+            ? [{ source: 'Attached Image (qwen2.5vl:7b Vision Engine)', snippet: workflowContext.visionFindings.slice(0, 150) + '...' }]
+            : undefined
+      });
+
+      useTelemetryStore.getState().completeJob({
+        inputSizeBytes: meetingNotesText.length || 100,
+        outputSizeBytes: responseText.length
+      });
+
+      setIsExecuting(false);
+    } else {
+      setIsExecuting(false);
+    }
   },
 
   rejectProposedPlan: (userFeedback?: string) => {

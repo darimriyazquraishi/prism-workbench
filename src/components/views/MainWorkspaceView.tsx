@@ -26,6 +26,7 @@ import {
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 import { PlanApprovalCard } from '../agent/PlanApprovalCard';
 import { LivePipelineTelemetryPanel } from '../antigravity/LivePipelineTelemetryPanel';
+import { TaskResultView } from '../antigravity/TaskResultView';
 
 export const MainWorkspaceView: React.FC = () => {
   const { 
@@ -432,55 +433,11 @@ export const MainWorkspaceView: React.FC = () => {
                   if (step.type === 'response') {
                     return (
                       <div key={step.id} className="max-w-4xl mx-auto w-full flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-sm">
+                        <div className="w-8 h-8 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-sm flex-shrink-0 mt-1">
                           <img src="/favicon.svg" alt="Lumi" className="w-5 h-5" />
                         </div>
-                        <div className="flex-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-5 shadow-sm space-y-4 font-sans text-xs">
-                          <div className="text-sm font-semibold text-[var(--text-primary)] border-b border-[var(--border-subtle)] pb-2 flex items-center justify-between">
-                            <span>{step.artifacts && step.artifacts.length > 0 ? 'Task Execution Deliverables & Output' : 'Lumi Assistant'}</span>
-                            <span className="font-mono text-[10px] text-[var(--text-secondary)]">{step.timestamp}</span>
-                          </div>
-                          <div className="text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-line font-sans">
-                            {step.content}
-                          </div>
-
-                          {step.citations && step.citations.length > 0 && (
-                            <div className="p-3 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg space-y-1 font-mono text-[11px]">
-                              <div className="font-bold text-[var(--text-secondary)] uppercase">Grounding Provenance</div>
-                              {step.citations.map((c, i) => (
-                                <div key={i} className="text-[var(--text-primary)]">
-                                  • <span className="text-[var(--accent-primary)] font-bold">{c.source}</span> {c.page ? `(Page ${c.page})` : ''}: "{c.snippet}"
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {step.artifacts && step.artifacts.length > 0 && (
-                            <div className="pt-2">
-                              <div className="text-[10px] uppercase font-mono font-bold text-[var(--text-secondary)] mb-2">Generated Workspace Files</div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {step.artifacts.map((art) => (
-                                  <div key={art.id} className="p-2.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
-                                    <div className="flex items-center gap-2 truncate">
-                                      <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
-                                      <div className="truncate">
-                                        <div className="font-semibold text-xs text-[var(--text-primary)] truncate">{art.name}</div>
-                                        <div className="text-[9px] font-mono text-[var(--text-tertiary)]">{art.path}</div>
-                                      </div>
-                                    </div>
-                                    <a 
-                                      href={art.downloadUrl || `/static/artifacts/${art.name}`}
-                                      download={art.name}
-                                      className="px-2.5 py-1 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] text-[var(--text-primary)] hover:border-[var(--accent-primary)] cursor-pointer font-mono flex items-center gap-1"
-                                    >
-                                      <Download className="w-3 h-3" />
-                                      <span>Download</span>
-                                    </a>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                        <div className="flex-1 min-w-0">
+                          <TaskResultView step={step} proposedPlan={activeProposedPlan || undefined} />
                         </div>
                       </div>
                     );

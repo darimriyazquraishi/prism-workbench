@@ -17,8 +17,6 @@ export const AntigravityHeader: React.FC = () => {
   const { 
     sessions, 
     activeSessionId, 
-    selectedModel, 
-    setSelectedModel,
     availableModels,
     fetchAvailableModels,
     projectTitle,
@@ -106,15 +104,16 @@ export const AntigravityHeader: React.FC = () => {
         </div>
       </div>
 
-      {/* Right: Actions (Settings icon & Pane Toggle only) */}
+      {/* Right: Status Cluster + Actions */}
       <div className="flex items-center gap-2">
-        {/* Settings Modal Trigger */}
+        {/* Status Cluster Pill */}
         <button
-          onClick={() => setSettingsModalOpen(true)}
-          title="Enterprise Settings & Profile"
-          className="p-1.5 rounded-full border bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-secondary)] transition-colors cursor-pointer"
+          onClick={() => setServerHealthModalOpen(true)}
+          title={isServerOnline ? "Local Ollama engine connected (Click for health metrics)" : "Local engine offline (Click for configuration)"}
+          className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] font-medium text-[11px] font-sans cursor-pointer hover:opacity-80 transition-opacity text-[var(--text-primary)] font-sans"
         >
-          <Settings className="w-4 h-4" />
+          <span className={`w-1.5 h-1.5 rounded-full ${isServerOnline ? 'bg-[var(--accent-success)] shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></span>
+          <span>{isServerOnline ? 'Local' : 'Offline'}</span>
         </button>
 
         {/* Toggle Right Live Artifact / Viewer Pane */}
