@@ -702,86 +702,12 @@ namespace LUMI.Desktop
                     }
                     catch { }
                 }
-                // Also ensure Vision Server (port 8080) is running for local multimodal tasks
-                EnsureVisionServerRunning(showConsole);
             }
             catch (Exception ex)
             {
                 if (showConsole)
                 {
                     Console.WriteLine("[LUMI] Note: Could not auto-spawn llama inference server: " + ex.Message);
-                }
-            }
-        }
-
-        private static void EnsureVisionServerRunning(bool showConsole)
-        {
-            try
-            {
-                using (var client = new TcpClient())
-                {
-                    var result = client.BeginConnect("127.0.0.1", 8080, null, null);
-                    if (result.AsyncWaitHandle.WaitOne(400) && client.Connected)
-                    {
-                        client.EndConnect(result);
-                        if (showConsole)
-                        {
-                            Console.WriteLine("[LUMI] Multimodal vision server is active on 127.0.0.1:8080.");
-                        }
-                        return;
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                string visionExe = Path.Combine(_baseDir, "llama_server", "llama-server.exe");
-                if (!File.Exists(visionExe))
-                {
-                    visionExe = "llama-server";
-                }
-
-                string modelGguf = Path.Combine(_baseDir, "models", "qwen3-vl-8b", "Qwen3VL-8B-Instruct-Q4_K_M.gguf");
-                string mmprojGguf = Path.Combine(_baseDir, "models", "qwen3-vl-8b", "mmproj-Qwen3VL-8B-Instruct-F16.gguf");
-
-                if (!File.Exists(modelGguf) || !File.Exists(mmprojGguf))
-                {
-                    // Fallback check root models directory
-                    string rootModel = @"F:\corewithin\models\qwen3-vl-8b\Qwen3VL-8B-Instruct-Q4_K_M.gguf";
-                    string rootMmproj = @"F:\corewithin\models\qwen3-vl-8b\mmproj-Qwen3VL-8B-Instruct-F16.gguf";
-                    if (File.Exists(rootModel) && File.Exists(rootMmproj))
-                    {
-                        modelGguf = rootModel;
-                        mmprojGguf = rootMmproj;
-                    }
-                }
-
-                if (File.Exists(modelGguf) && File.Exists(mmprojGguf))
-                {
-                    if (showConsole)
-                    {
-                        Console.WriteLine("[LUMI] Auto-starting multimodal vision engine on port 8080...");
-                    }
-
-                    var psi = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = visionExe,
-                        Arguments = string.Format("-m \"{0}\" --mmproj \"{1}\" --port 8080 -ngl 99 -c 4096", modelGguf, mmprojGguf),
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-                        WorkingDirectory = Path.Combine(_baseDir, "llama_server")
-                    };
-
-                    System.Diagnostics.Process.Start(psi);
-                }
-            }
-            catch (Exception ex)
-            {
-                if (showConsole)
-                {
-                    Console.WriteLine("[LUMI] Note: Could not auto-spawn vision engine: " + ex.Message);
                 }
             }
         }
