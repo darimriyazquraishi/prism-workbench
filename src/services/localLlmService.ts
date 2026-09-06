@@ -13,6 +13,7 @@ export interface LocalLlmOptions {
   formatJson?: boolean;
   images?: string[]; // base64 strings
   temperature?: number;
+  numCtx?: number;
 }
 
 export interface LocalLlmResult {
@@ -25,6 +26,24 @@ export interface LocalLlmResult {
 }
 
 const OLLAMA_BASE = 'http://127.0.0.1:11434';
+
+function extractCleanErrorMessage(raw: string, status: number): string {
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.error === 'string') {
+      try {
+        const inner = JSON.parse(parsed.error);
+        if (inner?.error?.message) return inner.error.message;
+        if (inner?.message) return inner.message;
+      } catch {
+        return parsed.error;
+      }
+    }
+    if (parsed?.error?.message) return parsed.error.message;
+    if (parsed?.message) return parsed.message;
+  } catch {}
+  return `Ollama returned HTTP ${status}: ${raw}`;
+}
 
 /**
  * Normalizes model names from plan descriptions/aliases to available Ollama model tags
@@ -76,6 +95,9 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
 
   messages.push(userMsg);
 
+  // Default context window: 16,384 tokens for vision tasks (high-res image patches), 8,192 tokens for standard text
+  const defaultNumCtx = options.numCtx ?? (options.images && options.images.length > 0 ? 16384 : 8192);
+
   const requestBody = JSON.stringify({
     model: modelTag,
     messages,
@@ -83,6 +105,7 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
     format: options.formatJson ? 'json' : undefined,
     options: {
       temperature: options.temperature ?? 0.2,
+      num_ctx: defaultNumCtx,
       num_predict: 3500
     }
   });
@@ -102,6 +125,7 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
       console.log(`[LOCAL LLM DIAGNOSTIC] Initiating GPU vision request to '${modelTag}' at ${OLLAMA_BASE}/api/chat`, {
         imageCount: options.images.length,
         promptLength: options.userPrompt.length,
+        contextTokens: defaultNumCtx,
         timeoutMs: timeoutDuration
       });
     }
@@ -117,12 +141,46 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
 
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
-      throw new Error(`Ollama returned HTTP ${res.status}: ${errBody || res.statusText}`);
+      // If context length was exceeded, automatically retry once with expanded 32,768 context
+      if (
+        (errBody.includes('exceed_context_size_error') ||
+         errBody.includes('exceeds the available context size')) &&
+        defaultNumCtx < 32768
+      ) {
+        console.warn(`[LOCAL LLM] Context limit hit (${defaultNumCtx} tokens), auto-escalating to 32,768 tokens...`);
+        const retryBody = JSON.stringify({
+          model: modelTag,
+          messages,
+          stream: false,
+          format: options.formatJson ? 'json' : undefined,
+          options: {
+            temperature: options.temperature ?? 0.2,
+            num_ctx: 32768,
+            num_predict: 3500
+          }
+        });
+        const retryRes = await fetch(`${OLLAMA_BASE}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: retryBody,
+          signal: controller.signal
+        });
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          responseText = retryData?.message?.content || '';
+          bytesReceived = new TextEncoder().encode(JSON.stringify(retryData)).length;
+        } else {
+          const retryErr = await retryRes.text().catch(() => '');
+          throw new Error(extractCleanErrorMessage(retryErr || retryRes.statusText, retryRes.status));
+        }
+      } else {
+        throw new Error(extractCleanErrorMessage(errBody || res.statusText, res.status));
+      }
+    } else {
+      const data = await res.json();
+      responseText = data?.message?.content || '';
+      bytesReceived = new TextEncoder().encode(JSON.stringify(data)).length;
     }
-
-    const data = await res.json();
-    responseText = data?.message?.content || '';
-    bytesReceived = new TextEncoder().encode(JSON.stringify(data)).length;
 
     if (options.images && options.images.length > 0) {
       console.log(`[LOCAL LLM DIAGNOSTIC] Vision request to '${modelTag}' completed successfully`, {
