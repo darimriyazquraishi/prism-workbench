@@ -20,6 +20,7 @@ FOLDER CONTENTS:
 - LUMI.exe                      : Standalone native desktop executable
 - *.dll                         : Native WebView2 offline rendering engines
 - dist\                         : Pre-compiled application interface
+- llama_server\                 : Local inference engine (auto-starts with LUMI.exe)
 - demo\                         : Datasets, inspection reports, meeting notes
 - models\                       : Local open-weight models directory
 - public\                       : Icons and media assets

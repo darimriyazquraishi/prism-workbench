@@ -45,10 +45,15 @@ foreach ($dir in $modelDirs) {
     Set-Content -Path "$targetDir\.gitkeep" -Value "# Placeholder for $dir model weights. Download model files here." -Encoding UTF8
 }
 
-# 6. Public Assets & Icons (public)
+# 6. Local Inference Server Directory (llama_server)
+if (Test-Path "F:\corewithin\llama_server") {
+    Copy-Item "F:\corewithin\llama_server" -Destination $DestinationPath -Recurse -Force
+}
+
+# 7. Public Assets & Icons (public)
 Copy-Item "F:\corewithin\public" -Destination $DestinationPath -Recurse -Force
 
-# 7. Add Quick Launch Readme
+# 8. Add Quick Launch Readme
 $readmeContent = @"
 ======================================================================
   LUMI -- STANDALONE OFFLINE DESKTOP APPLICATION
@@ -72,6 +77,7 @@ FOLDER CONTENTS:
 - LUMI.exe                      : Standalone native desktop executable
 - *.dll                         : Native WebView2 offline rendering engines
 - dist\                         : Pre-compiled application interface
+- llama_server\                 : Local inference engine (auto-starts with LUMI.exe)
 - demo\                         : Datasets, inspection reports, meeting notes
 - models\                       : Local open-weight models directory
 - public\                       : Icons and media assets

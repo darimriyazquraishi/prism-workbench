@@ -622,7 +622,7 @@ namespace LUMI.Desktop
                         client.EndConnect(result);
                         if (showConsole)
                         {
-                            Console.WriteLine("Ollama inference engine is active on 127.0.0.1:11434.");
+                            Console.WriteLine("[LUMI] Local inference engine is already active on 127.0.0.1:11434.");
                         }
                         return;
                     }
@@ -632,25 +632,82 @@ namespace LUMI.Desktop
 
             try
             {
+                string localExe = Path.Combine(_baseDir, "llama_server", "ollama.exe");
+                string localBat = Path.Combine(_baseDir, "llama_server", "start_server.bat");
+                string appDataExe = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Programs", "Ollama", "ollama.exe"
+                );
+
+                string targetBinary = null;
+                string targetArgs = "";
+
+                if (File.Exists(localExe))
+                {
+                    targetBinary = localExe;
+                    targetArgs = "serve";
+                }
+                else if (File.Exists(localBat))
+                {
+                    targetBinary = localBat;
+                    targetArgs = "";
+                }
+                else if (File.Exists(appDataExe))
+                {
+                    targetBinary = appDataExe;
+                    targetArgs = "serve";
+                }
+                else
+                {
+                    targetBinary = "ollama";
+                    targetArgs = "serve";
+                }
+
                 if (showConsole)
                 {
-                    Console.WriteLine("Starting local Ollama inference service in background...");
+                    Console.WriteLine(string.Format("[LUMI] Auto-starting local inference engine: {0} {1}", targetBinary, targetArgs));
                 }
+
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = "ollama",
-                    Arguments = "serve",
+                    FileName = targetBinary,
+                    Arguments = targetArgs,
                     UseShellExecute = false,
                     CreateNoWindow = true,
-                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                    WorkingDirectory = Directory.Exists(Path.Combine(_baseDir, "llama_server")) ? Path.Combine(_baseDir, "llama_server") : _baseDir
                 };
+
                 System.Diagnostics.Process.Start(psi);
+
+                // Wait up to 5 seconds for loopback listener on port 11434 to become active
+                for (int i = 0; i < 25; i++)
+                {
+                    Thread.Sleep(200);
+                    try
+                    {
+                        using (var client = new TcpClient())
+                        {
+                            var r = client.BeginConnect("127.0.0.1", 11434, null, null);
+                            if (r.AsyncWaitHandle.WaitOne(200) && client.Connected)
+                            {
+                                client.EndConnect(r);
+                                if (showConsole)
+                                {
+                                    Console.WriteLine("[LUMI] Inference engine is now ready on 127.0.0.1:11434.");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    catch { }
+                }
             }
             catch (Exception ex)
             {
                 if (showConsole)
                 {
-                    Console.WriteLine("Could not automatically spawn ollama serve: " + ex.Message);
+                    Console.WriteLine("[LUMI] Note: Could not auto-spawn llama inference server: " + ex.Message);
                 }
             }
         }

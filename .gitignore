@@ -40,6 +40,8 @@ llama/
 *.so
 *.dylib
 lib/
+llama_server/*.exe
+LUMI_Desktop/llama_server/*.exe
 
 # Caches and runtime
 .cache/
