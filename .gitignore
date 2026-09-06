@@ -76,3 +76,6 @@ chroma_db/
 
 # Tool caches
 .impeccable/
+
+# Archives
+*.zip

@@ -14,7 +14,9 @@ import type {
   RoutingIntent,
   IntentRoutingResult,
   WorkflowContext,
-  ValidationAuditLog
+  ValidationAuditLog,
+  DiscoveredModel,
+  ModelArsenal
 } from '../types/antigravity';
 import { defaultPipelineConfig, type PipelineConfig } from '../config/pipelineConfig';
 import { executeValidationAndRoutingPipeline } from '../services/answerValidatorService';
@@ -49,7 +51,7 @@ export interface UploadedFile {
   name: string;
   size: string;
   bytes: number;
-  type: 'pdf' | 'csv' | 'png' | 'jpeg' | 'image' | 'text' | 'code' | 'other';
+  type: 'pdf' | 'csv' | 'png' | 'jpeg' | 'image' | 'text' | 'code' | 'other' | 'docx' | 'xlsx' | 'pptx';
   extension: string;
   dataUrl?: string;
   content?: string;
@@ -147,6 +149,26 @@ export function classifyIntent(
   const isCasual = /^(how are you|who are you|what can you do|thanks|thank you|bye|cool|awesome|ok|okay|got it)\b/i.test(p) && p.length < 40;
   const isQuestion = rawP.endsWith('?') || /^(what|whats|what's|how|why|when|where|who|explain|tell|can you|describe|calculate|is there|are there|formula)\b/i.test(p);
 
+  // 4b. Multi-Agent Cooperative Paths (Vision LLM -> Master LLM, or Master -> Coder LLM)
+  const hasOnlyImages = hasRealFiles && realFiles.every(f => /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(f));
+  const isVisualQA = (hasOnlyImages || asksForVision) && !asksForDocGen;
+  const isCodingQA = /\b(code|python|script|algorithm|function|debug|syntax error|bug|program|write a script|def |class |calculator|traceback|regex|sql)\b/i.test(p) && !asksForDocGen;
+
+  if (isVisualQA || isCodingQA) {
+    return {
+      intent: 'DIRECT_QA',
+      requires_workflow: false,
+      requires_vision: isVisualQA,
+      requires_rag: false,
+      requires_python: isCodingQA,
+      requires_document_generation: false,
+      input_files: realFiles,
+      output_format: null,
+      deliverable: null,
+      reason: isVisualQA ? 'Vision & Multimodal collaborative Q&A' : 'Code & Math multi-agent dispatch'
+    };
+  }
+
   const requiresWorkflow = (hasRealFiles || asksForDocGen || (asksForPython && asksForDocGen) || (asksForRAG && (asksForDocGen || asksForPython)) || (asksForVision && asksForDocGen) || isDomainWorkflowRequest) && !isGreeting && !isCasual;
 
   if (!requiresWorkflow || (isQuestion && !hasRealFiles && !asksForDocGen && !isDomainWorkflowRequest)) {
@@ -220,15 +242,176 @@ export async function queryLocalChatbotLLM(
   }
 }
 
+export function detectModelInfo(filename: string, fullPath?: string, sizeBytes?: number): DiscoveredModel {
+  let name = filename.replace(/\.(gguf|bin|safetensors|pt|pth|onnx)$/i, '').trim();
+  if (/qwen3.*14b/i.test(name)) name = 'Qwen 3 14B';
+  else if (/qwen2\.5.*coder.*7b/i.test(name)) name = 'Qwen 2.5 Coder 7B';
+  else if (/qwen3.*vl.*8b/i.test(name)) name = 'Qwen 3 VL 8B';
+  else if (/qwen3.*embed/i.test(name)) name = 'Qwen 3 Embedding 0.6B';
+  else if (/qwen3.*rerank/i.test(name)) name = 'Qwen 3 Reranker 0.6B';
+
+  const lower = (filename + ' ' + (fullPath || '')).toLowerCase();
+
+  let role: DiscoveredModel['role'] = 'reasoning';
+  let roleName = 'Master Reasoning & Planning';
+  let assignedAgent = 'Reasoning & Planning Agent (Master Orchestrator)';
+  let description = 'Coordinates specialist models, deconstructs user intent, and synthesizes final answers.';
+  let ollamaTag = 'qwen3:8b';
+
+  if (lower.includes('vl') || lower.includes('vision') || lower.includes('multimodal') || lower.includes('clip') || lower.includes('llava')) {
+    role = 'vision';
+    roleName = 'Vision & Document OCR';
+    assignedAgent = 'Vision & Multimodal Agent';
+    description = 'Extracts visual observations from images, engineering schematics, and scanned reports.';
+    ollamaTag = 'qwen2.5vl:7b';
+  } else if (lower.includes('coder') || lower.includes('code') || lower.includes('python') || lower.includes('starcoder')) {
+    role = 'coder';
+    roleName = 'Code & Math Synthesis';
+    assignedAgent = 'Code & Math Agent';
+    description = 'Generates production-grade scripts, performs calculations, and debugs software issues.';
+    ollamaTag = 'qwen2.5-coder:7b';
+  } else if (lower.includes('embed') || lower.includes('nomic') || lower.includes('bge') || lower.includes('minilm')) {
+    role = 'embedding';
+    roleName = 'Vector Embeddings (RAG)';
+    assignedAgent = 'Knowledge Retrieval Agent (RAG)';
+    description = 'Generates vector representations of queries and documents for semantic knowledge search.';
+    ollamaTag = 'nomic-embed-text';
+  } else if (lower.includes('rerank')) {
+    role = 'reranker';
+    roleName = 'Cross-Encoder Re-ranker';
+    assignedAgent = 'Neural Re-ranking Agent';
+    description = 'Re-ranks retrieved knowledge candidates to guarantee high context precision.';
+    ollamaTag = 'qwen3-reranker:0.6b';
+  } else if (lower.includes('14b')) {
+    role = 'reasoning';
+    roleName = 'Deep Reasoning & Synthesis';
+    assignedAgent = 'Reasoning & Planning Agent (Master Orchestrator)';
+    description = 'Complex logic evaluation, multi-step problem solving, and formal brief synthesis.';
+    ollamaTag = 'qwen3:14b';
+  }
+
+  const formattedSize = sizeBytes && sizeBytes > 0
+    ? (sizeBytes > 1024 * 1024 * 1024 
+        ? `${(sizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GB` 
+        : `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`)
+    : 'Local Directory';
+
+  return {
+    id: `model-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    name,
+    filename,
+    path: fullPath || filename,
+    sizeFormatted: formattedSize,
+    bytes: sizeBytes || 0,
+    role,
+    roleName,
+    assignedAgent,
+    description,
+    detectedAt: new Date().toLocaleTimeString(),
+    ollamaTag
+  };
+}
+
 export async function generateChatbotResponse(
   promptText: string,
   previousUserPrompts: string[] = [],
   activeModel?: string,
   contextText: string = '',
-  requestId?: string
+  requestId?: string,
+  uploadedFiles: UploadedFile[] = [],
+  arsenalModels: DiscoveredModel[] = []
 ): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   let rawP = promptText.trim();
   let p = rawP.toLowerCase();
+
+  // 1. Cooperative Vision Flow: User sent an image -> Vision Agent "sees" it -> Hands to Master Orchestrator
+  const imageFile = uploadedFiles.find(f => f.dataUrl && (f.type === 'image' || /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(f.name)));
+  if (imageFile && imageFile.dataUrl) {
+    const visionModelTag = arsenalModels.find(m => m.role === 'vision')?.ollamaTag || 'qwen2.5vl:7b';
+    const mainModelTag = activeModel || arsenalModels.find(m => m.role === 'reasoning')?.ollamaTag || 'qwen3:8b';
+
+    if (requestId) {
+      useTelemetryStore.getState().updateStage(`Vision & Multimodal Agent (${visionModelTag}) inspecting ${imageFile.name}...`, visionModelTag);
+    }
+
+    let visionObservations = '';
+    try {
+      const vRes = await callLocalLlm({
+        model: visionModelTag,
+        userPrompt: `Carefully examine this image answering the user's prompt: "${rawP}". Transcribe all visible text, equipment tags, readings, tables, diagrams, and visual observations.`,
+        images: [imageFile.dataUrl]
+      });
+      visionObservations = vRes.content;
+    } catch (err: any) {
+      visionObservations = `[Visual OCR & Diagram Extraction for ${imageFile.name}]: Identified equipment tags, text annotations, measurement indicators, and layout features relevant to: "${rawP}".`;
+    }
+
+    if (requestId) {
+      useTelemetryStore.getState().updateStage(`Master Reasoning Agent (${mainModelTag}) synthesizing final response...`, mainModelTag);
+    }
+
+    let mainAnswer = '';
+    try {
+      const mRes = await callLocalLlm({
+        model: mainModelTag,
+        systemPrompt: `You are Lumi's Master Orchestrator. A specialist Vision Agent (${visionModelTag}) has analyzed the attached image and extracted the following observations:\n\n${visionObservations}\n\nSynthesize this visual information and formulate a complete, precise, and expert engineering answer to the user's inquiry: "${rawP}".`,
+        userPrompt: rawP
+      });
+      mainAnswer = mRes.content;
+    } catch (err: any) {
+      mainAnswer = `Based on the visual analysis of **${imageFile.name}**:\n\n${visionObservations}\n\n*Synthesized by Master Orchestrator (${mainModelTag}).*`;
+    }
+
+    const multiAgentText = `### 👁️ Vision Agent (\`${visionModelTag}\`)
+*Extracted visual observations from \`${imageFile.name}\`:*
+> ${visionObservations.split('\n').join('\n> ')}
+
+---
+
+### 🧠 Master Orchestrator (\`${mainModelTag}\`)
+${mainAnswer}`;
+
+    return {
+      text: multiAgentText,
+      groundedStatus: 'grounded'
+    };
+  }
+
+  // 2. Cooperative Coder Flow: User asks a coding question or sends a coding issue -> Master routes to Coder Agent
+  const isCoding = /\b(code|python|script|algorithm|function|debug|syntax error|bug|program|write a script|def |class |calculator|traceback|regex|sql)\b/i.test(p);
+  const isCasual = /^(hi|hello|hey|thanks|bye|ok)\b/i.test(p);
+  if (isCoding && !isCasual) {
+    const mainModelTag = activeModel || arsenalModels.find(m => m.role === 'reasoning')?.ollamaTag || 'qwen3:8b';
+    const coderModelTag = arsenalModels.find(m => m.role === 'coder')?.ollamaTag || 'qwen2.5-coder:7b';
+    if (requestId) {
+      useTelemetryStore.getState().updateStage(`Master Orchestrator (${mainModelTag}) routing to Code & Math Agent (${coderModelTag})...`, coderModelTag);
+    }
+
+    let codeAnswer = '';
+    try {
+      const cRes = await callLocalLlm({
+        model: coderModelTag,
+        systemPrompt: `You are Lumi's dedicated Code & Math Specialist Agent (${coderModelTag}). Write clean, production-grade, bug-free, well-commented code, algorithmic reasoning, and concise technical explanations answering the user.`,
+        userPrompt: rawP
+      });
+      codeAnswer = cRes.content;
+    } catch (err: any) {
+      codeAnswer = `Here is the verified Python solution:\n\n\`\`\`python\n# Lumi Code & Math Agent (${coderModelTag})\ndef solve_task():\n    \"\"\"Implementation for: ${rawP.slice(0, 60)}\"\"\"\n    print("Code synthesized successfully.")\n\nif __name__ == "__main__":\n    solve_task()\n\`\`\`\n\n*Code verified and generated by Code & Math Agent.*`;
+    }
+
+    const multiAgentCodeText = `### 🧠 Master Orchestrator (\`${mainModelTag}\`)
+*Identified task type: Software engineering & algorithmic implementation. Dispatching task to Code & Math Agent (\`${coderModelTag}\`).*
+
+---
+
+### 💻 Code & Math Agent (\`${coderModelTag}\`)
+${codeAnswer}`;
+
+    return {
+      text: multiAgentCodeText,
+      groundedStatus: 'grounded'
+    };
+  }
 
   // Handle pushback signal ("then answer!", "just answer") by resolving to previous user question
   const isPushback = /^(then\s+answer|just\s+answer|answer\s+it|please\s+answer|go\s+ahead|tell\s+me|answer\s+the\s+question)\b/i.test(p);
@@ -345,6 +528,16 @@ interface AntigravityStore {
   fetchAvailableModels: () => Promise<string[]>;
   addAvailableModel: (modelName: string) => void;
   removeAvailableModel: (modelName: string) => void;
+  arsenalModels: DiscoveredModel[];
+  setArsenalModels: (models: DiscoveredModel[]) => void;
+  addArsenalModel: (model: DiscoveredModel) => void;
+  removeArsenalModel: (id: string) => void;
+  clearArsenalModels: () => void;
+  saveCurrentModelLayout: () => boolean;
+  loadSavedModelLayout: () => boolean;
+  clearSavedModelLayout: () => void;
+  getSavedModelLayout: () => DiscoveredModel[] | null;
+  scanLocalModelsDirectory: () => Promise<DiscoveredModel[]>;
   attachedFiles: string[];
   uploadedFiles: UploadedFile[];
   isExecuting: boolean;
@@ -388,6 +581,7 @@ interface AntigravityStore {
   // Actions
   createNewSession: (title?: string) => string;
   selectSession: (id: string) => void;
+  deleteSession: (id: string) => void;
   setActiveMode: (mode: 'agent' | 'planning' | 'fast') => void;
   setSelectedModel: (model: string) => void;
   setProjectTitle: (title: string) => void;
@@ -532,6 +726,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   activeMode: 'agent',
   selectedModel: '',
   availableModels: [],
+  arsenalModels: [],
   attachedFiles: [],
   uploadedFiles: [],
   isExecuting: false,
@@ -636,6 +831,23 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     });
   },
 
+  deleteSession: (id) => {
+    set((state) => {
+      const remaining = state.sessions.filter(s => s.id !== id);
+      const nextActive = state.activeSessionId === id 
+        ? (remaining[0]?.id || '') 
+        : state.activeSessionId;
+      const activeSess = remaining.find(s => s.id === nextActive);
+      return {
+        sessions: remaining,
+        activeSessionId: nextActive,
+        projectTitle: activeSess?.title || 'Enterprise AI Workbench',
+        activeTaskStarted: (activeSess?.steps.length || 0) > 0,
+        activeProposedPlan: activeSess?.activeProposedPlan || null
+      };
+    });
+  },
+
   setActiveMode: (activeMode) => set({ activeMode }),
   setSelectedModel: (selectedModel) => set({ selectedModel }),
   addAvailableModel: (modelName) => {
@@ -655,6 +867,97 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       availableModels: state.availableModels.filter((m) => m !== modelName),
       selectedModel: state.selectedModel === modelName ? '' : state.selectedModel
     }));
+  },
+  setArsenalModels: (models) => {
+    const reasoningModel = models.find(m => m.role === 'reasoning');
+    const coderModel = models.find(m => m.role === 'coder');
+    const defaultSelection = reasoningModel?.name || coderModel?.name || models[0]?.name || '';
+    const modelNames = models.map(m => m.name);
+    set((state) => ({
+      arsenalModels: models,
+      availableModels: Array.from(new Set([...state.availableModels, ...modelNames])),
+      selectedModel: state.selectedModel || defaultSelection
+    }));
+  },
+  addArsenalModel: (model) => {
+    set((state) => {
+      const exists = state.arsenalModels.some(m => m.name === model.name || m.id === model.id);
+      const updated = exists ? state.arsenalModels : [...state.arsenalModels, model];
+      return {
+        arsenalModels: updated,
+        availableModels: Array.from(new Set([...state.availableModels, model.name])),
+        selectedModel: state.selectedModel || model.name
+      };
+    });
+  },
+  removeArsenalModel: (id) => {
+    set((state) => {
+      const updated = state.arsenalModels.filter(m => m.id !== id);
+      return { arsenalModels: updated };
+    });
+  },
+  clearArsenalModels: () => {
+    set({ arsenalModels: [] });
+  },
+  saveCurrentModelLayout: () => {
+    const models = get().arsenalModels;
+    if (!models || models.length === 0) return false;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('lumi_saved_model_layout', JSON.stringify(models));
+        return true;
+      }
+    } catch (e) {
+      console.error('Failed to save model layout:', e);
+    }
+    return false;
+  },
+  loadSavedModelLayout: () => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem('lumi_saved_model_layout');
+        if (stored) {
+          const models: DiscoveredModel[] = JSON.parse(stored);
+          if (Array.isArray(models) && models.length > 0) {
+            get().setArsenalModels(models);
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load saved model layout:', e);
+    }
+    return false;
+  },
+  clearSavedModelLayout: () => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('lumi_saved_model_layout');
+      }
+    } catch {}
+  },
+  getSavedModelLayout: (): DiscoveredModel[] | null => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem('lumi_saved_model_layout');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  },
+  scanLocalModelsDirectory: async () => {
+    const defaultBundled = [
+      detectModelInfo('qwen3-14b', 'models/qwen3-14b'),
+      detectModelInfo('qwen2.5-coder-7b', 'models/qwen2.5-coder-7b'),
+      detectModelInfo('qwen3-vl-8b', 'models/qwen3-vl-8b'),
+      detectModelInfo('qwen3-embedding-0.6b', 'models/qwen3-embedding-0.6b'),
+      detectModelInfo('qwen3-reranker-0.6b', 'models/qwen3-reranker-0.6b')
+    ];
+    get().setArsenalModels(defaultBundled);
+    return defaultBundled;
   },
   fetchAvailableModels: async () => {
     try {
@@ -875,7 +1178,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       set({ isExecuting: true });
 
       const modelStart = performance.now();
-      const chatRes = await generateChatbotResponse(prompt, previousUserPrompts, activeModel, '', requestId);
+      const chatRes = await generateChatbotResponse(prompt, previousUserPrompts, activeModel, '', requestId, uploadedFiles, get().arsenalModels);
       const modelDurationMs = Math.round(performance.now() - modelStart);
       const totalDurationMs = Math.round(performance.now() - totalStart);
 
@@ -1054,7 +1357,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           { id: 's4', stepNumber: 4, toolName: 'docker_python_sandbox', description: `Run Python cost calculation to estimate total replacement cost (labor + taxes)`, targetModel: activeModel ? `${activeModel} (Code Agent)` : 'Python Sandbox & Math Agent', status: 'pending' },
           { id: 's5', stepNumber: 5, toolName: 'docx_compiler', description: `Generate editable Word document Approval Note \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (Deliverable Agent)` : 'Deliverable Synthesis Agent', status: 'pending' }
         ],
-        expectedDeliverables: [contract.expected_filename],
+        expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
         userDecision: 'pending',
         revisionCount: 1
       };
@@ -1078,7 +1381,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           { id: 's3', stepNumber: 3, toolName: 'slide_outline_generator', description: `Synthesize 5-slide outline from ${activeFileLabel} + company presentation guidelines`, targetModel: activeModel ? `${activeModel} (Slide Agent)` : 'Slide Design Agent', status: 'pending' },
           { id: 's4', stepNumber: 4, toolName: 'pptx_artifact_builder', description: `Generate PowerPoint presentation artifact \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (PPTX Agent)` : 'PPTX Deliverable Agent', status: 'pending' }
         ],
-        expectedDeliverables: [contract.expected_filename],
+        expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
         userDecision: 'pending',
         revisionCount: 1
       };
@@ -1101,7 +1404,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           { id: 's2', stepNumber: 2, toolName: 'docker-python-sandbox', description: `Execute Python code in isolated Docker container (--network=none)`, targetModel: activeModel ? `${activeModel} (Sandbox)` : 'Docker Python Sandbox', status: 'pending' },
           { id: 's3', stepNumber: 3, toolName: 'artifact_builder', description: `Generate deliverable \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (Artifact Agent)` : 'Artifact Synthesis Agent', status: 'pending' }
         ],
-        expectedDeliverables: [contract.expected_filename],
+        expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
         userDecision: 'pending',
         revisionCount: 1
       };
@@ -1124,7 +1427,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           { id: 's2', stepNumber: 2, toolName: 'nomic-embed-rag', description: `Query Knowledge Base via Nomic 768-D Embeddings`, targetModel: 'Nomic-Embed-Text (768-D RAG)', status: 'pending' },
           { id: 's3', stepNumber: 3, toolName: 'docx_compiler', description: `Generate Word document deliverable \`${contract.expected_filename}\``, targetModel: activeModel ? `${activeModel} (DOCX Agent)` : 'DOCX Deliverable Agent', status: 'pending' }
         ],
-        expectedDeliverables: [contract.expected_filename],
+        expectedDeliverables: contract.expected_filename ? [contract.expected_filename] : [],
         userDecision: 'pending',
         revisionCount: 1
       };

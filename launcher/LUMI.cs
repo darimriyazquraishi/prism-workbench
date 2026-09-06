@@ -17,7 +17,7 @@ namespace LUMI.Desktop
         private HttpListener _listener;
         private readonly string _baseDir;
         private readonly string _distDir;
-        private readonly int _port;
+        private int _port;
         private volatile bool _isRunning;
 
         private static readonly Dictionary<string, string> MimeTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -51,22 +51,43 @@ namespace LUMI.Desktop
             { ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
         };
 
-        public HttpServer(string baseDir, int port)
+        public HttpServer(string baseDir)
         {
             _baseDir = baseDir;
-            _distDir = Path.Combine(baseDir, "dist");
-            _port = port;
+            if (File.Exists(Path.Combine(baseDir, "dist", "client", "index.html")))
+            {
+                _distDir = Path.Combine(baseDir, "dist", "client");
+            }
+            else
+            {
+                _distDir = Path.Combine(baseDir, "dist");
+            }
         }
 
-        public void Start()
-        {
-            _isRunning = true;
-            _listener = new HttpListener();
-            _listener.Prefixes.Add(string.Format("http://127.0.0.1:{0}/", _port));
-            _listener.Prefixes.Add(string.Format("http://localhost:{0}/", _port));
-            _listener.Start();
+        public int Port { get { return _port; } }
 
-            ThreadPool.QueueUserWorkItem(ListenLoop);
+        public bool Start(int preferredPort)
+        {
+            for (int p = preferredPort; p < preferredPort + 50; p++)
+            {
+                try
+                {
+                    _listener = new HttpListener();
+                    _listener.Prefixes.Add(string.Format("http://127.0.0.1:{0}/", p));
+                    _listener.Start();
+
+                    _port = p;
+                    _isRunning = true;
+                    ThreadPool.QueueUserWorkItem(ListenLoop);
+                    return true;
+                }
+                catch
+                {
+                    try { if (_listener != null) _listener.Close(); } catch { }
+                    _listener = null;
+                }
+            }
+            return false;
         }
 
         private void ListenLoop(object state)
@@ -342,14 +363,20 @@ namespace LUMI.Desktop
             this.BackColor = Color.FromArgb(25, 26, 26); // Perplexity #191A1A matte dark
 
             // Load custom application icon
-            string iconPath = Path.Combine(baseDir, "public", "favicon.ico");
-            if (!File.Exists(iconPath))
+            try
             {
-                iconPath = Path.Combine(baseDir, "dist", "favicon.ico");
+                this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             }
-            if (File.Exists(iconPath))
+            catch
             {
-                try { this.Icon = new Icon(iconPath); } catch { }
+                string iconPath = Path.Combine(baseDir, "launcher", "app.ico");
+                if (!File.Exists(iconPath)) iconPath = Path.Combine(baseDir, "app.ico");
+                if (!File.Exists(iconPath)) iconPath = Path.Combine(baseDir, "public", "favicon.ico");
+                if (!File.Exists(iconPath)) iconPath = Path.Combine(baseDir, "dist", "favicon.ico");
+                if (File.Exists(iconPath))
+                {
+                    try { this.Icon = new Icon(iconPath); } catch { }
+                }
             }
 
             // 2. Embedded Native WebView2 Control
@@ -371,11 +398,20 @@ namespace LUMI.Desktop
                     var env = await CoreWebView2Environment.CreateAsync(null, userDataDir);
                     await _webView.EnsureCoreWebView2Async(env);
 
-                    // Customize WebView2 for clean desktop software look
                     _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
                     _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
                     _webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
                     _webView.CoreWebView2.Settings.IsZoomControlEnabled = true;
+
+                    // Prevent external browser popups; keep all navigation within the native window
+                    _webView.CoreWebView2.NewWindowRequested += (s2, e2) =>
+                    {
+                        e2.Handled = true;
+                        if (!string.IsNullOrEmpty(e2.Uri))
+                        {
+                            _webView.CoreWebView2.Navigate(e2.Uri);
+                        }
+                    };
 
                     // Navigate to local offline application
                     _webView.CoreWebView2.Navigate(string.Format("http://127.0.0.1:{0}/", _port));
@@ -502,10 +538,19 @@ namespace LUMI.Desktop
 
             // Verify dist directory exists
             string distPath = Path.Combine(_baseDir, "dist");
-            if (!Directory.Exists(distPath) || !File.Exists(Path.Combine(distPath, "index.html")))
+            if (File.Exists(Path.Combine(distPath, "client", "index.html")))
+            {
+                distPath = Path.Combine(distPath, "client");
+            }
+            else if (!Directory.Exists(distPath) || !File.Exists(Path.Combine(distPath, "index.html")))
             {
                 string parentDist = Path.Combine(Directory.GetParent(_baseDir).FullName, "dist");
-                if (Directory.Exists(parentDist))
+                if (File.Exists(Path.Combine(parentDist, "client", "index.html")))
+                {
+                    _baseDir = Directory.GetParent(_baseDir).FullName;
+                    distPath = Path.Combine(parentDist, "client");
+                }
+                else if (Directory.Exists(parentDist) && File.Exists(Path.Combine(parentDist, "index.html")))
                 {
                     _baseDir = Directory.GetParent(_baseDir).FullName;
                     distPath = parentDist;
@@ -521,31 +566,26 @@ namespace LUMI.Desktop
                 }
             }
 
-            // Find available port starting from _port
-            _port = FindAvailablePort(_port);
+            // Start HTTP server with dynamic port fallback
+            _server = new HttpServer(_baseDir);
+            if (!_server.Start(_port))
+            {
+                MessageBox.Show(
+                    string.Format("Failed to start local offline server on ports {0} through {1}.\n\nPlease ensure no security software is blocking loopback listeners.", _port, _port + 50),
+                    "LUMI — Server Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                return;
+            }
+
+            _port = _server.Port;
 
             if (showConsole)
             {
                 Console.WriteLine(string.Format("Serving files from: {0}", distPath));
                 Console.WriteLine(string.Format("Local HTTP URL:     http://127.0.0.1:{0}/", _port));
                 Console.WriteLine("Starting embedded offline server...");
-            }
-
-            // Start HTTP server
-            _server = new HttpServer(_baseDir, _port);
-            try
-            {
-                _server.Start();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    string.Format("Failed to start local server on port {0}:\n\n{1}", _port, ex.Message),
-                    "LUMI — Server Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-                return;
             }
 
             // Launch Native Desktop Window
@@ -564,22 +604,6 @@ namespace LUMI.Desktop
             {
                 _server.Stop();
             }
-        }
-
-        private static int FindAvailablePort(int startingPort)
-        {
-            for (int p = startingPort; p < startingPort + 50; p++)
-            {
-                try
-                {
-                    TcpListener l = new TcpListener(IPAddress.Loopback, p);
-                    l.Start();
-                    l.Stop();
-                    return p;
-                }
-                catch { }
-            }
-            return startingPort;
         }
     }
 }

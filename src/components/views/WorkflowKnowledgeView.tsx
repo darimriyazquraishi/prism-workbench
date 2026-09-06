@@ -200,94 +200,113 @@ export const WorkflowKnowledgeView: React.FC = () => {
       />
 
       {/* Page Header */}
-      <div className="space-y-1">
-        <h1 className="text-lg font-bold text-[var(--text-primary)] tracking-tight font-sans">
-          KNOWLEDGE BASE
-        </h1>
-        <p className="text-xs text-[var(--text-secondary)]">
-          Upload and manage documents used by the local system.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
+        <div className="space-y-1">
+          <h1 className="text-lg font-bold text-[var(--text-primary)] tracking-tight font-sans flex items-center gap-2.5">
+            <FolderOpen className="w-5 h-5 text-white" />
+            <span>KNOWLEDGE BASE</span>
+          </h1>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Upload and manage documents used by the local offline system.
+          </p>
+        </div>
+
+        {/* Top Right: Upload Button when documents already exist */}
+        {files.length > 0 && (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="px-3.5 py-1.5 bg-white hover:bg-zinc-200 text-black font-semibold rounded-lg text-xs transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+          >
+            <Upload className="w-3.5 h-3.5 text-black" />
+            <span>{isUploading ? 'Uploading...' : 'Upload Files'}</span>
+          </button>
+        )}
       </div>
 
-      {/* Upload Button & Dropzone */}
-      <div className="space-y-3">
+      {/* Notifications */}
+      {successMessage && (
+        <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs font-mono flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span>{successMessage}</span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs font-mono flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* Main Body: Single Clean Empty State OR Document Grid */}
+      {isLoading ? (
+        <div className="p-12 text-center text-[var(--text-secondary)] font-mono text-xs">
+          Loading persisted documents from disk...
+        </div>
+      ) : files.length === 0 ? (
+        /* SINGLE CLEAN EMPTY STATE */
         <div 
-          onClick={() => fileInputRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
             handleFileUpload(e.dataTransfer.files);
           }}
-          className="border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--accent-primary)] rounded-xl p-6 bg-[var(--bg-surface)] text-center cursor-pointer transition-colors space-y-3 group"
+          className="border-2 border-dashed border-[var(--border-subtle)] rounded-xl p-12 bg-[var(--bg-surface)] text-center transition-all space-y-4"
         >
-          <div className="w-12 h-12 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center mx-auto text-[var(--accent-primary)] group-hover:scale-105 transition-transform">
-            <Upload className="w-6 h-6" />
+          <div className="w-14 h-14 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center mx-auto text-zinc-300 shadow-sm">
+            <FolderOpen className="w-7 h-7" />
           </div>
-          <div className="space-y-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                fileInputRef.current?.click();
-              }}
-              disabled={isUploading}
-              className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90 text-white font-semibold rounded-lg text-xs transition-colors inline-flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>{isUploading ? 'Uploading & Saving to Disk...' : '+ Upload Files'}</span>
-            </button>
-            <p className="text-[11px] text-[var(--text-tertiary)] pt-1">
-              Drag &amp; drop files here, or click to browse. Files are saved persistently to local disk storage.
+
+          <div className="space-y-1.5 max-w-md mx-auto">
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">
+              No Documents in Knowledge Base
+            </h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Upload engineering documents, manuals, and specifications to enable offline retrieval and reasoning.
             </p>
           </div>
+
+          <div className="pt-2 flex justify-center">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="px-5 py-2.5 bg-white hover:bg-zinc-200 text-black font-semibold rounded-lg text-xs transition-colors inline-flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+            >
+              <Upload className="w-4 h-4 text-black" />
+              <span>{isUploading ? 'Uploading & Saving to Disk...' : 'Upload Documents'}</span>
+            </button>
+          </div>
+
+          <p className="text-[11px] text-[var(--text-tertiary)] pt-2">
+            Supports PDF, DOCX, XLSX, CSV, TXT, Markdown, Code &amp; Images. Saved persistently to local disk.
+          </p>
         </div>
-
-        {/* Notifications */}
-        {successMessage && (
-          <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs font-mono flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-            <span>{successMessage}</span>
+      ) : (
+        /* POPULATED DOCUMENT GRID */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-mono font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+              STORED DOCUMENTS ({files.length})
+            </h2>
           </div>
-        )}
 
-        {errorMessage && (
-          <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs font-mono flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-      </div>
-
-      <hr className="border-[var(--border-subtle)] my-2" />
-
-      {/* PREVIOUSLY UPLOADED FILES SECTION */}
-      <div className="space-y-4">
-        <h2 className="text-xs font-mono font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-          PREVIOUSLY UPLOADED FILES {files.length > 0 && `(${files.length})`}
-        </h2>
-
-        {isLoading ? (
-          <div className="p-8 text-center text-[var(--text-secondary)] font-mono text-xs">
-            Loading persisted documents from disk...
-          </div>
-        ) : files.length === 0 ? (
-          <div className="p-8 border border-[var(--border-subtle)] rounded-xl bg-[var(--bg-surface)] text-center text-[var(--text-secondary)] font-mono text-xs">
-            No files uploaded yet.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {files.map((file) => (
               <div 
                 key={file.id || file.filename}
-                className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 flex items-center justify-between gap-3 shadow-sm hover:border-[var(--border-subtle)] transition-colors"
+                className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm hover:border-zinc-500 transition-colors"
               >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  {getFileIcon(file.filename)}
-                  <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex-shrink-0">
+                    {getFileIcon(file.filename)}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
                     <div className="font-bold text-xs text-[var(--text-primary)] truncate font-mono" title={file.name}>
                       {file.name}
                     </div>
-                    <div className="text-[11px] text-[var(--text-secondary)] font-mono flex items-center gap-2">
-                      <span>Uploaded: {file.formattedDate || 'Saved'}</span>
+                    <div className="text-[10px] text-[var(--text-secondary)] font-mono flex items-center gap-2">
+                      <span>{file.formattedDate || 'Saved'}</span>
                       {file.sizeBytes > 0 && (
                         <>
                           <span>•</span>
@@ -298,20 +317,20 @@ export const WorkflowKnowledgeView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
                   <a
                     href={`/api/kb/view/${encodeURIComponent(file.filename)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg text-[11px] font-medium text-[var(--text-primary)] flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 bg-[var(--bg-elevated)] hover:bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-md text-[11px] font-medium text-[var(--text-primary)] flex items-center gap-1.5 transition-colors cursor-pointer"
                     title="Open / View File"
                   >
-                    <ExternalLink className="w-3 h-3 text-[var(--accent-primary)]" />
+                    <ExternalLink className="w-3 h-3 text-zinc-300" />
                     <span>Open</span>
                   </a>
                   <button
                     onClick={() => setFileToDelete(file)}
-                    className="px-2.5 py-1.5 bg-[var(--bg-elevated)] hover:bg-rose-950/40 border border-[var(--border-subtle)] hover:border-rose-800/60 rounded-lg text-[11px] font-medium text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 bg-[var(--bg-elevated)] hover:bg-rose-950/40 border border-[var(--border-subtle)] hover:border-rose-800/60 rounded-md text-[11px] font-medium text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
                     title="Delete File"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -321,8 +340,8 @@ export const WorkflowKnowledgeView: React.FC = () => {
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {fileToDelete && (

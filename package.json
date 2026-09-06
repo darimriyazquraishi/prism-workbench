@@ -8,12 +8,13 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "build:exe": "npm run build && C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /nologo /target:winexe /optimize+ /out:LUMI.exe /win32icon:public\\favicon.ico /r:System.dll,System.Drawing.dll,System.Windows.Forms.dll,System.Core.dll,Microsoft.Web.WebView2.WinForms.dll,Microsoft.Web.WebView2.Core.dll launcher\\LUMI.cs && copy /Y LUMI.exe PrismWorkbench.exe",
+    "build:exe": "npm run build && C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /nologo /target:winexe /optimize+ /out:LUMI.exe /win32icon:launcher\\app.ico /r:System.dll,System.Drawing.dll,System.Windows.Forms.dll,System.Core.dll,Microsoft.Web.WebView2.WinForms.dll,Microsoft.Web.WebView2.Core.dll launcher\\LUMI.cs",
     "package": "powershell -ExecutionPolicy Bypass -File scripts/package_dist.ps1",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/node": "^11.1.5",
     "@astrojs/react": "^6.0.5",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",

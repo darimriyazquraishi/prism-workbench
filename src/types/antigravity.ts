@@ -302,3 +302,29 @@ export interface AntigravitySession {
   activeProposedPlan?: ProposedExecutionPlan;
 }
 
+export type ModelRole = 'reasoning' | 'vision' | 'coder' | 'embedding' | 'reranker';
+
+export interface DiscoveredModel {
+  id: string;
+  name: string;
+  filename: string;
+  path: string;
+  sizeFormatted: string;
+  bytes: number;
+  role: ModelRole;
+  roleName: string;
+  assignedAgent: string;
+  description: string;
+  detectedAt: string;
+  ollamaTag: string;
+}
+
+export interface ModelArsenal {
+  reasoningModel?: DiscoveredModel;
+  visionModel?: DiscoveredModel;
+  coderModel?: DiscoveredModel;
+  embeddingModel?: DiscoveredModel;
+  rerankerModel?: DiscoveredModel;
+  allModels: DiscoveredModel[];
+}
+

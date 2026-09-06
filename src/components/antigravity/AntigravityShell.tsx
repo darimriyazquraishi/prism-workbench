@@ -17,7 +17,9 @@ import {
   ChevronDown,
   Play,
   Bell,
-  Settings
+  Settings,
+  MessageSquare,
+  Trash2
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 
@@ -39,7 +41,8 @@ export const AntigravityShell: React.FC = () => {
     sessions,
     activeSessionId,
     createNewSession,
-    selectSession
+    selectSession,
+    deleteSession
   } = useAntigravityStore();
 
   return (
@@ -107,36 +110,57 @@ export const AntigravityShell: React.FC = () => {
               </button>
             </div>
 
-            {/* Recent Sessions List */}
-            {activeScreen === 'workspace' && (
-              <div className="pt-2">
-                <div className="px-3 pb-2 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1">
-                  <ChevronDown className="w-3 h-3" />
-                  Recent Chat Threads
-                </div>
-                <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
-                  {sessions.map((sess) => (
+            {/* Recent Sessions List - ALWAYS VISIBLE ACROSS ALL VIEWS */}
+            <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1.5">
+              <div className="px-3 pb-1 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider flex items-center justify-between">
+                <span>Recent Chats</span>
+                <span className="text-[9px] font-mono text-[var(--text-tertiary)]">{sessions.length}</span>
+              </div>
+              <div className="space-y-0.5 max-h-[360px] overflow-y-auto pr-1">
+                {sessions.length === 0 ? (
+                  <div className="px-3 py-3 text-[11px] text-[var(--text-tertiary)] italic border border-dashed border-[var(--border-subtle)] rounded-lg text-center">
+                    No active chats. Click + New Chat to begin.
+                  </div>
+                ) : (
+                  sessions.map((sess) => (
                     <div
                       key={sess.id}
                       onClick={() => {
                         setActiveScreen('workspace');
                         selectSession(sess.id);
                       }}
-                      className={`px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-colors flex items-center justify-between ${
-                        sess.id === activeSessionId
+                      className={`group px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                        sess.id === activeSessionId && activeScreen === 'workspace'
                           ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] font-semibold border border-[var(--border-subtle)]'
                           : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                       }`}
                     >
-                      <span className="truncate pr-2">{sess.title || 'Untitled Thread'}</span>
-                      <span className="text-[9px] font-mono text-[var(--text-tertiary)] flex-shrink-0">
-                        {sess.steps.length} msgs
-                      </span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+                        <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+                        <span className="truncate text-xs">{sess.title || 'Untitled Chat'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-[9px] font-mono text-[var(--text-tertiary)] group-hover:hidden">
+                          {sess.steps.length} msgs
+                        </span>
+                        {sessions.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteSession(sess.id);
+                            }}
+                            title="Delete chat"
+                            className="hidden group-hover:flex p-1 rounded hover:bg-rose-950/40 text-[var(--text-tertiary)] hover:text-rose-400 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  ))
+                )}
               </div>
-            )}
+            </div>
 
 
           </div>

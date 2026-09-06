@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import os from 'os';
 import { execSync } from 'child_process';
 
+export const prerender = false;
+
 let lastCpuMeasure = getCpuTimes();
 
 function getCpuTimes() {

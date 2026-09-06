@@ -106,47 +106,8 @@ export const AntigravityHeader: React.FC = () => {
         </div>
       </div>
 
-      {/* Right: Status Cluster + Actions */}
+      {/* Right: Actions (Settings icon & Pane Toggle only) */}
       <div className="flex items-center gap-2">
-        {/* Status Cluster Pill */}
-        <div className="hidden md:flex items-center gap-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-full px-2.5 py-1 text-[11px] font-sans">
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="bg-transparent border-none text-[var(--text-secondary)] focus:outline-none cursor-pointer hover:text-[var(--text-primary)] transition-colors max-w-[140px] truncate font-mono text-[11px]"
-          >
-            <option value="" className="bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
-              {availableModels.length === 0 ? 'No models selected' : 'No model selected'}
-            </option>
-            {availableModels.map((m) => (
-              <option key={m} value={m} className="bg-[var(--bg-elevated)] text-[var(--text-primary)]">
-                {m}
-              </option>
-            ))}
-          </select>
-          <div className="w-1 h-1 rounded-full bg-[var(--border-subtle)]"></div>
-          <button
-            onClick={() => setServerHealthModalOpen(true)}
-            title={isServerOnline ? "Local Ollama engine connected (Click for health metrics)" : "Local engine offline (Click for configuration)"}
-            className="flex items-center gap-1.5 font-medium cursor-pointer hover:opacity-80 transition-opacity text-[var(--text-primary)]"
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${isServerOnline ? 'bg-[var(--accent-success)] shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></span>
-            <span>{isServerOnline ? 'Local' : 'Offline'}</span>
-          </button>
-        </div>
-
-        <div className="h-4 w-[1px] bg-[var(--border-subtle)] mx-1 hidden sm:block"></div>
-
-        {/* Command Palette Trigger */}
-        <button
-          onClick={() => setCommandPaletteOpen(true)}
-          title="Open Command Palette (Ctrl+K)"
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] text-xs font-mono transition-colors cursor-pointer"
-        >
-          <Command className="w-3.5 h-3.5" />
-          <span>K</span>
-        </button>
-
         {/* Settings Modal Trigger */}
         <button
           onClick={() => setSettingsModalOpen(true)}
