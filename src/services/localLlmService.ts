@@ -136,7 +136,7 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
     if (err.name === 'AbortError') {
       throw new Error(`Local model execution timed out after ${options.images && options.images.length > 0 ? 120 : 90} seconds on model '${modelTag}'. Please ensure Ollama server is responsive.`);
     }
-    if (err.message && err.message.includes('fetch failed')) {
+    if (err.message && (err.message.toLowerCase().includes('fetch') || err.name === 'TypeError')) {
       throw new Error(
         `Local LLM engine (${modelTag}) is unreachable at ${OLLAMA_BASE}. Please ensure Ollama is running ('ollama serve') and model '${modelTag}' is installed.`
       );

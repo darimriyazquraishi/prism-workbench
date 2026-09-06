@@ -566,6 +566,9 @@ namespace LUMI.Desktop
                 }
             }
 
+            // Automatically ensure local Ollama inference service is active
+            EnsureOllamaRunning(showConsole);
+
             // Start HTTP server with dynamic port fallback
             _server = new HttpServer(_baseDir);
             if (!_server.Start(_port))
@@ -603,6 +606,52 @@ namespace LUMI.Desktop
             if (_server != null)
             {
                 _server.Stop();
+            }
+        }
+
+        private static void EnsureOllamaRunning(bool showConsole)
+        {
+            try
+            {
+                using (var client = new TcpClient())
+                {
+                    var result = client.BeginConnect("127.0.0.1", 11434, null, null);
+                    bool success = result.AsyncWaitHandle.WaitOne(600);
+                    if (success && client.Connected)
+                    {
+                        client.EndConnect(result);
+                        if (showConsole)
+                        {
+                            Console.WriteLine("Ollama inference engine is active on 127.0.0.1:11434.");
+                        }
+                        return;
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (showConsole)
+                {
+                    Console.WriteLine("Starting local Ollama inference service in background...");
+                }
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "ollama",
+                    Arguments = "serve",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                if (showConsole)
+                {
+                    Console.WriteLine("Could not automatically spawn ollama serve: " + ex.Message);
+                }
             }
         }
     }
