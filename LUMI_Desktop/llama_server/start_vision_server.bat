@@ -27,4 +27,4 @@ echo Starting llama-server with multimodal vision projector...
 echo Model:   !MODEL_PATH!
 echo Projector: !MMPROJ_PATH!
 
-llama-server.exe -m "!MODEL_PATH!" --mmproj "!MMPROJ_PATH!" --port 8080 -ngl 99 -c 4096
+"%~dp0llama-server.exe" -m "!MODEL_PATH!" --mmproj "!MMPROJ_PATH!" --port 8080 --host 127.0.0.1 -ngl 99 -c 4096

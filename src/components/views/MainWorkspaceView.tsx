@@ -21,7 +21,8 @@ import {
   Calculator,
   BookOpen,
   FileCode,
-  User
+  User,
+  Zap
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 import { PlanApprovalCard } from '../agent/PlanApprovalCard';
@@ -91,7 +92,9 @@ export const MainWorkspaceView: React.FC = () => {
     toggleComputerAccess,
     setNetworkModalOpen,
     isExecuting,
-    selectedModel
+    selectedModel,
+    isThinkHarderMode,
+    toggleThinkHarderMode
   } = useAntigravityStore();
 
   const [promptText, setPromptText] = useState('');
@@ -281,6 +284,21 @@ export const MainWorkspaceView: React.FC = () => {
                     >
                       <Plus className="w-4 h-4" />
                       Attach
+                    </button>
+
+                    {/* Think Harder Mode Toggle */}
+                    <button 
+                      type="button"
+                      onClick={toggleThinkHarderMode}
+                      title="Think Harder: Maximum local compute power, 32k context & deep multi-perspective chain of thought"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                        isThinkHarderMode 
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold shadow-md shadow-amber-500/20 hover:opacity-95' 
+                          : 'hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent hover:border-[var(--border-subtle)]'
+                      }`}
+                    >
+                      <Zap className={`w-3.5 h-3.5 ${isThinkHarderMode ? 'fill-black' : 'text-amber-400'}`} />
+                      <span>{isThinkHarderMode ? 'Think Harder ON' : 'Think Harder'}</span>
                     </button>
 
                     <button 
@@ -560,7 +578,7 @@ export const MainWorkspaceView: React.FC = () => {
                       }}
                     />
                     <div className="flex items-center justify-between mt-1 pt-1 border-t border-[var(--border-subtle)]/50">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <button 
                           onClick={() => fileInputRef.current?.click()}
                           title="Attach Document" 
@@ -568,6 +586,21 @@ export const MainWorkspaceView: React.FC = () => {
                         >
                           <Plus className="w-4 h-4" />
                           Attach
+                        </button>
+
+                        {/* Think Harder Mode Toggle */}
+                        <button 
+                          type="button"
+                          onClick={toggleThinkHarderMode}
+                          title="Think Harder: Maximum local compute power, 32k context & deep multi-perspective chain of thought"
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                            isThinkHarderMode 
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold shadow-md shadow-amber-500/20 hover:opacity-95' 
+                              : 'hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent hover:border-[var(--border-subtle)]'
+                          }`}
+                        >
+                          <Zap className={`w-3.5 h-3.5 ${isThinkHarderMode ? 'fill-black' : 'text-amber-400'}`} />
+                          <span>{isThinkHarderMode ? 'Think Harder ON' : 'Think Harder'}</span>
                         </button>
                       </div>
                       <div className="flex items-center gap-2">

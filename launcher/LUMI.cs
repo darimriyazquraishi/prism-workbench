@@ -129,7 +129,14 @@ namespace LUMI.Desktop
                 string rawPath = request.Url.AbsolutePath;
                 string urlPath = Uri.UnescapeDataString(rawPath);
 
-                // 1. Check if it's an API request to forward to Python backend (if running on port 8000)
+                // 1. Launcher Control Endpoints
+                if (urlPath.StartsWith("/api/launcher/", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleLauncherApi(context, urlPath);
+                    return;
+                }
+
+                // 2. Check if it's an API request to forward to Python backend (if running on port 8000)
                 if (urlPath.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
                 {
                     if (TryProxyToBackend(context, urlPath))
@@ -323,6 +330,81 @@ namespace LUMI.Desktop
             {
                 output.Write(buffer, 0, read);
             }
+        }
+
+        private void HandleLauncherApi(HttpListenerContext context, string urlPath)
+        {
+            var response = context.Response;
+            response.ContentType = "application/json; charset=utf-8";
+
+            if (urlPath.Equals("/api/launcher/status", StringComparison.OrdinalIgnoreCase))
+            {
+                bool ollamaActive = IsPortListening(11434);
+                bool visionActive = IsPortListening(8080);
+                string json = string.Format("{{\"ollama\":{0},\"visionServer\":{1},\"port\":{2}}}",
+                    ollamaActive ? "true" : "false",
+                    visionActive ? "true" : "false",
+                    _port);
+                byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
+                response.StatusCode = 200;
+                response.OutputStream.Write(b, 0, b.Length);
+                response.Close();
+                return;
+            }
+
+            if (urlPath.Equals("/api/launcher/start-vision", StringComparison.OrdinalIgnoreCase))
+            {
+                bool started = Program.StartVisionServer();
+                string json = string.Format("{{\"success\":{0},\"message\":\"{1}\"}}",
+                    started ? "true" : "false",
+                    started ? "Vision engine initializing on port 8080" : "Could not locate vision model files or binary");
+                byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
+                response.StatusCode = 200;
+                response.OutputStream.Write(b, 0, b.Length);
+                response.Close();
+                return;
+            }
+
+            if (urlPath.Equals("/api/launcher/stop-vision", StringComparison.OrdinalIgnoreCase))
+            {
+                Program.StopVisionServer();
+                byte[] b = System.Text.Encoding.UTF8.GetBytes("{\"success\":true,\"message\":\"Vision engine stopped\"}");
+                response.StatusCode = 200;
+                response.OutputStream.Write(b, 0, b.Length);
+                response.Close();
+                return;
+            }
+
+            if (urlPath.Equals("/api/launcher/start-ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                Program.EnsureOllamaRunning(false);
+                byte[] b = System.Text.Encoding.UTF8.GetBytes("{\"success\":true,\"message\":\"Ollama engine started\"}");
+                response.StatusCode = 200;
+                response.OutputStream.Write(b, 0, b.Length);
+                response.Close();
+                return;
+            }
+
+            response.StatusCode = 404;
+            response.Close();
+        }
+
+        public static bool IsPortListening(int port)
+        {
+            try
+            {
+                using (var client = new TcpClient())
+                {
+                    var result = client.BeginConnect("127.0.0.1", port, null, null);
+                    if (result.AsyncWaitHandle.WaitOne(400) && client.Connected)
+                    {
+                        client.EndConnect(result);
+                        return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
         }
 
         public void Stop()
@@ -607,9 +689,10 @@ namespace LUMI.Desktop
             {
                 _server.Stop();
             }
+            StopVisionServer();
         }
 
-        private static void EnsureOllamaRunning(bool showConsole)
+        public static void EnsureOllamaRunning(bool showConsole)
         {
             try
             {
@@ -710,6 +793,104 @@ namespace LUMI.Desktop
                     Console.WriteLine("[LUMI] Note: Could not auto-spawn llama inference server: " + ex.Message);
                 }
             }
+        }
+
+        private static System.Diagnostics.Process _visionProcess = null;
+
+        public static bool StartVisionServer()
+        {
+            try
+            {
+                if (HttpServer.IsPortListening(8080))
+                {
+                    return true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                string[] possibleExes = new string[]
+                {
+                    Path.Combine(_baseDir, "llama", "llama-server.exe"),
+                    Path.Combine(_baseDir, "llama_server", "llama-server.exe"),
+                    @"F:\corewithin\llama\llama-server.exe",
+                    "llama-server"
+                };
+
+                string visionExe = null;
+                string workingDir = null;
+                foreach (string exe in possibleExes)
+                {
+                    if (File.Exists(exe))
+                    {
+                        visionExe = exe;
+                        workingDir = Path.GetDirectoryName(exe);
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(visionExe)) return false;
+
+                string[] possibleModels = new string[]
+                {
+                    Path.Combine(_baseDir, "models", "qwen3-vl-8b", "Qwen3VL-8B-Instruct-Q4_K_M.gguf"),
+                    @"F:\corewithin\models\qwen3-vl-8b\Qwen3VL-8B-Instruct-Q4_K_M.gguf"
+                };
+
+                string[] possibleMmprojs = new string[]
+                {
+                    Path.Combine(_baseDir, "models", "qwen3-vl-8b", "mmproj-Qwen3VL-8B-Instruct-F16.gguf"),
+                    @"F:\corewithin\models\qwen3-vl-8b\mmproj-Qwen3VL-8B-Instruct-F16.gguf"
+                };
+
+                string modelPath = null;
+                foreach (string m in possibleModels) { if (File.Exists(m)) { modelPath = m; break; } }
+
+                string mmprojPath = null;
+                foreach (string p in possibleMmprojs) { if (File.Exists(p)) { mmprojPath = p; break; } }
+
+                if (string.IsNullOrEmpty(modelPath) || string.IsNullOrEmpty(mmprojPath)) return false;
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = visionExe,
+                    Arguments = string.Format("-m \"{0}\" --mmproj \"{1}\" --port 8080 -ngl 99 -c 4096", modelPath, mmprojPath),
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                    WorkingDirectory = workingDir ?? _baseDir
+                };
+
+                _visionProcess = System.Diagnostics.Process.Start(psi);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static void StopVisionServer()
+        {
+            try
+            {
+                if (_visionProcess != null && !_visionProcess.HasExited)
+                {
+                    _visionProcess.Kill();
+                    _visionProcess = null;
+                }
+            }
+            catch { }
+
+            try
+            {
+                foreach (var p in System.Diagnostics.Process.GetProcessesByName("llama-server"))
+                {
+                    try { p.Kill(); } catch { }
+                }
+            }
+            catch { }
         }
     }
 }

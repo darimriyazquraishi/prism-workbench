@@ -14,6 +14,7 @@ export interface LocalLlmOptions {
   images?: string[]; // base64 strings
   temperature?: number;
   numCtx?: number;
+  thinkHarder?: boolean;
 }
 
 export interface LocalLlmResult {
@@ -26,6 +27,7 @@ export interface LocalLlmResult {
 }
 
 const OLLAMA_BASE = 'http://127.0.0.1:11434';
+const VISION_SERVER_BASE = 'http://127.0.0.1:8080';
 
 function extractCleanErrorMessage(raw: string, status: number): string {
   try {
@@ -46,10 +48,37 @@ function extractCleanErrorMessage(raw: string, status: number): string {
 }
 
 /**
+ * Pre-warms and loads model weights into GPU VRAM to ensure 0-lag execution.
+ */
+export async function warmupModelCache(modelTag: string = 'qwen3:14b'): Promise<{ success: boolean; durationMs: number; error?: string }> {
+  const resolved = resolveOllamaModelTag(modelTag);
+  const startTime = performance.now();
+  try {
+    const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: resolved,
+        messages: [{ role: 'user', content: 'Warmup cache ping' }],
+        stream: false,
+        options: { num_predict: 1 }
+      })
+    });
+    if (res.ok) {
+      return { success: true, durationMs: Math.round(performance.now() - startTime) };
+    }
+    const errText = await res.text().catch(() => '');
+    return { success: false, durationMs: Math.round(performance.now() - startTime), error: errText };
+  } catch (err: any) {
+    return { success: false, durationMs: Math.round(performance.now() - startTime), error: err.message };
+  }
+}
+
+/**
  * Normalizes model names from plan descriptions/aliases to available Ollama model tags
  */
 export function resolveOllamaModelTag(requested?: string): string {
-  if (!requested) return 'qwen3:8b';
+  if (!requested) return 'qwen3:14b';
   const r = requested.toLowerCase();
 
   if (r.includes('coder') || r.includes('code') || r.includes('python')) {
@@ -68,16 +97,75 @@ export function resolveOllamaModelTag(requested?: string): string {
 }
 
 /**
- * Executes a live inference request to local Ollama on 127.0.0.1:11434
+ * Executes a live inference request to local Ollama (11434) or CUDA Vision Server (8080).
  * Measures exact latency and bytes transferred.
  */
 export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmResult> {
-  const modelTag = resolveOllamaModelTag(options.model);
   const startTime = performance.now();
 
+  // If Think Harder (Max Power) mode is enabled, inject deep reasoning directives and expand compute
+  let effectiveSystemPrompt = options.systemPrompt || '';
+  if (options.thinkHarder) {
+    const thinkHarderDirective = `\n\n[MAX POWER REASONING MODE: THINK HARDER ACTIVE]\n- Systematically analyze the underlying problem, assumptions, and constraints.\n- Break the task down into clear intermediate sub-steps with explicit logical justification.\n- Rigorously check edge cases, counterarguments, and potential failure modes.\n- Ensure deliverables strictly conform to required contracts and syntax.`;
+    effectiveSystemPrompt = effectiveSystemPrompt ? (effectiveSystemPrompt + thinkHarderDirective) : thinkHarderDirective.trim();
+  }
+
+  // 1. Multimodal Vision Handling: If images attached, prioritize the CUDA llama-server on port 8080 (native mmproj support)
+  if (options.images && options.images.length > 0) {
+    try {
+      const visionRes = await fetch(`${VISION_SERVER_BASE}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            ...(effectiveSystemPrompt ? [{ role: 'system', content: effectiveSystemPrompt }] : []),
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: options.userPrompt },
+                ...options.images.map(img => ({
+                  type: 'image_url',
+                  image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}` }
+                }))
+              ]
+            }
+          ],
+          max_tokens: options.thinkHarder ? 4096 : 3500,
+          temperature: options.thinkHarder ? 0.15 : (options.temperature ?? 0.2)
+        }),
+        signal: AbortSignal.timeout(120000)
+      });
+
+      if (visionRes.ok) {
+        const vData = await visionRes.json();
+        const vText = vData?.choices?.[0]?.message?.content || '';
+        if (vText) {
+          const durationMs = Math.round(performance.now() - startTime);
+          const bytesRec = new TextEncoder().encode(JSON.stringify(vData)).length;
+          useTelemetryStore.getState().recordInference({
+            model: 'Qwen3-VL 8B (CUDA mmproj 8080)',
+            inferenceTimeMs: durationMs
+          });
+          return {
+            content: vText.trim(),
+            model: 'qwen3-vl:8b (CUDA mmproj)',
+            durationMs,
+            bytesSent: new TextEncoder().encode(options.userPrompt).length,
+            bytesReceived: bytesRec,
+            endpoint: `${VISION_SERVER_BASE}/v1/chat/completions`
+          };
+        }
+      }
+    } catch (vErr) {
+      console.warn('[VISION] CUDA mmproj server on port 8080 not responding, falling back to Ollama 11434:', vErr);
+    }
+  }
+
+  // 2. Standard / Fallback Ollama Pipeline on port 11434
+  const modelTag = resolveOllamaModelTag(options.model);
   const messages: { role: string; content: string; images?: string[] }[] = [];
-  if (options.systemPrompt) {
-    messages.push({ role: 'system', content: options.systemPrompt });
+  if (effectiveSystemPrompt) {
+    messages.push({ role: 'system', content: effectiveSystemPrompt });
   }
 
   const userMsg: { role: string; content: string; images?: string[] } = {
@@ -86,7 +174,6 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
   };
 
   if (options.images && options.images.length > 0) {
-    // Extract raw base64 if it is a data URL
     userMsg.images = options.images.map(img => {
       const parts = img.split(',');
       return parts.length > 1 ? parts[1] : img;
@@ -95,8 +182,10 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
 
   messages.push(userMsg);
 
-  // Default context window: 16,384 tokens for vision tasks (high-res image patches), 8,192 tokens for standard text
-  const defaultNumCtx = options.numCtx ?? (options.images && options.images.length > 0 ? 16384 : 8192);
+  // Context window: 32,768 for Think Harder, 16,384 for vision, 8,192 default
+  const defaultNumCtx = options.numCtx ?? (options.thinkHarder ? 32768 : (options.images && options.images.length > 0 ? 16384 : 8192));
+  const numPredict = options.thinkHarder ? 4096 : 3500;
+  const temperature = options.thinkHarder ? 0.15 : (options.temperature ?? 0.2);
 
   const requestBody = JSON.stringify({
     model: modelTag,
@@ -104,9 +193,9 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
     stream: false,
     format: options.formatJson ? 'json' : undefined,
     options: {
-      temperature: options.temperature ?? 0.2,
+      temperature,
       num_ctx: defaultNumCtx,
-      num_predict: 3500
+      num_predict: numPredict
     }
   });
 
@@ -117,18 +206,8 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
 
   try {
     const controller = new AbortController();
-    // 120s ceiling to support initial VRAM weight loading for vision models (qwen2.5vl)
     const timeoutDuration = options.images && options.images.length > 0 ? 120000 : 90000;
     const timeout = setTimeout(() => controller.abort(), timeoutDuration);
-
-    if (options.images && options.images.length > 0) {
-      console.log(`[LOCAL LLM DIAGNOSTIC] Initiating GPU vision request to '${modelTag}' at ${OLLAMA_BASE}/api/chat`, {
-        imageCount: options.images.length,
-        promptLength: options.userPrompt.length,
-        contextTokens: defaultNumCtx,
-        timeoutMs: timeoutDuration
-      });
-    }
 
     const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
       method: 'POST',

@@ -47,7 +47,11 @@ foreach ($dir in $modelDirs) {
 
 # 6. Local Inference Server Directory (llama_server)
 if (Test-Path "F:\corewithin\llama_server") {
-    Copy-Item "F:\corewithin\llama_server" -Destination $DestinationPath -Recurse -Force
+    $targetLlama = "$DestinationPath\llama_server"
+    if (-not (Test-Path $targetLlama)) { New-Item -ItemType Directory -Path $targetLlama -Force | Out-Null }
+    Get-ChildItem "F:\corewithin\llama_server\*" | ForEach-Object {
+        try { Copy-Item $_.FullName -Destination $targetLlama -Force -ErrorAction Stop } catch {}
+    }
 }
 
 # 7. Public Assets & Icons (public)

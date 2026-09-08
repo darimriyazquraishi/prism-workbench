@@ -34,7 +34,8 @@ import {
   generateDocxSectionsWithQwen,
   generateXlsxStructureWithQwen,
   generatePythonCodeWithQwen,
-  resolveOllamaModelTag
+  resolveOllamaModelTag,
+  warmupModelCache
 } from '../services/localLlmService';
 import { detectRequiredCapabilities, resolveModelForCapability } from '../services/modelCapabilityRouter';
 
@@ -423,6 +424,35 @@ export interface KbSearchResult {
 
 
 interface AntigravityStore {
+  // Launcher & Model Cache Controls
+  isLauncherOpen: boolean;
+  setLauncherOpen: (open: boolean) => void;
+  selectedGeneralModel: string;
+  setSelectedGeneralModel: (model: string) => void;
+  selectedCodingModel: string;
+  setSelectedCodingModel: (model: string) => void;
+  selectedVisionEngine: string;
+  setSelectedVisionEngine: (engine: string) => void;
+  isThinkHarderMode: boolean;
+  toggleThinkHarderMode: () => void;
+  setThinkHarderMode: (val: boolean) => void;
+  engineStatuses: {
+    ollama: boolean;
+    visionServer: boolean;
+    lastChecked: string;
+  };
+  cacheStatus: {
+    generalLlmWarm: boolean;
+    visionWarm: boolean;
+    vramFreeMb: number;
+    warmingUp: boolean;
+  };
+  checkEngineStatuses: () => Promise<void>;
+  warmupModelCacheAction: (modelTag?: string) => Promise<{ success: boolean; durationMs: number; error?: string }>;
+  startVisionServerDaemon: () => Promise<boolean>;
+  stopVisionServerDaemon: () => Promise<boolean>;
+  startOllamaDaemon: () => Promise<boolean>;
+
   // Session & Trajectory
   sessions: AntigravitySession[];
   activeSessionId: string;
@@ -856,10 +886,103 @@ const initialSessions: AntigravitySession[] = [
 ];
 
 export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
+  // Launcher & Model Cache State
+  isLauncherOpen: true,
+  setLauncherOpen: (open: boolean) => set({ isLauncherOpen: open }),
+  selectedGeneralModel: 'qwen3:14b',
+  setSelectedGeneralModel: (model: string) => set({ selectedGeneralModel: model, selectedModel: model }),
+  selectedCodingModel: 'qwen2.5-coder:7b',
+  setSelectedCodingModel: (model: string) => set({ selectedCodingModel: model }),
+  selectedVisionEngine: 'cuda-llama-server',
+  setSelectedVisionEngine: (engine: string) => set({ selectedVisionEngine: engine }),
+  isThinkHarderMode: false,
+  toggleThinkHarderMode: () => set((state) => ({ isThinkHarderMode: !state.isThinkHarderMode })),
+  setThinkHarderMode: (val: boolean) => set({ isThinkHarderMode: val }),
+
+  engineStatuses: {
+    ollama: true,
+    visionServer: false,
+    lastChecked: ''
+  },
+  cacheStatus: {
+    generalLlmWarm: false,
+    visionWarm: false,
+    vramFreeMb: 10240,
+    warmingUp: false
+  },
+
+  checkEngineStatuses: async () => {
+    try {
+      const res = await fetch('/api/launcher/status', { signal: AbortSignal.timeout(1500) }).catch(() => null);
+      if (res && res.ok) {
+        const data = await res.json();
+        set({
+          engineStatuses: {
+            ollama: !!data.ollama,
+            visionServer: !!data.visionServer,
+            lastChecked: new Date().toLocaleTimeString()
+          }
+        });
+        return;
+      }
+    } catch {}
+
+    const ollamaCheck = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false);
+    const visionCheck = await fetch('http://127.0.0.1:8080/health', { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false);
+    set({
+      engineStatuses: {
+        ollama: ollamaCheck,
+        visionServer: visionCheck,
+        lastChecked: new Date().toLocaleTimeString()
+      }
+    });
+  },
+
+  warmupModelCacheAction: async (modelTag?: string) => {
+    const target = modelTag || get().selectedGeneralModel || 'qwen3:14b';
+    set((state) => ({ cacheStatus: { ...state.cacheStatus, warmingUp: true } }));
+    const result = await warmupModelCache(target);
+    set((state) => ({
+      cacheStatus: {
+        ...state.cacheStatus,
+        generalLlmWarm: result.success,
+        warmingUp: false
+      }
+    }));
+    return result;
+  },
+
+  startVisionServerDaemon: async () => {
+    try {
+      const res = await fetch('/api/launcher/start-vision', { method: 'POST', signal: AbortSignal.timeout(2000) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  stopVisionServerDaemon: async () => {
+    try {
+      const res = await fetch('/api/launcher/stop-vision', { method: 'POST', signal: AbortSignal.timeout(2000) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  startOllamaDaemon: async () => {
+    try {
+      const res = await fetch('/api/launcher/start-ollama', { method: 'POST', signal: AbortSignal.timeout(2000) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
   sessions: initialSessions,
   activeSessionId: initialSessionId,
   activeMode: 'agent',
-  selectedModel: '',
+  selectedModel: 'qwen3:14b',
   availableModels: [],
   arsenalModels: [],
   attachedFiles: [],
@@ -1294,7 +1417,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
     const totalStart = performance.now();
     const requestId = `req-${Date.now()}`;
-    const activeModel = get().selectedModel || 'qwen3:8b';
+    const activeModel = get().selectedGeneralModel || get().selectedModel || 'qwen3:14b';
     useTelemetryStore.getState().resetExecutionState(requestId, prompt, activeModel);
 
     const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1473,7 +1596,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       ? `✓ Knowledge Base: No relevant guidance matched threshold (${kbResult.totalChunksSearched || 0} chunks searched using ${kbResult.embeddingModel || 'Nomic-768D'}) — proceeding using user upload content.`
       : `✓ Knowledge Base: Retrieved ${kbResult.guidance.length} relevant chunks using ${kbResult.embeddingModel || 'Nomic-768D'}: ${kbResult.guidance.map(g => g.title).join(', ')}`;
 
-    const cleanRoutingText = `I have received your request and coordinated the plan with the local General Reasoning model:
+    const thinkHarderPrefix = get().isThinkHarderMode ? '\n\n⚡ [THINK HARDER ACTIVE: Maximum local compute budget & 32k context allocated]' : '';
+    const cleanRoutingText = `I have received your request and coordinated the plan with the local General Reasoning model (${activeModel}):${thinkHarderPrefix}
 
 • Task Objective: ${prompt.trim()}
 • Attached Context: ${fileContextStr}
@@ -1485,7 +1609,7 @@ Passing to local specialist models to assemble the execution plan.`;
     addStepToActiveSession({
       id: `step-${Date.now()}-chatbot`,
       type: 'chatbot_routing',
-      title: activeModel ? `General LLM Orchestrator (${activeModel})` : 'General LLM Orchestrator',
+      title: `General LLM Orchestrator (${activeModel})`,
       content: cleanRoutingText,
       timestamp: now()
     });
@@ -1617,7 +1741,7 @@ Passing to local specialist models to assemble the execution plan.`;
     set({ activeProposedPlan: null });
     setIsExecuting(true);
 
-    const activeModel = get().selectedModel || 'qwen3:8b';
+    const activeModel = get().selectedGeneralModel || get().selectedModel || 'qwen3:14b';
     const userFiles = approvedPlan.userUploadFiles || [];
 
     useTelemetryStore.getState().startJob({
@@ -1719,7 +1843,8 @@ Describe titles, authors, text, headings, diagrams, numbers, equipment tags, and
               model: visionModelTag,
               systemPrompt: 'You are a precise computer vision and OCR assistant. Extract visual content, text, titles, numbers, and cover details accurately without speculation.',
               userPrompt: dynamicVisionPrompt,
-              images: [imageFile.dataUrl]
+              images: [imageFile.dataUrl],
+              thinkHarder: get().isThinkHarderMode
             });
 
             workflowContext.visionFindings = visionRes.content;
@@ -1873,7 +1998,8 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
             model: activeModel,
             systemPrompt: 'You are Lumi, a sovereign multimodal reasoning assistant. Synthesize a complete and accurate answer grounded strictly in the provided visual findings and source context.',
             userPrompt: reasoningPrompt,
-            temperature: 0.3
+            temperature: 0.3,
+            thinkHarder: get().isThinkHarderMode
           });
 
           workflowContext.llmOutputs['reasoning_synthesis'] = genRes.content;
