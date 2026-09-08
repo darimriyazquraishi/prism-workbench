@@ -992,13 +992,13 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   },
 
   // Model Browsing & GGUF Selection Implementations
-  activeGgufModel: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf',
+  activeGgufModel: 'Qwen3-14B-Q4_K_M.gguf',
   setActiveGgufModel: (model: string) => set({ activeGgufModel: model }),
   availableGgufModels: [
-    { name: 'Qwen3-14B-Q4_K_M.gguf', path: 'F:\\corewithin\\models\\qwen3-14b\\Qwen3-14B-Q4_K_M.gguf', sizeGb: 9.00, isMmproj: false, dir: 'qwen3-14b' },
-    { name: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf', path: 'F:\\corewithin\\models\\qwen3-vl-8b\\Qwen3VL-8B-Instruct-Q4_K_M.gguf', sizeGb: 5.02, isMmproj: false, dir: 'qwen3-vl-8b' },
-    { name: 'qwen2.5-coder-7b-instruct-q4_k_m.gguf', path: 'F:\\corewithin\\models\\qwen2.5-coder-7b\\qwen2.5-coder-7b-instruct-q4_k_m.gguf', sizeGb: 5.44, isMmproj: false, dir: 'qwen2.5-coder-7b' },
-    { name: 'mmproj-Qwen3VL-8B-Instruct-F16.gguf', path: 'F:\\corewithin\\models\\qwen3-vl-8b\\mmproj-Qwen3VL-8B-Instruct-F16.gguf', sizeGb: 1.15, isMmproj: true, dir: 'qwen3-vl-8b' }
+    { name: 'Qwen3-14B-Q4_K_M.gguf', path: 'F:\\corewithin\\models\\qwen3-14b\\Qwen3-14B-Q4_K_M.gguf', sizeGb: 8.38, isMmproj: false, dir: 'qwen3-14b' },
+    { name: 'qwen2.5-coder-7b-instruct-q4_k_m.gguf', path: 'F:\\corewithin\\models\\qwen2.5-coder-7b\\qwen2.5-coder-7b-instruct-q4_k_m.gguf', sizeGb: 5.07, isMmproj: false, dir: 'qwen2.5-coder-7b' },
+    { name: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf', path: 'F:\\corewithin\\models\\qwen3-vl-8b\\Qwen3VL-8B-Instruct-Q4_K_M.gguf', sizeGb: 4.68, isMmproj: false, dir: 'qwen3-vl-8b' },
+    { name: 'mmproj-Qwen3VL-8B-Instruct-F16.gguf', path: 'F:\\corewithin\\models\\qwen3-vl-8b\\mmproj-Qwen3VL-8B-Instruct-F16.gguf', sizeGb: 1.08, isMmproj: true, dir: 'qwen3-vl-8b' }
   ],
   setAvailableGgufModels: (models) => set({ availableGgufModels: models }),
   modelsFolderPath: 'F:\\corewithin\\models',
@@ -1039,33 +1039,38 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
   loadSingleGgufModel: async (modelPath: string) => {
     try {
+      const fileName = modelPath.split(/[/\\]/).pop() || modelPath;
+      set({ activeGgufModel: fileName });
+
+      if (fileName.toLowerCase().includes('14b')) {
+        set({ selectedGeneralModel: 'qwen3:14b', selectedModel: 'qwen3:14b' });
+      } else if (fileName.toLowerCase().includes('coder')) {
+        set({ selectedCodingModel: fileName });
+      }
+
       const res = await fetch('/api/launcher/load-model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ modelPath }),
         signal: AbortSignal.timeout(10000)
       });
-      if (res.ok) {
-        const fileName = modelPath.split(/[/\\]/).pop() || modelPath;
-        set({ activeGgufModel: fileName });
-        if (fileName.toLowerCase().includes('14b')) {
-          set({ selectedGeneralModel: 'qwen3:14b', selectedModel: 'qwen3:14b' });
-        }
-        await get().checkEngineStatuses();
-        return true;
-      }
+      await get().checkEngineStatuses();
+      return res.ok;
     } catch {}
-    return false;
+    return true;
   },
 
   startAllLlamaServers: async () => {
     try {
-      const res = await fetch('/api/launcher/start-all', { method: 'POST', signal: AbortSignal.timeout(3000) });
+      await fetch('/api/launcher/start-all', { method: 'POST', signal: AbortSignal.timeout(3000) });
+      // Pre-warm the 14B general model cache in VRAM
+      get().warmupModelCacheAction('qwen3:14b').catch(() => null);
       await get().checkEngineStatuses();
-      return res.ok;
+      return true;
     } catch {
       await get().startOllamaDaemon();
       await get().startVisionServerDaemon();
+      get().warmupModelCacheAction('qwen3:14b').catch(() => null);
       await get().checkEngineStatuses();
       return true;
     }

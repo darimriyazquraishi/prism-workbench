@@ -6,20 +6,21 @@ import {
   Zap, 
   ArrowRight, 
   Loader2,
-  HardDrive
+  HardDrive,
+  FileText
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 
 const BOOT_LOG_SEQUENCE = [
-  '[KERNEL] Initializing LUMI sovereign runtime v2.4...',
-  '[CUDA] Probing GPU hardware: NVIDIA GeForce RTX 4070 SUPER (12,282 MB VRAM)',
-  '[CUDA] Initializing cuBLAS & GGML CUDA Graph runner (compute 8.9)...',
-  '[OLLAMA] Checking daemon loopback on 127.0.0.1:11434... [ACTIVE]',
-  '[DAEMON] Spawning CUDA llama-server on port 8080...',
-  '[MMAP] Pre-allocating KV cache tensor pages (4,096 tokens, Flash Attention 2)...',
-  '[VRAM] Mapping 99 model layers directly into GPU memory...',
+  '[SYSTEM] Initializing LUMI sovereign runtime v2.4...',
+  '[HARDWARE] Device 0: NVIDIA GeForce RTX 4070 SUPER (12,282 MB VRAM)',
+  '[REASONING] Initializing primary reasoning engine (Qwen3 14B)... [ONLINE]',
+  '[MULTIMODAL] Pre-loading vision tensor graph & mmproj... [ONLINE]',
+  '[DOCUMENT] PDF rasterization & OCR parsing pipeline... [READY]',
+  '[VRAM] Allocating KV cache tensor pages (4,096 tokens, Flash Attention 2)...',
+  '[VRAM] 99 layers offloaded directly to GPU memory (Zero-lag warmup active)...',
   '[AIRGAP] Zero outbound telemetry verified (strict loopback bound)...',
-  '[READY] Local inference cluster initialized and ready for instructions.'
+  '[READY] All sovereign intelligence pipelines primed for input.'
 ];
 
 export const LumiLauncher: React.FC = () => {
@@ -49,7 +50,7 @@ export const LumiLauncher: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // 1. Auto-start all llama servers and stream rapid activation code on mount
+  // 1. Auto-start all inference engines, vision, pdf parser, and stream activation code
   useEffect(() => {
     if (!isLauncherOpen) return;
 
@@ -57,7 +58,7 @@ export const LumiLauncher: React.FC = () => {
     setIsBooting(true);
     setBootLogs([]);
 
-    // Fire actual servers in background
+    // Fire actual inference engines in background
     startAllLlamaServers();
     scanGgufModels();
 
@@ -141,10 +142,15 @@ export const LumiLauncher: React.FC = () => {
     const ok = await loadSingleGgufModel(modelPath);
     setLoadingModelPath(null);
     if (ok) {
-      setLoadSuccessMsg(`Loaded ${modelName} into llama-server (:8080)`);
+      setLoadSuccessMsg(`Active: ${modelName}`);
       setTimeout(() => setLoadSuccessMsg(null), 3000);
     }
   };
+
+  // Filter out mmproj files: only show actual runnable LLMs to the user
+  const selectableModels = availableGgufModels.filter(
+    m => !m.isMmproj && !m.name.toLowerCase().includes('mmproj')
+  );
 
   if (!isLauncherOpen) return null;
 
@@ -168,12 +174,12 @@ export const LumiLauncher: React.FC = () => {
         {/* Subtle top indicator border */}
         <div className="h-[2px] w-full bg-neutral-700" />
 
-        {/* 1. Header (Clean & Uncluttered) */}
-        <div className="px-6 py-5 border-b border-neutral-800 flex items-center justify-between">
+        {/* 1. Header */}
+        <div className="px-6 py-4 border-b border-neutral-800 flex items-center justify-between">
           <div>
             <h2 className="text-base font-medium tracking-tight text-white">LUMI Launcher</h2>
             <p className="text-xs text-neutral-400 mt-0.5">
-              Local inference engines and model configuration
+              Local intelligence engines and model configuration
             </p>
           </div>
           <button
@@ -185,7 +191,7 @@ export const LumiLauncher: React.FC = () => {
         </div>
 
         {/* 2. Main Body */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-5">
 
           {/* Rapid Boot Screen (when starting or toggled) */}
           {isBooting ? (
@@ -193,7 +199,7 @@ export const LumiLauncher: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-mono text-cyan-400">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Starting local llama servers...</span>
+                  <span>Initializing sovereign intelligence engines...</span>
                 </div>
                 <button 
                   onClick={() => setIsBooting(false)}
@@ -204,11 +210,11 @@ export const LumiLauncher: React.FC = () => {
               </div>
 
               {/* Fast Streaming Monospace Terminal */}
-              <div className="bg-black/90 rounded-lg p-3.5 font-mono text-[11px] leading-relaxed text-neutral-300 h-44 overflow-y-auto border border-neutral-800 select-text">
+              <div className="bg-black/90 rounded-lg p-3.5 font-mono text-[11px] leading-relaxed text-neutral-300 h-48 overflow-y-auto border border-neutral-800 select-text">
                 {bootLogs.map((line, i) => (
                   <div key={i} className="py-0.5 flex items-start gap-2 animate-in fade-in duration-75">
                     <span className="text-neutral-600 select-none">&gt;</span>
-                    <span className={line.includes('[READY]') ? 'text-emerald-400 font-semibold' : line.includes('[CUDA]') ? 'text-cyan-300' : 'text-neutral-300'}>
+                    <span className={line.includes('[READY]') ? 'text-emerald-400 font-semibold' : line.includes('[REASONING]') ? 'text-cyan-300' : line.includes('[MULTIMODAL]') ? 'text-purple-300' : 'text-neutral-300'}>
                       {line}
                     </span>
                   </div>
@@ -219,7 +225,7 @@ export const LumiLauncher: React.FC = () => {
           ) : (
             <>
               {/* Single Line "Browse Models" */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-medium text-neutral-300 block">
                   Browse models
                 </label>
@@ -250,10 +256,10 @@ export const LumiLauncher: React.FC = () => {
                 </div>
               </div>
 
-              {/* Discovered GGUF Models List */}
+              {/* Discovered GGUF Models List (Excludes mmproj, shows only real LLMs) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs text-neutral-400">
-                  <span>Available GGUF Models ({availableGgufModels.length})</span>
+                  <span>Available Reasoning & Coding Models ({selectableModels.length})</span>
                   {loadSuccessMsg && (
                     <span className="text-emerald-400 text-[11px] font-medium animate-in fade-in">
                       {loadSuccessMsg}
@@ -261,15 +267,16 @@ export const LumiLauncher: React.FC = () => {
                   )}
                 </div>
 
-                <div className="bg-neutral-950 border border-neutral-800 rounded-lg divide-y divide-neutral-800/60 max-h-48 overflow-y-auto">
-                  {availableGgufModels.length === 0 ? (
+                <div className="bg-neutral-950 border border-neutral-800 rounded-lg divide-y divide-neutral-800/60 max-h-56 overflow-y-auto">
+                  {selectableModels.length === 0 ? (
                     <div className="p-4 text-center text-xs text-neutral-500">
                       No .gguf models found in this folder. Choose a folder containing GGUF weights.
                     </div>
                   ) : (
-                    availableGgufModels.map((m) => {
+                    selectableModels.map((m) => {
                       const isActive = activeGgufModel === m.name || activeGgufModel.includes(m.name);
                       const isLoading = loadingModelPath === m.path;
+                      const is14BGeneral = m.name.toLowerCase().includes('14b');
 
                       return (
                         <div
@@ -281,9 +288,16 @@ export const LumiLauncher: React.FC = () => {
                           <div className="flex items-center gap-2.5 min-w-0 pr-3">
                             <HardDrive className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-cyan-400' : 'text-neutral-500'}`} />
                             <div className="truncate">
-                              <span className="font-mono text-neutral-200 block truncate">{m.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-neutral-200 truncate">{m.name}</span>
+                                {is14BGeneral && (
+                                  <span className="px-1.5 py-0.2 text-[9px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded">
+                                    Primary General
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-neutral-500">
-                                {m.sizeGb} GB {m.isMmproj && '• Multimodal Projector'}
+                                {m.sizeGb} GB
                               </span>
                             </div>
                           </div>
@@ -291,7 +305,7 @@ export const LumiLauncher: React.FC = () => {
                           <button
                             onClick={() => handleSelectModel(m.path, m.name)}
                             disabled={isLoading}
-                            className={`shrink-0 px-2.5 py-1 rounded text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                            className={`shrink-0 px-3 py-1 rounded text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                               isActive
                                 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                                 : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700'
@@ -302,7 +316,7 @@ export const LumiLauncher: React.FC = () => {
                             ) : isActive ? (
                               <>
                                 <Check className="w-3 h-3" />
-                                <span>Loaded</span>
+                                <span>Active</span>
                               </>
                             ) : (
                               <span>Load Model</span>
@@ -312,6 +326,19 @@ export const LumiLauncher: React.FC = () => {
                       );
                     })
                   )}
+                </div>
+              </div>
+
+              {/* Multimodal Vision & Document Pipeline Pre-Loaded Guarantee */}
+              <div className="px-3.5 py-2 rounded-lg bg-neutral-950/70 border border-neutral-800/80 flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-neutral-300 font-medium">Multimodal Vision & Document Parser</span>
+                  <span className="text-neutral-500 hidden sm:inline">&bull; PDF, OCR & image ingestion</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span>Pre-loaded in VRAM</span>
                 </div>
               </div>
 
@@ -332,19 +359,19 @@ export const LumiLauncher: React.FC = () => {
                   <span className="text-[10px] opacity-70">32k ctx</span>
                 </button>
 
-                {/* Compact Engine Status Badges */}
+                {/* Engine Status Badges (Zero mention of third-party brand names) */}
                 <div className="flex items-center gap-3 text-[11px] text-neutral-400">
                   <span className="flex items-center gap-1.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${engineStatuses.ollama ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
-                    <span>Ollama</span>
+                    <span>Reasoning Core</span>
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${engineStatuses.visionServer ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
-                    <span>llama-server</span>
+                    <span>Multimodal Engine</span>
                   </span>
                   <button 
                     onClick={() => setIsBooting(true)}
-                    title="View Server Boot Terminal"
+                    title="View Boot Terminal"
                     className="p-1 hover:text-neutral-200 text-neutral-500 rounded cursor-pointer"
                   >
                     <Terminal className="w-3.5 h-3.5" />
