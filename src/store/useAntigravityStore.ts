@@ -1018,15 +1018,45 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   scanGgufModels: async (folder?: string) => {
     const target = folder || get().modelsFolderPath || 'models';
     try {
-      const res = await fetch(`/api/launcher/scan-models?path=${encodeURIComponent(target)}`, { signal: AbortSignal.timeout(2500) });
+      const res = await fetch(`/api/launcher/scan-models?path=${encodeURIComponent(target)}`, { signal: AbortSignal.timeout(4000) });
       if (res.ok) {
         const data = await res.json();
-        if (data && Array.isArray(data.models) && data.models.length > 0) {
-          set({ 
+        if (data && Array.isArray(data.models)) {
+          if (data.models.length > 0) {
+            set({ 
+              availableGgufModels: data.models,
+              modelsFolderPath: data.folder || target
+            });
+            const current = get().activeGgufModel;
+            const nonMmproj = data.models.filter((m: any) => !m.isMmproj && !m.name.toLowerCase().includes('mmproj'));
+            if (!current && nonMmproj.length > 0) {
+              const best = nonMmproj.find((m: any) => m.name.toLowerCase().includes('14b')) || nonMmproj[0];
+              set({ activeGgufModel: best.name });
+            }
+            return;
+          } else if (target !== '') {
+            // If target folder had 0 models, try auto-discovery with empty path
+            const retryRes = await fetch('/api/launcher/scan-models', { signal: AbortSignal.timeout(4000) });
+            if (retryRes.ok) {
+              const retryData = await retryRes.json();
+              if (retryData && Array.isArray(retryData.models) && retryData.models.length > 0) {
+                set({
+                  availableGgufModels: retryData.models,
+                  modelsFolderPath: retryData.folder || target
+                });
+                const nonMmproj = retryData.models.filter((m: any) => !m.isMmproj && !m.name.toLowerCase().includes('mmproj'));
+                if (nonMmproj.length > 0) {
+                  const best = nonMmproj.find((m: any) => m.name.toLowerCase().includes('14b')) || nonMmproj[0];
+                  set({ activeGgufModel: best.name });
+                }
+                return;
+              }
+            }
+          }
+          set({
             availableGgufModels: data.models,
             modelsFolderPath: data.folder || target
           });
-          return;
         }
       }
     } catch {}
@@ -1037,12 +1067,16 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       const res = await fetch('/api/launcher/browse-folder', { signal: AbortSignal.timeout(60000) });
       if (res.ok) {
         const data = await res.json();
-        if (data && Array.isArray(data.models) && data.models.length > 0) {
+        if (data && Array.isArray(data.models)) {
           set({
             availableGgufModels: data.models,
             modelsFolderPath: data.folder || get().modelsFolderPath
           });
-          return;
+          const nonMmproj = data.models.filter((m: any) => !m.isMmproj && !m.name.toLowerCase().includes('mmproj'));
+          if (nonMmproj.length > 0) {
+            const best = nonMmproj.find((m: any) => m.name.toLowerCase().includes('14b')) || nonMmproj[0];
+            set({ activeGgufModel: best.name });
+          }
         }
       }
     } catch {}

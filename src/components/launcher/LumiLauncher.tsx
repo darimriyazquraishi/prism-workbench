@@ -6,8 +6,7 @@ import {
   Zap, 
   ArrowRight, 
   Loader2,
-  HardDrive,
-  FileText
+  HardDrive
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 
@@ -329,20 +328,7 @@ export const LumiLauncher: React.FC = () => {
                 </div>
               </div>
 
-              {/* Multimodal Vision & Document Pipeline Pre-Loaded Guarantee */}
-              <div className="px-3.5 py-2 rounded-lg bg-neutral-950/70 border border-neutral-800/80 flex items-center justify-between text-[11px]">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="text-neutral-300 font-medium">Multimodal Vision & Document Parser</span>
-                  <span className="text-neutral-500 hidden sm:inline">&bull; PDF, OCR & image ingestion</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span>Pre-loaded in VRAM</span>
-                </div>
-              </div>
-
-              {/* Think Harder Mode & Engine Status Bar */}
+              {/* Think Harder Mode & Boot Terminal */}
               <div className="pt-2 flex items-center justify-between border-t border-neutral-800 text-xs">
                 
                 {/* Clean Think Harder toggle */}
@@ -359,20 +345,11 @@ export const LumiLauncher: React.FC = () => {
                   <span className="text-[10px] opacity-70">32k ctx</span>
                 </button>
 
-                {/* Engine Status Badges (Zero mention of third-party brand names) */}
-                <div className="flex items-center gap-3 text-[11px] text-neutral-400">
-                  <span className="flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${engineStatuses.ollama ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
-                    <span>Reasoning Core</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${engineStatuses.visionServer ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
-                    <span>Multimodal Engine</span>
-                  </span>
+                <div className="flex items-center gap-2 text-[11px] text-neutral-400">
                   <button 
                     onClick={() => setIsBooting(true)}
                     title="View Boot Terminal"
-                    className="p-1 hover:text-neutral-200 text-neutral-500 rounded cursor-pointer"
+                    className="p-1 hover:text-neutral-200 text-neutral-500 rounded cursor-pointer transition-colors"
                   >
                     <Terminal className="w-3.5 h-3.5" />
                   </button>

@@ -472,25 +472,14 @@ namespace LUMI.Desktop
 
         private string ScanModelsJson(string folderPath)
         {
-            if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
-            {
-                folderPath = Path.Combine(_baseDir, "models");
-                if (!Directory.Exists(folderPath))
-                {
-                    var parent = Directory.GetParent(_baseDir);
-                    if (parent != null && Directory.Exists(Path.Combine(parent.FullName, "models")))
-                    {
-                        folderPath = Path.Combine(parent.FullName, "models");
-                    }
-                }
-            }
-
+            string targetFolder = Program.LocateModelsDirectory(folderPath);
             var list = new List<string>();
-            if (Directory.Exists(folderPath))
+
+            if (Directory.Exists(targetFolder))
             {
                 try
                 {
-                    var files = Directory.GetFiles(folderPath, "*.gguf", SearchOption.AllDirectories);
+                    var files = Directory.GetFiles(targetFolder, "*.gguf", SearchOption.AllDirectories);
                     foreach (var f in files)
                     {
                         try
@@ -511,7 +500,7 @@ namespace LUMI.Desktop
                 catch { }
             }
 
-            string folderEscaped = (folderPath ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+            string folderEscaped = (targetFolder ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
             return string.Format("{{\"folder\":\"{0}\",\"models\":[{1}]}}", folderEscaped, string.Join(",", list.ToArray()));
         }
 
@@ -524,7 +513,7 @@ namespace LUMI.Desktop
                 {
                     fbd.Description = "Select folder containing GGUF models";
                     fbd.ShowNewFolderButton = false;
-                    string defaultFolder = Path.Combine(_baseDir, "models");
+                    string defaultFolder = Program.LocateModelsDirectory();
                     if (Directory.Exists(defaultFolder))
                     {
                         fbd.SelectedPath = defaultFolder;
@@ -737,11 +726,13 @@ namespace LUMI.Desktop
         [STAThread]
         static void Main(string[] args)
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
+            try
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
 
-            bool showConsole = false;
-            bool noWindow = false;
+                bool showConsole = false;
+                bool noWindow = false;
 
             foreach (string arg in args)
             {
@@ -838,7 +829,7 @@ namespace LUMI.Desktop
             }
             else
             {
-                Application.Run();
+                new System.Threading.ManualResetEvent(false).WaitOne();
             }
 
             // Clean shutdown
@@ -847,6 +838,108 @@ namespace LUMI.Desktop
                 _server.Stop();
             }
             StopVisionServer();
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lumi_startup_err.log"), ex.ToString());
+                    MessageBox.Show(ex.ToString(), "LUMI Fatal Startup Error");
+                }
+                catch { }
+            }
+        }
+
+        public static string LocateModelsDirectory(string preferred = null)
+        {
+            var candidates = new List<string>();
+
+            if (!string.IsNullOrEmpty(preferred))
+            {
+                if (Path.IsPathRooted(preferred) && Directory.Exists(preferred))
+                {
+                    candidates.Add(preferred);
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(_baseDir))
+                    {
+                        string p1 = Path.Combine(_baseDir, preferred);
+                        if (Directory.Exists(p1)) candidates.Add(p1);
+
+                        try
+                        {
+                            var parent = Directory.GetParent(_baseDir);
+                            if (parent != null)
+                            {
+                                string p2 = Path.Combine(parent.FullName, preferred);
+                                if (Directory.Exists(p2)) candidates.Add(p2);
+                            }
+                        }
+                        catch { }
+                    }
+
+                    try
+                    {
+                        string cwdPref = Path.Combine(Directory.GetCurrentDirectory(), preferred);
+                        if (Directory.Exists(cwdPref) && !candidates.Contains(cwdPref)) candidates.Add(cwdPref);
+                    }
+                    catch { }
+                }
+            }
+
+            // Standard locations
+            if (!string.IsNullOrEmpty(_baseDir))
+            {
+                string d1 = Path.Combine(_baseDir, "models");
+                if (Directory.Exists(d1) && !candidates.Contains(d1)) candidates.Add(d1);
+
+                try
+                {
+                    var parent = Directory.GetParent(_baseDir);
+                    if (parent != null)
+                    {
+                        string d2 = Path.Combine(parent.FullName, "models");
+                        if (Directory.Exists(d2) && !candidates.Contains(d2)) candidates.Add(d2);
+
+                        var gparent = parent.Parent;
+                        if (gparent != null)
+                        {
+                            string d3 = Path.Combine(gparent.FullName, "models");
+                            if (Directory.Exists(d3) && !candidates.Contains(d3)) candidates.Add(d3);
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            try
+            {
+                string cwdModels = Path.Combine(Directory.GetCurrentDirectory(), "models");
+                if (Directory.Exists(cwdModels) && !candidates.Contains(cwdModels)) candidates.Add(cwdModels);
+            }
+            catch { }
+
+            // 1. Return the first candidate that actually contains .gguf files
+            foreach (var c in candidates)
+            {
+                try
+                {
+                    if (Directory.Exists(c) && Directory.GetFiles(c, "*.gguf", SearchOption.AllDirectories).Length > 0)
+                    {
+                        return c;
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Return first existing directory among candidates
+            foreach (var c in candidates)
+            {
+                if (Directory.Exists(c)) return c;
+            }
+
+            return Path.Combine(_baseDir ?? AppDomain.CurrentDomain.BaseDirectory, "models");
         }
 
         public static void EnsureOllamaRunning(bool showConsole)
@@ -981,7 +1074,25 @@ namespace LUMI.Desktop
                     }
                 }
 
-                if (string.IsNullOrEmpty(serverExe) || !File.Exists(customModelPath)) return false;
+                if (string.IsNullOrEmpty(serverExe)) return false;
+
+                if (!File.Exists(customModelPath))
+                {
+                    string modelsDir = LocateModelsDirectory();
+                    if (Directory.Exists(modelsDir))
+                    {
+                        foreach (var f in Directory.GetFiles(modelsDir, "*.gguf", SearchOption.AllDirectories))
+                        {
+                            if (Path.GetFileName(f).Equals(Path.GetFileName(customModelPath), StringComparison.OrdinalIgnoreCase))
+                            {
+                                customModelPath = f;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!File.Exists(customModelPath)) return false;
 
                 // Check for mmproj in model directory or models directory
                 string dir = Path.GetDirectoryName(customModelPath);
@@ -996,13 +1107,7 @@ namespace LUMI.Desktop
                 }
                 if (string.IsNullOrEmpty(mmprojPath))
                 {
-                    string modelsDir = Path.Combine(_baseDir, "models");
-                    if (!Directory.Exists(modelsDir))
-                    {
-                        var parent = Directory.GetParent(_baseDir);
-                        if (parent != null && Directory.Exists(Path.Combine(parent.FullName, "models")))
-                            modelsDir = Path.Combine(parent.FullName, "models");
-                    }
+                    string modelsDir = LocateModelsDirectory();
                     if (Directory.Exists(modelsDir))
                     {
                         foreach (var f in Directory.GetFiles(modelsDir, "*mmproj*.gguf", SearchOption.AllDirectories))
@@ -1074,15 +1179,7 @@ namespace LUMI.Desktop
                 if (string.IsNullOrEmpty(visionExe)) return false;
 
                 // Dynamically locate models directory
-                string modelsDir = Path.Combine(_baseDir, "models");
-                if (!Directory.Exists(modelsDir))
-                {
-                    var parent = Directory.GetParent(_baseDir);
-                    if (parent != null && Directory.Exists(Path.Combine(parent.FullName, "models")))
-                    {
-                        modelsDir = Path.Combine(parent.FullName, "models");
-                    }
-                }
+                string modelsDir = LocateModelsDirectory();
 
                 string modelPath = null;
                 string mmprojPath = null;

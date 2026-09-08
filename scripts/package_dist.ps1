@@ -33,16 +33,15 @@ if (Test-Path "F:\corewithin\dist\client") {
 # 4. Demo Notes & Datasets (demo)
 Copy-Item "F:\corewithin\demo" -Destination $DestinationPath -Recurse -Force
 
-# 5. Local Models Directory (models) - folder structure & documentation only (exclude large weights)
-New-Item -ItemType Directory -Path "$DestinationPath\models" -Force | Out-Null
-if (Test-Path "F:\corewithin\models\README.md") {
-    Copy-Item "F:\corewithin\models\README.md" -Destination "$DestinationPath\models\" -Force
-}
-$modelDirs = @("qwen3-14b", "qwen2.5-coder-7b", "qwen3-vl-8b", "qwen3-embedding-0.6b", "qwen3-reranker-0.6b")
-foreach ($dir in $modelDirs) {
-    $targetDir = "$DestinationPath\models\$dir"
-    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
-    Set-Content -Path "$targetDir\.gitkeep" -Value "# Placeholder for $dir model weights. Download model files here." -Encoding UTF8
+# 5. Local Models Directory (models)
+if (Test-Path "F:\corewithin\models") {
+    if (-not (Test-Path "$DestinationPath\models")) {
+        try {
+            New-Item -ItemType Junction -Path "$DestinationPath\models" -Target "F:\corewithin\models" -Force | Out-Null
+        } catch {
+            New-Item -ItemType Directory -Path "$DestinationPath\models" -Force | Out-Null
+        }
+    }
 }
 
 # 6. Local Inference Server Directory (llama_server)
