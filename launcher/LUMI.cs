@@ -341,12 +341,65 @@ namespace LUMI.Desktop
             {
                 bool ollamaActive = IsPortListening(11434);
                 bool visionActive = IsPortListening(8080);
-                string json = string.Format("{{\"ollama\":{0},\"visionServer\":{1},\"port\":{2}}}",
+                string json = string.Format("{{\"ollama\":{0},\"visionServer\":{1},\"port\":{2},\"loadedModel\":\"{3}\"}}",
                     ollamaActive ? "true" : "false",
                     visionActive ? "true" : "false",
-                    _port);
+                    _port,
+                    (Program.ActiveModelName ?? "").Replace("\\", "\\\\").Replace("\"", "\\\""));
                 byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
                 response.StatusCode = 200;
+                response.OutputStream.Write(b, 0, b.Length);
+                response.Close();
+                return;
+            }
+
+            if (urlPath.Equals("/api/launcher/start-all", StringComparison.OrdinalIgnoreCase))
+            {
+                Program.EnsureOllamaRunning(false);
+                Program.StartVisionServer();
+                string json = "{\"success\":true,\"message\":\"Started Ollama and Vision servers\"}";
+                byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
+                response.StatusCode = 200;
+                response.OutputStream.Write(b, 0, b.Length);
+                response.Close();
+                return;
+            }
+
+            if (urlPath.Equals("/api/launcher/scan-models", StringComparison.OrdinalIgnoreCase))
+            {
+                string targetDir = context.Request.QueryString["path"];
+                string json = ScanModelsJson(targetDir);
+                byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
+                response.StatusCode = 200;
+                response.OutputStream.Write(b, 0, b.Length);
+                response.Close();
+                return;
+            }
+
+            if (urlPath.Equals("/api/launcher/browse-folder", StringComparison.OrdinalIgnoreCase))
+            {
+                string json = ShowBrowseFolderDialog();
+                byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
+                response.StatusCode = 200;
+                response.OutputStream.Write(b, 0, b.Length);
+                response.Close();
+                return;
+            }
+
+            if (urlPath.Equals("/api/launcher/load-model", StringComparison.OrdinalIgnoreCase))
+            {
+                string body = ReadRequestBody(context.Request);
+                string modelPath = ExtractJsonField(body, "modelPath");
+                bool ok = false;
+                if (!string.IsNullOrEmpty(modelPath))
+                {
+                    ok = Program.StartModelServer(modelPath);
+                }
+                string json = string.Format("{{\"success\":{0},\"model\":\"{1}\"}}",
+                    ok ? "true" : "false",
+                    (modelPath ?? "").Replace("\\", "\\\\").Replace("\"", "\\\""));
+                byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
+                response.StatusCode = ok ? 200 : 400;
                 response.OutputStream.Write(b, 0, b.Length);
                 response.Close();
                 return;
@@ -387,6 +440,110 @@ namespace LUMI.Desktop
 
             response.StatusCode = 404;
             response.Close();
+        }
+
+        private string ReadRequestBody(HttpListenerRequest request)
+        {
+            if (!request.HasEntityBody) return "";
+            try
+            {
+                using (var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? System.Text.Encoding.UTF8))
+                {
+                    return reader.ReadToEnd();
+                }
+            }
+            catch { return ""; }
+        }
+
+        private string ExtractJsonField(string json, string fieldName)
+        {
+            if (string.IsNullOrEmpty(json)) return "";
+            string pattern = "\"" + fieldName + "\"\\s*:\\s*\"";
+            var match = System.Text.RegularExpressions.Regex.Match(json, pattern);
+            if (!match.Success) return "";
+            int start = match.Index + match.Length;
+            int end = json.IndexOf('"', start);
+            if (end > start)
+            {
+                return json.Substring(start, end - start).Replace("\\\\", "\\").Replace("\\/", "/");
+            }
+            return "";
+        }
+
+        private string ScanModelsJson(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
+            {
+                folderPath = Path.Combine(_baseDir, "models");
+                if (!Directory.Exists(folderPath))
+                {
+                    var parent = Directory.GetParent(_baseDir);
+                    if (parent != null && Directory.Exists(Path.Combine(parent.FullName, "models")))
+                    {
+                        folderPath = Path.Combine(parent.FullName, "models");
+                    }
+                }
+            }
+
+            var list = new List<string>();
+            if (Directory.Exists(folderPath))
+            {
+                try
+                {
+                    var files = Directory.GetFiles(folderPath, "*.gguf", SearchOption.AllDirectories);
+                    foreach (var f in files)
+                    {
+                        try
+                        {
+                            var fi = new FileInfo(f);
+                            double sizeGb = Math.Round((double)fi.Length / (1024.0 * 1024.0 * 1024.0), 2);
+                            bool isMmproj = fi.Name.IndexOf("mmproj", StringComparison.OrdinalIgnoreCase) >= 0;
+                            string escapedPath = f.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                            string escapedName = fi.Name.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                            string escapedDir = (fi.DirectoryName ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+                            list.Add(string.Format("{{\"name\":\"{0}\",\"path\":\"{1}\",\"sizeGb\":{2},\"isMmproj\":{3},\"dir\":\"{4}\"}}",
+                                escapedName, escapedPath, sizeGb.ToString(System.Globalization.CultureInfo.InvariantCulture), isMmproj ? "true" : "false", escapedDir));
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            string folderEscaped = (folderPath ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+            return string.Format("{{\"folder\":\"{0}\",\"models\":[{1}]}}", folderEscaped, string.Join(",", list.ToArray()));
+        }
+
+        private string ShowBrowseFolderDialog()
+        {
+            string selected = null;
+            var thread = new Thread(new ThreadStart(delegate()
+            {
+                using (var fbd = new FolderBrowserDialog())
+                {
+                    fbd.Description = "Select folder containing GGUF models";
+                    fbd.ShowNewFolderButton = false;
+                    string defaultFolder = Path.Combine(_baseDir, "models");
+                    if (Directory.Exists(defaultFolder))
+                    {
+                        fbd.SelectedPath = defaultFolder;
+                    }
+                    if (fbd.ShowDialog() == DialogResult.OK)
+                    {
+                        selected = fbd.SelectedPath;
+                    }
+                }
+            }));
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join(60000);
+
+            if (!string.IsNullOrEmpty(selected))
+            {
+                return ScanModelsJson(selected);
+            }
+            return ScanModelsJson(null);
         }
 
         public static bool IsPortListening(int port)
@@ -796,6 +953,81 @@ namespace LUMI.Desktop
         }
 
         private static System.Diagnostics.Process _visionProcess = null;
+        public static string ActiveModelName = "Qwen3VL-8B-Instruct-Q4_K_M.gguf";
+
+        public static bool StartModelServer(string customModelPath)
+        {
+            try
+            {
+                StopVisionServer();
+                Thread.Sleep(300);
+
+                string[] possibleExes = new string[]
+                {
+                    Path.Combine(_baseDir, "llama_server", "llama-server.exe"),
+                    Path.Combine(_baseDir, "llama", "llama-server.exe"),
+                    @"F:\corewithin\llama\llama-server.exe",
+                    "llama-server"
+                };
+
+                string serverExe = null;
+                string workingDir = null;
+                foreach (string exe in possibleExes)
+                {
+                    if (File.Exists(exe))
+                    {
+                        serverExe = exe;
+                        workingDir = Path.GetDirectoryName(exe);
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(serverExe) || !File.Exists(customModelPath)) return false;
+
+                // Check for mmproj in model directory or default
+                string dir = Path.GetDirectoryName(customModelPath);
+                string mmprojPath = null;
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    foreach (var f in Directory.GetFiles(dir, "*mmproj*.gguf"))
+                    {
+                        mmprojPath = f;
+                        break;
+                    }
+                }
+                if (string.IsNullOrEmpty(mmprojPath))
+                {
+                    string defaultMmproj = Path.Combine(_baseDir, "models", "qwen3-vl-8b", "mmproj-Qwen3VL-8B-Instruct-F16.gguf");
+                    if (File.Exists(defaultMmproj)) mmprojPath = defaultMmproj;
+                    else if (File.Exists(@"F:\corewithin\models\qwen3-vl-8b\mmproj-Qwen3VL-8B-Instruct-F16.gguf"))
+                        mmprojPath = @"F:\corewithin\models\qwen3-vl-8b\mmproj-Qwen3VL-8B-Instruct-F16.gguf";
+                }
+
+                string args = string.Format("-m \"{0}\" --port 8080 -ngl 99 -c 4096", customModelPath);
+                if (!string.IsNullOrEmpty(mmprojPath) && File.Exists(mmprojPath) && customModelPath.IndexOf("mmproj", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    args += string.Format(" --mmproj \"{0}\"", mmprojPath);
+                }
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = serverExe,
+                    Arguments = args,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                    WorkingDirectory = workingDir ?? _baseDir
+                };
+
+                _visionProcess = System.Diagnostics.Process.Start(psi);
+                ActiveModelName = Path.GetFileName(customModelPath);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         public static bool StartVisionServer()
         {
@@ -863,6 +1095,7 @@ namespace LUMI.Desktop
                 };
 
                 _visionProcess = System.Diagnostics.Process.Start(psi);
+                ActiveModelName = Path.GetFileName(modelPath);
                 return true;
             }
             catch

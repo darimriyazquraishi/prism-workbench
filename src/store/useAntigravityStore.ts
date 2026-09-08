@@ -453,6 +453,18 @@ interface AntigravityStore {
   stopVisionServerDaemon: () => Promise<boolean>;
   startOllamaDaemon: () => Promise<boolean>;
 
+  // Model Browsing & GGUF Selection
+  activeGgufModel: string;
+  setActiveGgufModel: (model: string) => void;
+  availableGgufModels: Array<{ name: string; path: string; sizeGb: number; isMmproj: boolean; dir?: string }>;
+  setAvailableGgufModels: (models: Array<{ name: string; path: string; sizeGb: number; isMmproj: boolean; dir?: string }>) => void;
+  modelsFolderPath: string;
+  setModelsFolderPath: (path: string) => void;
+  scanGgufModels: (folder?: string) => Promise<void>;
+  browseModelsFolder: () => Promise<void>;
+  loadSingleGgufModel: (modelPath: string) => Promise<boolean>;
+  startAllLlamaServers: () => Promise<boolean>;
+
   // Session & Trajectory
   sessions: AntigravitySession[];
   activeSessionId: string;
@@ -976,6 +988,86 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       return res.ok;
     } catch {
       return false;
+    }
+  },
+
+  // Model Browsing & GGUF Selection Implementations
+  activeGgufModel: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf',
+  setActiveGgufModel: (model: string) => set({ activeGgufModel: model }),
+  availableGgufModels: [
+    { name: 'Qwen3-14B-Q4_K_M.gguf', path: 'F:\\corewithin\\models\\qwen3-14b\\Qwen3-14B-Q4_K_M.gguf', sizeGb: 9.00, isMmproj: false, dir: 'qwen3-14b' },
+    { name: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf', path: 'F:\\corewithin\\models\\qwen3-vl-8b\\Qwen3VL-8B-Instruct-Q4_K_M.gguf', sizeGb: 5.02, isMmproj: false, dir: 'qwen3-vl-8b' },
+    { name: 'qwen2.5-coder-7b-instruct-q4_k_m.gguf', path: 'F:\\corewithin\\models\\qwen2.5-coder-7b\\qwen2.5-coder-7b-instruct-q4_k_m.gguf', sizeGb: 5.44, isMmproj: false, dir: 'qwen2.5-coder-7b' },
+    { name: 'mmproj-Qwen3VL-8B-Instruct-F16.gguf', path: 'F:\\corewithin\\models\\qwen3-vl-8b\\mmproj-Qwen3VL-8B-Instruct-F16.gguf', sizeGb: 1.15, isMmproj: true, dir: 'qwen3-vl-8b' }
+  ],
+  setAvailableGgufModels: (models) => set({ availableGgufModels: models }),
+  modelsFolderPath: 'F:\\corewithin\\models',
+  setModelsFolderPath: (path: string) => set({ modelsFolderPath: path }),
+
+  scanGgufModels: async (folder?: string) => {
+    const target = folder || get().modelsFolderPath || '';
+    try {
+      const res = await fetch(`/api/launcher/scan-models?path=${encodeURIComponent(target)}`, { signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.models) && data.models.length > 0) {
+          set({ 
+            availableGgufModels: data.models,
+            modelsFolderPath: data.folder || target
+          });
+          return;
+        }
+      }
+    } catch {}
+  },
+
+  browseModelsFolder: async () => {
+    try {
+      const res = await fetch('/api/launcher/browse-folder', { signal: AbortSignal.timeout(60000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.models) && data.models.length > 0) {
+          set({
+            availableGgufModels: data.models,
+            modelsFolderPath: data.folder || get().modelsFolderPath
+          });
+          return;
+        }
+      }
+    } catch {}
+  },
+
+  loadSingleGgufModel: async (modelPath: string) => {
+    try {
+      const res = await fetch('/api/launcher/load-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelPath }),
+        signal: AbortSignal.timeout(10000)
+      });
+      if (res.ok) {
+        const fileName = modelPath.split(/[/\\]/).pop() || modelPath;
+        set({ activeGgufModel: fileName });
+        if (fileName.toLowerCase().includes('14b')) {
+          set({ selectedGeneralModel: 'qwen3:14b', selectedModel: 'qwen3:14b' });
+        }
+        await get().checkEngineStatuses();
+        return true;
+      }
+    } catch {}
+    return false;
+  },
+
+  startAllLlamaServers: async () => {
+    try {
+      const res = await fetch('/api/launcher/start-all', { method: 'POST', signal: AbortSignal.timeout(3000) });
+      await get().checkEngineStatuses();
+      return res.ok;
+    } catch {
+      await get().startOllamaDaemon();
+      await get().startVisionServerDaemon();
+      await get().checkEngineStatuses();
+      return true;
     }
   },
 

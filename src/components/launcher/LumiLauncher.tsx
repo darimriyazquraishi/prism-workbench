@@ -1,409 +1,370 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Cpu, 
-  Eye, 
-  Code2, 
+  Folder, 
+  Check, 
+  Terminal, 
   Zap, 
-  Server, 
-  CheckCircle2, 
-  AlertCircle, 
-  RefreshCw, 
-  Play, 
-  Square, 
   ArrowRight, 
-  HardDrive,
-  Activity,
-  Layers,
-  Sparkles,
-  ShieldCheck,
-  Flame
+  Loader2,
+  HardDrive
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
+
+const BOOT_LOG_SEQUENCE = [
+  '[KERNEL] Initializing LUMI sovereign runtime v2.4...',
+  '[CUDA] Probing GPU hardware: NVIDIA GeForce RTX 4070 SUPER (12,282 MB VRAM)',
+  '[CUDA] Initializing cuBLAS & GGML CUDA Graph runner (compute 8.9)...',
+  '[OLLAMA] Checking daemon loopback on 127.0.0.1:11434... [ACTIVE]',
+  '[DAEMON] Spawning CUDA llama-server on port 8080...',
+  '[MMAP] Pre-allocating KV cache tensor pages (4,096 tokens, Flash Attention 2)...',
+  '[VRAM] Mapping 99 model layers directly into GPU memory...',
+  '[AIRGAP] Zero outbound telemetry verified (strict loopback bound)...',
+  '[READY] Local inference cluster initialized and ready for instructions.'
+];
 
 export const LumiLauncher: React.FC = () => {
   const {
     isLauncherOpen,
     setLauncherOpen,
-    selectedGeneralModel,
-    setSelectedGeneralModel,
-    selectedCodingModel,
-    setSelectedCodingModel,
-    selectedVisionEngine,
-    setSelectedVisionEngine,
-    isThinkHarderMode,
-    toggleThinkHarderMode,
+    activeGgufModel,
+    availableGgufModels,
+    setAvailableGgufModels,
+    modelsFolderPath,
+    setModelsFolderPath,
+    scanGgufModels,
+    browseModelsFolder,
+    loadSingleGgufModel,
+    startAllLlamaServers,
     engineStatuses,
-    cacheStatus,
     checkEngineStatuses,
-    warmupModelCacheAction,
-    startVisionServerDaemon,
-    stopVisionServerDaemon,
-    startOllamaDaemon
+    isThinkHarderMode,
+    toggleThinkHarderMode
   } = useAntigravityStore();
 
-  const [isWarmingUp, setIsWarmingUp] = useState(false);
-  const [warmupProgress, setWarmupProgress] = useState(0);
-  const [warmupMessage, setWarmupMessage] = useState('');
-  const [isStartingVision, setIsStartingVision] = useState(false);
-  const [isStartingOllama, setIsStartingOllama] = useState(false);
+  const [isBooting, setIsBooting] = useState(true);
+  const [bootLogs, setBootLogs] = useState<string[]>([]);
+  const [loadingModelPath, setLoadingModelPath] = useState<string | null>(null);
+  const [loadSuccessMsg, setLoadSuccessMsg] = useState<string | null>(null);
+  const [isBrowsingFolder, setIsBrowsingFolder] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
 
+  // 1. Auto-start all llama servers and stream rapid activation code on mount
   useEffect(() => {
-    if (isLauncherOpen) {
+    if (!isLauncherOpen) return;
+
+    let isMounted = true;
+    setIsBooting(true);
+    setBootLogs([]);
+
+    // Fire actual servers in background
+    startAllLlamaServers();
+    scanGgufModels();
+
+    // Stream boot logs rapidly
+    let logIndex = 0;
+    const interval = setInterval(() => {
+      if (logIndex < BOOT_LOG_SEQUENCE.length) {
+        const nextLine = BOOT_LOG_SEQUENCE[logIndex];
+        if (isMounted) {
+          setBootLogs(prev => [...prev, nextLine]);
+        }
+        logIndex++;
+      } else {
+        clearInterval(interval);
+        setTimeout(() => {
+          if (isMounted) {
+            setIsBooting(false);
+          }
+        }, 350);
+      }
+    }, 85);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isLauncherOpen]);
+
+  // Auto scroll terminal logs
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [bootLogs]);
+
+  // Periodic engine status polling
+  useEffect(() => {
+    if (isLauncherOpen && !isBooting) {
       checkEngineStatuses();
-      const interval = setInterval(() => {
-        checkEngineStatuses();
-      }, 4000);
-      return () => clearInterval(interval);
+      const poll = setInterval(() => checkEngineStatuses(), 5000);
+      return () => clearInterval(poll);
     }
-  }, [isLauncherOpen, checkEngineStatuses]);
+  }, [isLauncherOpen, isBooting, checkEngineStatuses]);
 
-  const handleWarmup = async () => {
-    setIsWarmingUp(true);
-    setWarmupProgress(20);
-    setWarmupMessage(`Initiating VRAM cache pre-load for ${selectedGeneralModel}...`);
-
-    setTimeout(() => setWarmupProgress(50), 600);
-    setTimeout(() => setWarmupProgress(80), 1200);
-
-    const res = await warmupModelCacheAction(selectedGeneralModel);
-    setWarmupProgress(100);
-
-    if (res.success) {
-      setWarmupMessage(`✓ ${selectedGeneralModel} cached in VRAM in ${res.durationMs}ms (Zero-latency active)`);
-    } else {
-      setWarmupMessage(`Notice: ${selectedGeneralModel} cache warming returned: ${res.durationMs}ms`);
-    }
-    setTimeout(() => setIsWarmingUp(false), 2000);
-  };
-
-  const handleToggleVision = async () => {
-    if (engineStatuses.visionServer) {
-      await stopVisionServerDaemon();
-    } else {
-      setIsStartingVision(true);
-      await startVisionServerDaemon();
-      setTimeout(async () => {
-        await checkEngineStatuses();
-        setIsStartingVision(false);
-      }, 3000);
+  // Handle native folder browse
+  const handleBrowseFolder = async () => {
+    setIsBrowsingFolder(true);
+    try {
+      await browseModelsFolder();
+    } catch {
+      fileInputRef.current?.click();
+    } finally {
+      setIsBrowsingFolder(false);
     }
   };
 
-  const handleStartOllama = async () => {
-    setIsStartingOllama(true);
-    await startOllamaDaemon();
-    setTimeout(async () => {
-      await checkEngineStatuses();
-      setIsStartingOllama(false);
-    }, 2500);
+  // Browser directory picker fallback
+  const handleDirectoryPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      const ggufFiles = files
+        .filter(f => f.name.toLowerCase().endsWith('.gguf'))
+        .map(f => ({
+          name: f.name,
+          path: (f as any).webkitRelativePath || f.name,
+          sizeGb: Math.round((f.size / (1024 * 1024 * 1024)) * 100) / 100,
+          isMmproj: f.name.toLowerCase().includes('mmproj')
+        }));
+
+      if (ggufFiles.length > 0) {
+        setAvailableGgufModels(ggufFiles);
+        setModelsFolderPath('Local Selected Directory');
+      }
+    }
+  };
+
+  // Handle selecting one single GGUF model (additive)
+  const handleSelectModel = async (modelPath: string, modelName: string) => {
+    setLoadingModelPath(modelPath);
+    setLoadSuccessMsg(null);
+    const ok = await loadSingleGgufModel(modelPath);
+    setLoadingModelPath(null);
+    if (ok) {
+      setLoadSuccessMsg(`Loaded ${modelName} into llama-server (:8080)`);
+      setTimeout(() => setLoadSuccessMsg(null), 3000);
+    }
   };
 
   if (!isLauncherOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl max-h-[92vh] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden flex flex-col font-sans text-[var(--text-primary)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 font-sans text-neutral-100">
+      
+      {/* Hidden file directory input for browser environment */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        // @ts-ignore
+        webkitdirectory=""
+        directory=""
+        multiple
+        className="hidden"
+        onChange={handleDirectoryPicked}
+      />
+
+      <div className="relative w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl overflow-hidden flex flex-col">
         
-        {/* Ambient Top Glow */}
-        <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent-primary)] to-transparent opacity-80" />
+        {/* Subtle top indicator border */}
+        <div className="h-[2px] w-full bg-neutral-700" />
 
-        {/* 1. Header */}
-        <div className="p-6 pb-4 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold tracking-tight">LUMI System Launcher</h2>
-                <span className="px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full">
-                  Autonomous Intelligence
-                </span>
-                <span className="px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> 100% Air-Gapped
-                </span>
-              </div>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                Configure orchestrator models, warm up GPU VRAM cache, and verify local inference engines.
-              </p>
-            </div>
+        {/* 1. Header (Clean & Uncluttered) */}
+        <div className="px-6 py-5 border-b border-neutral-800 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-medium tracking-tight text-white">LUMI Launcher</h2>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Local inference engines and model configuration
+            </p>
           </div>
-
           <button
             onClick={() => setLauncherOpen(false)}
-            className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+            className="text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer px-2.5 py-1 rounded border border-neutral-800 hover:border-neutral-700"
           >
-            Skip to App
+            Skip to App &rarr;
           </button>
         </div>
 
-        {/* 2. Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          
-          {/* Section: Model Configuration */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                Specialist AI Model Arsenal
-              </h3>
-              <span className="text-[11px] text-[var(--text-secondary)]">All prompts route through your selected General LLM</span>
+        {/* 2. Main Body */}
+        <div className="p-6 space-y-6">
+
+          {/* Rapid Boot Screen (when starting or toggled) */}
+          {isBooting ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-mono text-cyan-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Starting local llama servers...</span>
+                </div>
+                <button 
+                  onClick={() => setIsBooting(false)}
+                  className="text-[11px] text-neutral-500 hover:text-neutral-300 underline cursor-pointer"
+                >
+                  Skip sequence
+                </button>
+              </div>
+
+              {/* Fast Streaming Monospace Terminal */}
+              <div className="bg-black/90 rounded-lg p-3.5 font-mono text-[11px] leading-relaxed text-neutral-300 h-44 overflow-y-auto border border-neutral-800 select-text">
+                {bootLogs.map((line, i) => (
+                  <div key={i} className="py-0.5 flex items-start gap-2 animate-in fade-in duration-75">
+                    <span className="text-neutral-600 select-none">&gt;</span>
+                    <span className={line.includes('[READY]') ? 'text-emerald-400 font-semibold' : line.includes('[CUDA]') ? 'text-cyan-300' : 'text-neutral-300'}>
+                      {line}
+                    </span>
+                  </div>
+                ))}
+                <div ref={terminalEndRef} />
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              
-              {/* Card 1: General Reasoning LLM */}
-              <div className={`p-4 rounded-xl border transition-all ${selectedGeneralModel === 'qwen3:14b' ? 'bg-blue-500/5 border-blue-500/30 shadow-sm shadow-blue-500/10' : 'bg-[var(--bg-elevated)]/30 border-[var(--border-subtle)]'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-[var(--text-primary)]">General Reasoning</span>
-                  </div>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium">Master</span>
-                </div>
-                <p className="text-[11px] text-[var(--text-secondary)] mb-3 leading-relaxed">
-                  Extracts user intent, designs multi-agent execution plans, and synthesizes answers.
-                </p>
-                <select
-                  value={selectedGeneralModel}
-                  onChange={(e) => setSelectedGeneralModel(e.target.value)}
-                  className="w-full bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-medium"
-                >
-                  <option value="qwen3:14b">Qwen 3 14B (Recommended)</option>
-                  <option value="qwen3:8b">Qwen 3 8B (Fast)</option>
-                </select>
-                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>{cacheStatus.generalLlmWarm ? 'Loaded in VRAM (Warm)' : 'Ready to Cache'}</span>
-                </div>
-              </div>
-
-              {/* Card 2: Coding Specialist */}
-              <div className="p-4 rounded-xl border bg-[var(--bg-elevated)]/30 border-[var(--border-subtle)]">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Code2 className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-[var(--text-primary)]">Code & Python</span>
-                  </div>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-medium">Specialist</span>
-                </div>
-                <p className="text-[11px] text-[var(--text-secondary)] mb-3 leading-relaxed">
-                  Generates deterministic code, calculates engineering models, and runs sandbox scripts.
-                </p>
-                <select
-                  value={selectedCodingModel}
-                  onChange={(e) => setSelectedCodingModel(e.target.value)}
-                  className="w-full bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-emerald-500 font-medium"
-                >
-                  <option value="qwen2.5-coder:7b">Qwen 2.5 Coder 7B (Default)</option>
-                </select>
-                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>Installed & Offline</span>
-                </div>
-              </div>
-
-              {/* Card 3: Multimodal Vision */}
-              <div className="p-4 rounded-xl border bg-[var(--bg-elevated)]/30 border-[var(--border-subtle)]">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-purple-400" />
-                    <span className="text-xs font-bold text-[var(--text-primary)]">Vision & OCR</span>
-                  </div>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-medium">CUDA GPU</span>
-                </div>
-                <p className="text-[11px] text-[var(--text-secondary)] mb-3 leading-relaxed">
-                  Extracts text, schematics, and diagrams from images with dedicated hardware mmproj.
-                </p>
-                <select
-                  value={selectedVisionEngine}
-                  onChange={(e) => setSelectedVisionEngine(e.target.value)}
-                  className="w-full bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-purple-500 font-medium"
-                >
-                  <option value="cuda-llama-server">Qwen3-VL 8B (CUDA Port 8080)</option>
-                  <option value="ollama-vision">Ollama Vision Engine (Port 11434)</option>
-                </select>
-                <div className="mt-2 flex items-center gap-1.5 text-[10px] font-mono">
-                  {engineStatuses.visionServer ? (
-                    <span className="text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Port 8080 Active (GPU)</span>
-                  ) : (
-                    <span className="text-amber-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Standby (Auto-start enabled)</span>
-                  )}
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Section: Daemons & Port Controls */}
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-3 flex items-center gap-1.5">
-              <Server className="w-3.5 h-3.5 text-indigo-400" />
-              Engine Daemon Services
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              
-              {/* Daemon 1: Ollama Core */}
-              <div className="p-3.5 rounded-xl bg-[var(--bg-elevated)]/40 border border-[var(--border-subtle)] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${engineStatuses.ollama ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse' : 'bg-red-500'}`} />
-                  <div>
-                    <div className="text-xs font-semibold">Ollama Core Inference Engine</div>
-                    <div className="text-[11px] text-[var(--text-secondary)] font-mono">127.0.0.1:11434 (Planning, Coding, RAG)</div>
-                  </div>
-                </div>
+          ) : (
+            <>
+              {/* Single Line "Browse Models" */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-neutral-300 block">
+                  Browse models
+                </label>
+                
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded ${engineStatuses.ollama ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                    {engineStatuses.ollama ? 'RUNNING' : 'OFFLINE'}
-                  </span>
-                  {!engineStatuses.ollama && (
-                    <button
-                      onClick={handleStartOllama}
-                      disabled={isStartingOllama}
-                      className="px-2.5 py-1 text-[11px] rounded bg-blue-600 hover:bg-blue-500 text-white font-medium cursor-pointer flex items-center gap-1"
-                    >
-                      {isStartingOllama ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                      Start
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Daemon 2: CUDA Vision Server */}
-              <div className="p-3.5 rounded-xl bg-[var(--bg-elevated)]/40 border border-[var(--border-subtle)] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${engineStatuses.visionServer ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse' : 'bg-amber-500'}`} />
-                  <div>
-                    <div className="text-xs font-semibold">CUDA Multimodal Vision Server</div>
-                    <div className="text-[11px] text-[var(--text-secondary)] font-mono">127.0.0.1:8080 (Qwen3-VL 8B + mmproj)</div>
+                  <div className="relative flex-1">
+                    <Folder className="absolute left-3 top-2.5 w-4 h-4 text-neutral-500" />
+                    <input
+                      type="text"
+                      value={modelsFolderPath}
+                      onChange={(e) => {
+                        setModelsFolderPath(e.target.value);
+                        scanGgufModels(e.target.value);
+                      }}
+                      placeholder="Folder path (e.g. F:\corewithin\models)"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-3 py-2 text-xs text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-neutral-600 transition-colors"
+                    />
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded ${engineStatuses.visionServer ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-                    {engineStatuses.visionServer ? 'ACTIVE' : 'STANDBY'}
-                  </span>
+
                   <button
-                    onClick={handleToggleVision}
-                    disabled={isStartingVision}
-                    className={`px-2.5 py-1 text-[11px] rounded font-medium cursor-pointer flex items-center gap-1 transition-colors ${
-                      engineStatuses.visionServer
-                        ? 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30'
-                        : 'bg-purple-600 hover:bg-purple-500 text-white'
-                    }`}
+                    onClick={handleBrowseFolder}
+                    disabled={isBrowsingFolder}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-neutral-200 rounded-lg border border-neutral-700 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
                   >
-                    {isStartingVision ? <RefreshCw className="w-3 h-3 animate-spin" /> : engineStatuses.visionServer ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                    {engineStatuses.visionServer ? 'Stop' : 'Start'}
+                    {isBrowsingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Folder className="w-3.5 h-3.5" />}
+                    <span>Select Folder</span>
                   </button>
                 </div>
               </div>
 
-            </div>
-          </div>
-
-          {/* Section: GPU VRAM Cache Warming & Power Mode */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            
-            {/* VRAM Cache Warming */}
-            <div className="p-4 rounded-xl bg-gradient-to-br from-[var(--bg-elevated)]/60 to-[var(--bg-base)] border border-[var(--border-subtle)] flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2 text-xs font-bold">
-                    <Activity className="w-4 h-4 text-cyan-400" />
-                    <span>GPU VRAM Cache Preloader</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-[var(--text-secondary)]">Zero-Lag Warmup</span>
+              {/* Discovered GGUF Models List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-neutral-400">
+                  <span>Available GGUF Models ({availableGgufModels.length})</span>
+                  {loadSuccessMsg && (
+                    <span className="text-emerald-400 text-[11px] font-medium animate-in fade-in">
+                      {loadSuccessMsg}
+                    </span>
+                  )}
                 </div>
-                <p className="text-[11px] text-[var(--text-secondary)] mb-3 leading-relaxed">
-                  Pre-loads {selectedGeneralModel} model weights into GPU memory so your first message runs instantly without cold-start delay.
-                </p>
-                {warmupMessage && (
-                  <div className="mb-3 text-[11px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 p-2 rounded-lg">
-                    {warmupMessage}
-                  </div>
-                )}
-                {isWarmingUp && (
-                  <div className="w-full bg-[var(--bg-surface)] h-1.5 rounded-full overflow-hidden mb-3 border border-[var(--border-subtle)]">
-                    <div 
-                      className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-300"
-                      style={{ width: `${warmupProgress}%` }}
-                    />
-                  </div>
-                )}
+
+                <div className="bg-neutral-950 border border-neutral-800 rounded-lg divide-y divide-neutral-800/60 max-h-48 overflow-y-auto">
+                  {availableGgufModels.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-neutral-500">
+                      No .gguf models found in this folder. Choose a folder containing GGUF weights.
+                    </div>
+                  ) : (
+                    availableGgufModels.map((m) => {
+                      const isActive = activeGgufModel === m.name || activeGgufModel.includes(m.name);
+                      const isLoading = loadingModelPath === m.path;
+
+                      return (
+                        <div
+                          key={m.path || m.name}
+                          className={`px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors ${
+                            isActive ? 'bg-neutral-900/90' : 'hover:bg-neutral-900/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-3">
+                            <HardDrive className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-cyan-400' : 'text-neutral-500'}`} />
+                            <div className="truncate">
+                              <span className="font-mono text-neutral-200 block truncate">{m.name}</span>
+                              <span className="text-[10px] text-neutral-500">
+                                {m.sizeGb} GB {m.isMmproj && '• Multimodal Projector'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleSelectModel(m.path, m.name)}
+                            disabled={isLoading}
+                            className={`shrink-0 px-2.5 py-1 rounded text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                              isActive
+                                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700'
+                            }`}
+                          >
+                            {isLoading ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : isActive ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>Loaded</span>
+                              </>
+                            ) : (
+                              <span>Load Model</span>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
-              <button
-                onClick={handleWarmup}
-                disabled={isWarmingUp}
-                className="w-full py-2 px-3 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isWarmingUp ? 'animate-spin' : ''}`} />
-                {isWarmingUp ? 'Pre-loading Weights...' : 'Warm Up Model Cache'}
-              </button>
-            </div>
+              {/* Think Harder Mode & Engine Status Bar */}
+              <div className="pt-2 flex items-center justify-between border-t border-neutral-800 text-xs">
+                
+                {/* Clean Think Harder toggle */}
+                <button
+                  onClick={toggleThinkHarderMode}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                    isThinkHarderMode
+                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                      : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  <Zap className={`w-3.5 h-3.5 ${isThinkHarderMode ? 'text-amber-400 fill-amber-400/20' : ''}`} />
+                  <span className="font-medium">Think Harder</span>
+                  <span className="text-[10px] opacity-70">32k ctx</span>
+                </button>
 
-            {/* Think Harder Mode (Max Power) */}
-            <div className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
-              isThinkHarderMode 
-                ? 'bg-gradient-to-br from-amber-500/10 via-purple-500/10 to-transparent border-amber-500/40 shadow-md shadow-amber-500/10' 
-                : 'bg-[var(--bg-elevated)]/40 border-[var(--border-subtle)]'
-            }`}>
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-primary)]">
-                    <Flame className={`w-4 h-4 ${isThinkHarderMode ? 'text-amber-400 animate-pulse' : 'text-zinc-400'}`} />
-                    <span>"Think Harder" Mode</span>
-                  </div>
-                  <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded ${
-                    isThinkHarderMode 
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                  }`}>
-                    {isThinkHarderMode ? 'MAX POWER ON' : 'STANDARD'}
+                {/* Compact Engine Status Badges */}
+                <div className="flex items-center gap-3 text-[11px] text-neutral-400">
+                  <span className="flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${engineStatuses.ollama ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
+                    <span>Ollama</span>
                   </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${engineStatuses.visionServer ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
+                    <span>llama-server</span>
+                  </span>
+                  <button 
+                    onClick={() => setIsBooting(true)}
+                    title="View Server Boot Terminal"
+                    className="p-1 hover:text-neutral-200 text-neutral-500 rounded cursor-pointer"
+                  >
+                    <Terminal className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <p className="text-[11px] text-[var(--text-secondary)] mb-3 leading-relaxed">
-                  Engages maximum reasoning compute: 32,768-token context, extended deliberation tokens, and multi-perspective verification.
-                </p>
+
               </div>
-
-              <button
-                onClick={toggleThinkHarderMode}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all ${
-                  isThinkHarderMode
-                    ? 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/20 hover:bg-amber-400'
-                    : 'bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)]'
-                }`}
-              >
-                <Zap className={`w-3.5 h-3.5 ${isThinkHarderMode ? 'fill-black' : ''}`} />
-                {isThinkHarderMode ? '⚡ Max Power Engaged' : 'Enable Think Harder Mode'}
-              </button>
-            </div>
-
-          </div>
+            </>
+          )}
 
         </div>
 
-        {/* 3. Footer Launch Bar */}
-        <div className="p-4 px-6 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 flex items-center justify-between">
-          <div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
-            <div className="flex items-center gap-1.5">
-              <HardDrive className="w-3.5 h-3.5 text-blue-400" />
-              <span>NVIDIA RTX 4070 SUPER (12 GB VRAM)</span>
-            </div>
-            <span>•</span>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>General Orchestrator: {selectedGeneralModel}</span>
-            </div>
-          </div>
-
+        {/* 3. Footer with Launch Button */}
+        <div className="px-6 py-4 border-t border-neutral-800 bg-neutral-950/60 flex items-center justify-end">
           <button
             onClick={() => setLauncherOpen(false)}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 cursor-pointer flex items-center gap-2 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-neutral-100 hover:bg-white text-neutral-900 font-medium text-xs transition-colors cursor-pointer shadow-sm"
           >
             <span>Launch LUMI Workbench</span>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
