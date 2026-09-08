@@ -9,12 +9,19 @@ export interface PipelineConfig {
 }
 
 export const defaultPipelineConfig: PipelineConfig = {
-  initialModel: 'qwen3:14b',
-  generalReasoningModel: 'qwen3:14b',
-  validatorModel: 'qwen3:14b',
+  initialModel: '',
+  generalReasoningModel: '',
+  validatorModel: '',
   confidenceThreshold: 0.75,
   maxRoutingAttempts: 2,
   validationEnabled: true,
   developerLogsEnabled: true
 };
 
+export function updateDefaultPipelineModels(generalModel: string, validatorModel?: string) {
+  if (generalModel) {
+    defaultPipelineConfig.initialModel = generalModel;
+    defaultPipelineConfig.generalReasoningModel = generalModel;
+    defaultPipelineConfig.validatorModel = validatorModel || generalModel;
+  }
+}

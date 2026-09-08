@@ -112,7 +112,8 @@ export async function executeValidationAndRoutingPipeline(
   userQuery: string,
   sourceContext: string,
   overrideConfig: Partial<PipelineConfig> = {},
-  requestId?: string
+  requestId?: string,
+  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void
 ): Promise<PipelineExecutionResult> {
   const cfg: PipelineConfig = { ...defaultPipelineConfig, ...overrideConfig };
   const logId = `val-log-${Date.now()}`;
@@ -122,7 +123,8 @@ export async function executeValidationAndRoutingPipeline(
   if (!cfg.validationEnabled) {
     const initialRes = await callLocalLlm({
       model: cfg.initialModel,
-      userPrompt: `Context:\n${sourceContext}\n\nUser Question:\n${userQuery}`
+      userPrompt: `Context:\n${sourceContext}\n\nUser Question:\n${userQuery}`,
+      onToken
     });
     const mockValidation: ValidationResult = {
       grounded: true,
@@ -171,7 +173,8 @@ export async function executeValidationAndRoutingPipeline(
       ? 'You are a precise, grounded assistant. Answer the user prompt using available evidence. Do not hallucinate or invent details.'
       : 'You are a helpful, concise assistant. Answer the user prompt directly.',
     userPrompt: initialPrompt,
-    temperature: 0.2
+    temperature: 0.2,
+    onToken
   });
   const initialModelDuration = Math.round(performance.now() - startInitialModel);
   const initialAnswer = initialRes.content;

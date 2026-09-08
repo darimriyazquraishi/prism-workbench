@@ -15,6 +15,7 @@ export interface LocalLlmOptions {
   temperature?: number;
   numCtx?: number;
   thinkHarder?: boolean;
+  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void;
 }
 
 export interface LocalLlmResult {
@@ -28,6 +29,19 @@ export interface LocalLlmResult {
 
 const OLLAMA_BASE = 'http://127.0.0.1:11434';
 const VISION_SERVER_BASE = 'http://127.0.0.1:8080';
+
+// Dynamic model registry cache populated from /api/tags or launcher
+let cachedInstalledOllamaModels: string[] = [];
+
+export function setInstalledOllamaModels(models: string[]) {
+  if (Array.isArray(models)) {
+    cachedInstalledOllamaModels = models.filter(Boolean);
+  }
+}
+
+export function getInstalledOllamaModels(): string[] {
+  return cachedInstalledOllamaModels;
+}
 
 function extractCleanErrorMessage(raw: string, status: number): string {
   try {
@@ -50,8 +64,11 @@ function extractCleanErrorMessage(raw: string, status: number): string {
 /**
  * Pre-warms and loads model weights into GPU VRAM to ensure 0-lag execution.
  */
-export async function warmupModelCache(modelTag: string = 'qwen3:14b'): Promise<{ success: boolean; durationMs: number; error?: string }> {
+export async function warmupModelCache(modelTag?: string): Promise<{ success: boolean; durationMs: number; error?: string }> {
   const resolved = resolveOllamaModelTag(modelTag);
+  if (!resolved || resolved === 'default') {
+    return { success: false, durationMs: 0, error: 'No model available to warm up' };
+  }
   const startTime = performance.now();
   try {
     const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
@@ -75,29 +92,73 @@ export async function warmupModelCache(modelTag: string = 'qwen3:14b'): Promise<
 }
 
 /**
- * Normalizes model names from plan descriptions/aliases to available Ollama model tags
+ * Dynamically resolves requested model names/roles against actually installed Ollama models.
+ * Never forces hardcoded model tags that may not exist on the user's workstation.
  */
 export function resolveOllamaModelTag(requested?: string): string {
-  if (!requested) return 'qwen3:14b';
-  const r = requested.toLowerCase();
+  // 1. Direct exact match
+  if (requested && cachedInstalledOllamaModels.includes(requested)) {
+    return requested;
+  }
 
+  // 2. Case-insensitive match
+  if (requested) {
+    const reqLower = requested.toLowerCase();
+    const matched = cachedInstalledOllamaModels.find(m => m.toLowerCase() === reqLower);
+    if (matched) return matched;
+  }
+
+  const r = (requested || '').toLowerCase();
+
+  // 3. Coding role match
   if (r.includes('coder') || r.includes('code') || r.includes('python')) {
-    return 'qwen2.5-coder:7b';
+    const coder = cachedInstalledOllamaModels.find(m => {
+      const ml = m.toLowerCase();
+      return ml.includes('coder') || ml.includes('code') || ml.includes('python') || ml.includes('starcoder') || ml.includes('dev');
+    });
+    if (coder) return coder;
   }
-  if (r.includes('vl') || r.includes('vision')) {
-    return 'qwen2.5vl:7b';
+
+  // 4. Vision / Multimodal role match
+  if (r.includes('vl') || r.includes('vision') || r.includes('image') || r.includes('multimodal')) {
+    const vision = cachedInstalledOllamaModels.find(m => {
+      const ml = m.toLowerCase();
+      return ml.includes('vl') || ml.includes('vision') || ml.includes('llava') || ml.includes('multimodal') || ml.includes('clip');
+    });
+    if (vision) return vision;
   }
-  if (r.includes('14b')) {
-    return 'qwen3:14b';
+
+  // 5. Embedding role match
+  if (r.includes('embed') || r.includes('nomic') || r.includes('bge')) {
+    const embed = cachedInstalledOllamaModels.find(m => {
+      const ml = m.toLowerCase();
+      return ml.includes('embed') || ml.includes('nomic') || ml.includes('bge');
+    });
+    if (embed) return embed;
   }
-  if (r.includes('qwen') || r.includes('instruct') || r.includes('8b')) {
-    return 'qwen3:8b';
+
+  // 6. Substring match for specific model name or parameter size (e.g. "14b", "llama3", "deepseek")
+  if (requested && requested.trim()) {
+    const fuzzy = cachedInstalledOllamaModels.find(m => m.toLowerCase().includes(r));
+    if (fuzzy) return fuzzy;
   }
-  return requested;
+
+  // 7. Premier General Reasoning Model: pick primary general model (non-embedding, non-reranker)
+  if (cachedInstalledOllamaModels.length > 0) {
+    const general = cachedInstalledOllamaModels.find(m => {
+      const ml = m.toLowerCase();
+      return !ml.includes('embed') && !ml.includes('rerank') && !ml.includes('vl') && !ml.includes('vision');
+    });
+    if (general) return general;
+    return cachedInstalledOllamaModels[0];
+  }
+
+  return requested || 'default';
 }
 
 /**
  * Executes a live inference request to local Ollama (11434) or CUDA Vision Server (8080).
+ * Supports real-time token streaming via options.onToken.
  * Measures exact latency and bytes transferred.
  */
 export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmResult> {
@@ -108,6 +169,10 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
   if (options.thinkHarder) {
     const thinkHarderDirective = `\n\n[MAX POWER REASONING MODE: THINK HARDER ACTIVE]\n- Systematically analyze the underlying problem, assumptions, and constraints.\n- Break the task down into clear intermediate sub-steps with explicit logical justification.\n- Rigorously check edge cases, counterarguments, and potential failure modes.\n- Ensure deliverables strictly conform to required contracts and syntax.`;
     effectiveSystemPrompt = effectiveSystemPrompt ? (effectiveSystemPrompt + thinkHarderDirective) : thinkHarderDirective.trim();
+  } else if (!options.formatJson) {
+    // For standard casual / conversational queries, guide the model to be direct and responsive
+    const directDirective = `\nRespond directly and helpfully to the user without an extended internal chain-of-thought monologue.`;
+    effectiveSystemPrompt = effectiveSystemPrompt ? (effectiveSystemPrompt + directDirective) : directDirective.trim();
   }
 
   // 1. Multimodal Vision Handling: If images attached, prioritize the CUDA llama-server on port 8080 (native mmproj support)
@@ -131,29 +196,77 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
             }
           ],
           max_tokens: options.thinkHarder ? 4096 : 3500,
-          temperature: options.thinkHarder ? 0.15 : (options.temperature ?? 0.2)
+          temperature: options.thinkHarder ? 0.15 : (options.temperature ?? 0.2),
+          stream: Boolean(options.onToken)
         }),
         signal: AbortSignal.timeout(120000)
       });
 
       if (visionRes.ok) {
-        const vData = await visionRes.json();
-        const vText = vData?.choices?.[0]?.message?.content || '';
-        if (vText) {
-          const durationMs = Math.round(performance.now() - startTime);
-          const bytesRec = new TextEncoder().encode(JSON.stringify(vData)).length;
-          useTelemetryStore.getState().recordInference({
-            model: 'Qwen3-VL 8B (CUDA mmproj 8080)',
-            inferenceTimeMs: durationMs
-          });
-          return {
-            content: vText.trim(),
-            model: 'qwen3-vl:8b (CUDA mmproj)',
-            durationMs,
-            bytesSent: new TextEncoder().encode(options.userPrompt).length,
-            bytesReceived: bytesRec,
-            endpoint: `${VISION_SERVER_BASE}/v1/chat/completions`
-          };
+        if (options.onToken && visionRes.body) {
+          const reader = visionRes.body.getReader();
+          const decoder = new TextDecoder();
+          let vAccumulated = '';
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || !trimmed.startsWith('data:')) continue;
+              const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const chunk = JSON.parse(jsonStr);
+                const delta = chunk.choices?.[0]?.delta?.content || '';
+                if (delta) {
+                  vAccumulated += delta;
+                  options.onToken(delta, vAccumulated, false);
+                }
+              } catch {}
+            }
+          }
+
+          if (vAccumulated) {
+            const durationMs = Math.round(performance.now() - startTime);
+            const bytesRec = new TextEncoder().encode(vAccumulated).length;
+            useTelemetryStore.getState().recordInference({
+              model: 'Local Vision Engine (CUDA mmproj 8080)',
+              inferenceTimeMs: durationMs
+            });
+            return {
+              content: vAccumulated.trim(),
+              model: 'vision (CUDA mmproj)',
+              durationMs,
+              bytesSent: new TextEncoder().encode(options.userPrompt).length,
+              bytesReceived: bytesRec,
+              endpoint: `${VISION_SERVER_BASE}/v1/chat/completions`
+            };
+          }
+        } else {
+          const vData = await visionRes.json();
+          const vText = vData?.choices?.[0]?.message?.content || '';
+          if (vText) {
+            const durationMs = Math.round(performance.now() - startTime);
+            const bytesRec = new TextEncoder().encode(JSON.stringify(vData)).length;
+            useTelemetryStore.getState().recordInference({
+              model: 'Local Vision Engine (CUDA mmproj 8080)',
+              inferenceTimeMs: durationMs
+            });
+            return {
+              content: vText.trim(),
+              model: 'vision (CUDA mmproj)',
+              durationMs,
+              bytesSent: new TextEncoder().encode(options.userPrompt).length,
+              bytesReceived: bytesRec,
+              endpoint: `${VISION_SERVER_BASE}/v1/chat/completions`
+            };
+          }
         }
       }
     } catch (vErr) {
@@ -186,11 +299,12 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
   const defaultNumCtx = options.numCtx ?? (options.thinkHarder ? 32768 : (options.images && options.images.length > 0 ? 16384 : 8192));
   const numPredict = options.thinkHarder ? 4096 : 3500;
   const temperature = options.thinkHarder ? 0.15 : (options.temperature ?? 0.2);
+  const isStreaming = Boolean(options.onToken);
 
   const requestBody = JSON.stringify({
     model: modelTag,
     messages,
-    stream: false,
+    stream: isStreaming,
     format: options.formatJson ? 'json' : undefined,
     options: {
       temperature,
@@ -230,7 +344,7 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
         const retryBody = JSON.stringify({
           model: modelTag,
           messages,
-          stream: false,
+          stream: isStreaming,
           format: options.formatJson ? 'json' : undefined,
           options: {
             temperature: options.temperature ?? 0.2,
@@ -245,9 +359,44 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
           signal: controller.signal
         });
         if (retryRes.ok) {
-          const retryData = await retryRes.json();
-          responseText = retryData?.message?.content || '';
-          bytesReceived = new TextEncoder().encode(JSON.stringify(retryData)).length;
+          if (isStreaming && retryRes.body) {
+            const reader = retryRes.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedContent = '';
+            let accumulatedThinking = '';
+            let buffer = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                try {
+                  const chunk = JSON.parse(trimmed);
+                  const thinking = chunk.message?.thinking || '';
+                  const content = chunk.message?.content || '';
+                  if (thinking) {
+                    accumulatedThinking += thinking;
+                    options.onToken?.(thinking, accumulatedContent || accumulatedThinking, true);
+                  }
+                  if (content) {
+                    accumulatedContent += content;
+                    options.onToken?.(content, accumulatedContent, false);
+                  }
+                } catch {}
+              }
+            }
+            responseText = accumulatedContent || accumulatedThinking;
+            bytesReceived = new TextEncoder().encode(responseText).length;
+          } else {
+            const retryData = await retryRes.json();
+            responseText = retryData?.message?.content || retryData?.message?.thinking || '';
+            bytesReceived = new TextEncoder().encode(JSON.stringify(retryData)).length;
+          }
         } else {
           const retryErr = await retryRes.text().catch(() => '');
           throw new Error(extractCleanErrorMessage(retryErr || retryRes.statusText, retryRes.status));
@@ -256,9 +405,63 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
         throw new Error(extractCleanErrorMessage(errBody || res.statusText, res.status));
       }
     } else {
-      const data = await res.json();
-      responseText = data?.message?.content || '';
-      bytesReceived = new TextEncoder().encode(JSON.stringify(data)).length;
+      // Handle streaming or JSON response
+      if (isStreaming && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedContent = '';
+        let accumulatedThinking = '';
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const chunk = JSON.parse(trimmed);
+              const thinking = chunk.message?.thinking || '';
+              const content = chunk.message?.content || '';
+              if (thinking) {
+                accumulatedThinking += thinking;
+                options.onToken?.(thinking, accumulatedContent || accumulatedThinking, true);
+              }
+              if (content) {
+                accumulatedContent += content;
+                options.onToken?.(content, accumulatedContent, false);
+              }
+            } catch {}
+          }
+        }
+
+        if (buffer.trim()) {
+          try {
+            const chunk = JSON.parse(buffer.trim());
+            const thinking = chunk.message?.thinking || '';
+            const content = chunk.message?.content || '';
+            if (thinking) {
+              accumulatedThinking += thinking;
+              options.onToken?.(thinking, accumulatedContent || accumulatedThinking, true);
+            }
+            if (content) {
+              accumulatedContent += content;
+              options.onToken?.(content, accumulatedContent, false);
+            }
+          } catch {}
+        }
+
+        responseText = accumulatedContent || accumulatedThinking;
+        bytesReceived = new TextEncoder().encode(responseText).length;
+      } else {
+        const data = await res.json();
+        responseText = data?.message?.content || data?.message?.thinking || '';
+        bytesReceived = new TextEncoder().encode(JSON.stringify(data)).length;
+      }
     }
 
     if (options.images && options.images.length > 0) {
@@ -314,9 +517,9 @@ export async function parseOrRepairJson<T>(rawText: string, modelTag: string, sc
   try {
     return JSON.parse(cleaned) as T;
   } catch (initialParseError: any) {
-    console.warn('Initial JSON parse failed. Attempting repair with local Qwen...', initialParseError);
+    console.warn('Initial JSON parse failed. Attempting repair with local reasoning model...', initialParseError);
 
-    // Attempt 2: Ask Qwen to repair the JSON syntax
+    // Attempt 2: Ask the model to repair the JSON syntax
     try {
       const repairPrompt = `The following text was supposed to be valid JSON conforming to this schema:\n${schemaDescription}\n\nHowever, it failed JSON.parse with error: ${initialParseError.message}\n\nPlease output ONLY the fixed, valid JSON. Do not include markdown commentary, explanations, or backticks.\n\nINVALID JSON:\n${cleaned}`;
 
@@ -345,14 +548,15 @@ export async function parseOrRepairJson<T>(rawText: string, modelTag: string, sc
 }
 
 /**
- * PPTX Content Reasoning: Qwen determines presentation title, slide order, content, speaker notes
+ * PPTX Content Reasoning: Model determines presentation title, slide order, content, speaker notes
  */
 export async function generatePptxSlidesWithQwen(
   userPrompt: string,
   sourceMaterial: string,
   ragContext: KbGuidanceRef[],
-  modelTag = 'qwen3:8b'
+  modelTag?: string
 ): Promise<{ data: PptxStructuredContent; audit: LocalLlmResult }> {
+  const resolvedModel = resolveOllamaModelTag(modelTag);
   const schemaDesc = `{
   "title": "string (Executive Presentation Title)",
   "subtitle": "string (Subtitle with context and date)",
@@ -373,7 +577,7 @@ export async function generatePptxSlidesWithQwen(
     ? ragContext.map(r => `[Guideline: ${r.title}]\n${r.snippet}`).join('\n\n')
     : 'No specific corporate presentation guidelines retrieved.';
 
-  const systemPrompt = `You are Qwen, the executive presentation brain for Lumi Sovereign AI Workbench.
+  const systemPrompt = `You are the executive presentation architect for Lumi Sovereign AI Workbench.
 Your job is to thoroughly analyze the user request, uploaded source notes, and company presentation guidelines to create a high-impact, professional slide deck.
 You MUST determine:
 - Title and subtitle
@@ -398,33 +602,34 @@ ${ragSection}
 Create the complete structured presentation JSON now. Ground all factual statements in the provided sources.`;
 
   const result = await callLocalLlm({
-    model: modelTag,
+    model: resolvedModel,
     systemPrompt,
     userPrompt: userQuery,
     formatJson: true,
     temperature: 0.3
   });
 
-  const parsed = await parseOrRepairJson<PptxStructuredContent>(result.content, modelTag, schemaDesc);
+  const parsed = await parseOrRepairJson<PptxStructuredContent>(result.content, resolvedModel, schemaDesc);
 
   // Schema validation checks
   if (!parsed.title || !Array.isArray(parsed.slides) || parsed.slides.length === 0) {
-    throw new Error('Qwen returned incomplete slide structure (missing title or slides array).');
+    throw new Error('Model returned incomplete slide structure (missing title or slides array).');
   }
 
   return { data: parsed, audit: result };
 }
 
 /**
- * DOCX Content Reasoning: Qwen determines full document sections, findings, and formal approval note
+ * DOCX Content Reasoning: Model determines full document sections, findings, and formal approval note
  */
 export async function generateDocxSectionsWithQwen(
   userPrompt: string,
   sourceMaterial: string,
   ragContext: KbGuidanceRef[],
   deterministicCalcs?: { formula: string; result: any; summary: string },
-  modelTag = 'qwen3:8b'
+  modelTag?: string
 ): Promise<{ data: DocxStructuredContent; audit: LocalLlmResult }> {
+  const resolvedModel = resolveOllamaModelTag(modelTag);
   const schemaDesc = `{
   "documentTitle": "string (Formal Document / Approval Note Title)",
   "documentType": "string (e.g. Formal Approval Note / Technical Inspection Brief)",
@@ -459,7 +664,7 @@ export async function generateDocxSectionsWithQwen(
     ? `Formula Applied: ${deterministicCalcs.formula}\nCalculated Values: ${JSON.stringify(deterministicCalcs.result)}\nSummary: ${deterministicCalcs.summary}`
     : 'No deterministic sensor calculations provided.';
 
-  const systemPrompt = `You are Qwen, the engineering reasoning brain for Lumi Sovereign AI Workbench.
+  const systemPrompt = `You are the engineering reasoning brain for Lumi Sovereign AI Workbench.
 Your job is to synthesize an official, formal engineering document (Word .docx format) such as an Equipment Approval Note or Compliance Review.
 You MUST reason over:
 - Uploaded inspection notes and readings
@@ -485,31 +690,32 @@ ${calcSection}
 Produce the structured document content now. Ground all analysis directly in the provided evidence.`;
 
   const result = await callLocalLlm({
-    model: modelTag,
+    model: resolvedModel,
     systemPrompt,
     userPrompt: userQuery,
     formatJson: true,
     temperature: 0.2
   });
 
-  const parsed = await parseOrRepairJson<DocxStructuredContent>(result.content, modelTag, schemaDesc);
+  const parsed = await parseOrRepairJson<DocxStructuredContent>(result.content, resolvedModel, schemaDesc);
 
   if (!parsed.documentTitle || !Array.isArray(parsed.sections) || parsed.sections.length === 0) {
-    throw new Error('Qwen returned incomplete document structure (missing documentTitle or sections).');
+    throw new Error('Model returned incomplete document structure (missing documentTitle or sections).');
   }
 
   return { data: parsed, audit: result };
 }
 
 /**
- * XLSX Structure Reasoning: Qwen decides workbook layout, sheets, column headers, and data rows
+ * XLSX Structure Reasoning: Model decides workbook layout, sheets, column headers, and data rows
  */
 export async function generateXlsxStructureWithQwen(
   userPrompt: string,
   sourceMaterial: string,
   deterministicCalcs?: { formula: string; result: any; summary: string },
-  modelTag = 'qwen3:8b'
+  modelTag?: string
 ): Promise<{ data: XlsxStructuredContent; audit: LocalLlmResult }> {
+  const resolvedModel = resolveOllamaModelTag(modelTag);
   const schemaDesc = `{
   "workbookTitle": "string",
   "summary": "string",
@@ -532,7 +738,7 @@ export async function generateXlsxStructureWithQwen(
     ? `Formula Applied: ${deterministicCalcs.formula}\nCalculations: ${JSON.stringify(deterministicCalcs.result)}\nSummary: ${deterministicCalcs.summary}`
     : 'No prior calculation results.';
 
-  const systemPrompt = `You are Qwen, the quantitative spreadsheet architect for Lumi Sovereign AI Workbench.
+  const systemPrompt = `You are the quantitative spreadsheet architect for Lumi Sovereign AI Workbench.
 Your job is to structure an Excel workbook (.xlsx) with clean, professional financial/engineering tables.
 You MUST determine:
 - Meaningful sheet names (e.g. 'Executive Summary', 'Cost Breakdown', 'Reliability Metrics')
@@ -555,31 +761,32 @@ ${calcSection}
 Synthesize the complete workbook schema now.`;
 
   const result = await callLocalLlm({
-    model: modelTag,
+    model: resolvedModel,
     systemPrompt,
     userPrompt: userQuery,
     formatJson: true,
     temperature: 0.2
   });
 
-  const parsed = await parseOrRepairJson<XlsxStructuredContent>(result.content, modelTag, schemaDesc);
+  const parsed = await parseOrRepairJson<XlsxStructuredContent>(result.content, resolvedModel, schemaDesc);
 
   if (!parsed.workbookTitle || !Array.isArray(parsed.sheets) || parsed.sheets.length === 0) {
-    throw new Error('Qwen returned incomplete spreadsheet structure (missing workbookTitle or sheets).');
+    throw new Error('Model returned incomplete spreadsheet structure (missing workbookTitle or sheets).');
   }
 
   return { data: parsed, audit: result };
 }
 
 /**
- * Code Generation: Qwen2.5-Coder writes genuine, executable Python code
+ * Code Generation: Model writes genuine, executable Python code
  */
 export async function generatePythonCodeWithQwen(
   userPrompt: string,
   sourceData: string,
-  modelTag = 'qwen2.5-coder:7b'
+  modelTag?: string
 ): Promise<{ code: string; explanation: string; audit: LocalLlmResult }> {
-  const systemPrompt = `You are Qwen2.5-Coder, a world-class senior Python engineer in an air-gapped industrial computing environment.
+  const resolvedModel = resolveOllamaModelTag(modelTag || 'coder');
+  const systemPrompt = `You are a world-class senior Python engineer in an air-gapped industrial computing environment.
 Your job is to write complete, bug-free, self-contained, and deterministic Python code fulfilling the user's requirements.
 Follow these rules:
 1. Provide valid Python 3 code with imports, clear type annotations, and docstrings.
@@ -596,7 +803,7 @@ ${sourceData || 'Standard industrial dataset specifications.'}
 Write the complete Python calculation script now.`;
 
   const result = await callLocalLlm({
-    model: modelTag,
+    model: resolvedModel,
     systemPrompt,
     userPrompt: userQuery,
     temperature: 0.2
@@ -613,3 +820,9 @@ Write the complete Python calculation script now.`;
     audit: result
   };
 }
+
+// Aliases for cleaner imports without vendor-specific names
+export const generatePptxSlides = generatePptxSlidesWithQwen;
+export const generateDocxSections = generateDocxSectionsWithQwen;
+export const generateXlsxStructure = generateXlsxStructureWithQwen;
+export const generatePythonCode = generatePythonCodeWithQwen;

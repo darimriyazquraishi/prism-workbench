@@ -18,7 +18,7 @@ import type {
   DiscoveredModel,
   ModelArsenal
 } from '../types/antigravity';
-import { defaultPipelineConfig, type PipelineConfig } from '../config/pipelineConfig';
+import { defaultPipelineConfig, updateDefaultPipelineModels, type PipelineConfig } from '../config/pipelineConfig';
 import { executeValidationAndRoutingPipeline } from '../services/answerValidatorService';
 import { useTelemetryStore } from './telemetryStore';
 import { searchKnowledgeBaseWithNomic, chunkDocumentText } from '../services/nomicEmbeddings';
@@ -35,7 +35,8 @@ import {
   generateXlsxStructureWithQwen,
   generatePythonCodeWithQwen,
   resolveOllamaModelTag,
-  warmupModelCache
+  warmupModelCache,
+  setInstalledOllamaModels
 } from '../services/localLlmService';
 import { detectRequiredCapabilities, resolveModelForCapability } from '../services/modelCapabilityRouter';
 
@@ -206,12 +207,13 @@ export async function queryLocalChatbotLLM(
   model?: string,
   previousPrompts: string[] = [],
   contextText: string = '',
-  requestId?: string
+  requestId?: string,
+  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void
 ): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   try {
     const pipelineRes = await executeValidationAndRoutingPipeline(promptText, contextText, {
       initialModel: model || defaultPipelineConfig.initialModel
-    }, requestId);
+    }, requestId, onToken);
     return {
       text: pipelineRes.finalAnswer,
       auditLog: pipelineRes.auditLog,
@@ -230,11 +232,12 @@ export async function queryLocalChatbotLLM(
 
 export function detectModelInfo(filename: string, fullPath?: string, sizeBytes?: number): DiscoveredModel {
   let name = filename.replace(/\.(gguf|bin|safetensors|pt|pth|onnx)$/i, '').trim();
-  if (/qwen3.*14b/i.test(name)) name = 'Qwen 3 14B';
-  else if (/qwen2\.5.*coder.*7b/i.test(name)) name = 'Qwen 2.5 Coder 7B';
-  else if (/qwen3.*vl.*8b/i.test(name)) name = 'Qwen 3 VL 8B';
-  else if (/qwen3.*embed/i.test(name)) name = 'Qwen 3 Embedding 0.6B';
-  else if (/qwen3.*rerank/i.test(name)) name = 'Qwen 3 Reranker 0.6B';
+  // Clean up standard hyphens/underscores to clean title case
+  const cleanName = name
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b([a-z])/g, c => c.toUpperCase())
+    .replace(/\bQ\d+ K M\b/i, '')
+    .trim();
 
   const lower = (filename + ' ' + (fullPath || '')).toLowerCase();
 
@@ -242,38 +245,38 @@ export function detectModelInfo(filename: string, fullPath?: string, sizeBytes?:
   let roleName = 'Master Reasoning & Planning';
   let assignedAgent = 'Reasoning & Planning Agent (Master Orchestrator)';
   let description = 'Coordinates specialist models, deconstructs user intent, and synthesizes final answers.';
-  let ollamaTag = 'qwen3:8b';
+  let ollamaTag = resolveOllamaModelTag(name);
 
   if (lower.includes('vl') || lower.includes('vision') || lower.includes('multimodal') || lower.includes('clip') || lower.includes('llava')) {
     role = 'vision';
     roleName = 'Vision & Document OCR';
     assignedAgent = 'Vision & Multimodal Agent';
     description = 'Extracts visual observations from images, engineering schematics, and scanned reports.';
-    ollamaTag = 'qwen2.5vl:7b';
-  } else if (lower.includes('coder') || lower.includes('code') || lower.includes('python') || lower.includes('starcoder')) {
+    ollamaTag = resolveOllamaModelTag('vision');
+  } else if (lower.includes('coder') || lower.includes('code') || lower.includes('python') || lower.includes('starcoder') || lower.includes('dev')) {
     role = 'coder';
     roleName = 'Code & Math Synthesis';
     assignedAgent = 'Code & Math Agent';
     description = 'Generates production-grade scripts, performs calculations, and debugs software issues.';
-    ollamaTag = 'qwen2.5-coder:7b';
+    ollamaTag = resolveOllamaModelTag('coder');
   } else if (lower.includes('embed') || lower.includes('nomic') || lower.includes('bge') || lower.includes('minilm')) {
     role = 'embedding';
     roleName = 'Vector Embeddings (RAG)';
     assignedAgent = 'Knowledge Retrieval Agent (RAG)';
     description = 'Generates vector representations of queries and documents for semantic knowledge search.';
-    ollamaTag = 'nomic-embed-text';
+    ollamaTag = resolveOllamaModelTag('embed');
   } else if (lower.includes('rerank')) {
     role = 'reranker';
     roleName = 'Cross-Encoder Re-ranker';
     assignedAgent = 'Neural Re-ranking Agent';
     description = 'Re-ranks retrieved knowledge candidates to guarantee high context precision.';
-    ollamaTag = 'qwen3-reranker:0.6b';
-  } else if (lower.includes('14b')) {
+    ollamaTag = resolveOllamaModelTag('reranker');
+  } else {
     role = 'reasoning';
     roleName = 'Deep Reasoning & Synthesis';
     assignedAgent = 'Reasoning & Planning Agent (Master Orchestrator)';
     description = 'Complex logic evaluation, multi-step problem solving, and formal brief synthesis.';
-    ollamaTag = 'qwen3:14b';
+    ollamaTag = resolveOllamaModelTag(name);
   }
 
   const formattedSize = sizeBytes && sizeBytes > 0
@@ -284,7 +287,7 @@ export function detectModelInfo(filename: string, fullPath?: string, sizeBytes?:
 
   return {
     id: `model-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-    name,
+    name: cleanName || name,
     filename,
     path: fullPath || filename,
     sizeFormatted: formattedSize,
@@ -303,7 +306,8 @@ export async function generateChatbotResponse(
   previousUserPrompts: string[] = [],
   activeModel?: string,
   contextText: string = '',
-  requestId?: string
+  requestId?: string,
+  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void
 ): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   let rawP = promptText.trim();
   let p = rawP.toLowerCase();
@@ -401,7 +405,7 @@ export async function generateChatbotResponse(
   }
 
   // Fallback Reasoning Engine: Call the actual validation and routing pipeline
-  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId);
+  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId, onToken);
 }
 
 export interface PreviewFile {
@@ -903,9 +907,12 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   // Launcher & Model Cache State
   isLauncherOpen: true,
   setLauncherOpen: (open: boolean) => set({ isLauncherOpen: open }),
-  selectedGeneralModel: 'qwen3:14b',
-  setSelectedGeneralModel: (model: string) => set({ selectedGeneralModel: model, selectedModel: model }),
-  selectedCodingModel: 'qwen2.5-coder:7b',
+  selectedGeneralModel: '',
+  setSelectedGeneralModel: (model: string) => {
+    updateDefaultPipelineModels(model);
+    set({ selectedGeneralModel: model, selectedModel: model });
+  },
+  selectedCodingModel: '',
   setSelectedCodingModel: (model: string) => set({ selectedCodingModel: model }),
   selectedVisionEngine: 'cuda-llama-server',
   setSelectedVisionEngine: (engine: string) => set({ selectedVisionEngine: engine }),
@@ -959,7 +966,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   },
 
   warmupModelCacheAction: async (modelTag?: string) => {
-    const target = modelTag || get().selectedGeneralModel || 'qwen3:14b';
+    const target = modelTag || get().selectedGeneralModel || get().selectedModel || resolveOllamaModelTag();
+    if (!target || target === 'default') return { success: false, durationMs: 0 };
     set((state) => ({ cacheStatus: { ...state.cacheStatus, warmingUp: true } }));
     const result = await warmupModelCache(target);
     set((state) => ({
@@ -1000,20 +1008,15 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   },
 
   // Model Browsing & GGUF Selection Implementations
-  activeGgufModel: 'Qwen3-14B-Q4_K_M.gguf',
+  activeGgufModel: '',
   setActiveGgufModel: (model: string) => set({ activeGgufModel: model }),
-  availableGgufModels: [
-    { name: 'Qwen3-14B-Q4_K_M.gguf', path: 'F:\\corewithin\\models\\qwen3-14b\\Qwen3-14B-Q4_K_M.gguf', sizeGb: 8.38, isMmproj: false, dir: 'qwen3-14b' },
-    { name: 'qwen2.5-coder-7b-instruct-q4_k_m.gguf', path: 'F:\\corewithin\\models\\qwen2.5-coder-7b\\qwen2.5-coder-7b-instruct-q4_k_m.gguf', sizeGb: 5.07, isMmproj: false, dir: 'qwen2.5-coder-7b' },
-    { name: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf', path: 'F:\\corewithin\\models\\qwen3-vl-8b\\Qwen3VL-8B-Instruct-Q4_K_M.gguf', sizeGb: 4.68, isMmproj: false, dir: 'qwen3-vl-8b' },
-    { name: 'mmproj-Qwen3VL-8B-Instruct-F16.gguf', path: 'F:\\corewithin\\models\\qwen3-vl-8b\\mmproj-Qwen3VL-8B-Instruct-F16.gguf', sizeGb: 1.08, isMmproj: true, dir: 'qwen3-vl-8b' }
-  ],
+  availableGgufModels: [],
   setAvailableGgufModels: (models) => set({ availableGgufModels: models }),
-  modelsFolderPath: 'F:\\corewithin\\models',
+  modelsFolderPath: 'models',
   setModelsFolderPath: (path: string) => set({ modelsFolderPath: path }),
 
   scanGgufModels: async (folder?: string) => {
-    const target = folder || get().modelsFolderPath || '';
+    const target = folder || get().modelsFolderPath || 'models';
     try {
       const res = await fetch(`/api/launcher/scan-models?path=${encodeURIComponent(target)}`, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
@@ -1050,10 +1053,14 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       const fileName = modelPath.split(/[/\\]/).pop() || modelPath;
       set({ activeGgufModel: fileName });
 
-      if (fileName.toLowerCase().includes('14b')) {
-        set({ selectedGeneralModel: 'qwen3:14b', selectedModel: 'qwen3:14b' });
-      } else if (fileName.toLowerCase().includes('coder')) {
+      const lower = fileName.toLowerCase();
+      if (lower.includes('coder') || lower.includes('code')) {
         set({ selectedCodingModel: fileName });
+      } else if (lower.includes('vl') || lower.includes('vision')) {
+        set({ selectedVisionEngine: fileName });
+      } else {
+        set({ selectedGeneralModel: fileName, selectedModel: fileName });
+        updateDefaultPipelineModels(fileName);
       }
 
       const res = await fetch('/api/launcher/load-model', {
@@ -1071,14 +1078,19 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   startAllLlamaServers: async () => {
     try {
       await fetch('/api/launcher/start-all', { method: 'POST', signal: AbortSignal.timeout(3000) });
-      // Pre-warm the 14B general model cache in VRAM
-      get().warmupModelCacheAction('qwen3:14b').catch(() => null);
+      const target = get().selectedGeneralModel || get().selectedModel || resolveOllamaModelTag();
+      if (target && target !== 'default') {
+        get().warmupModelCacheAction(target).catch(() => null);
+      }
       await get().checkEngineStatuses();
       return true;
     } catch {
       await get().startOllamaDaemon();
       await get().startVisionServerDaemon();
-      get().warmupModelCacheAction('qwen3:14b').catch(() => null);
+      const target = get().selectedGeneralModel || get().selectedModel || resolveOllamaModelTag();
+      if (target && target !== 'default') {
+        get().warmupModelCacheAction(target).catch(() => null);
+      }
       await get().checkEngineStatuses();
       return true;
     }
@@ -1087,7 +1099,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   sessions: initialSessions,
   activeSessionId: initialSessionId,
   activeMode: 'agent',
-  selectedModel: 'qwen3:14b',
+  selectedModel: '',
   availableModels: [],
   arsenalModels: [],
   attachedFiles: [],
@@ -1338,11 +1350,66 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
       if (res && res.ok) {
         const data = await res.json().catch(() => null);
-        if (data && Array.isArray(data.models)) {
-          const fetchedNames = data.models.map((m: any) => m.name || m.model).filter(Boolean);
+        if (data && Array.isArray(data.models) && data.models.length > 0) {
+          const rawModels = data.models;
+          const fetchedNames = rawModels.map((m: any) => m.name || m.model).filter(Boolean);
           const current = get().availableModels;
           const merged = Array.from(new Set([...current, ...fetchedNames]));
-          set({ availableModels: merged, isServerOnline: true });
+
+          // Register all discovered models with localLlmService dynamic resolver
+          setInstalledOllamaModels(merged);
+
+          // 1. Identify Vision models
+          const visionModel = rawModels.find((m: any) => {
+            const name = (m.name || m.model || '').toLowerCase();
+            return m.capabilities?.includes('vision') || /vl|vision|llava|multimodal|clip/i.test(name);
+          });
+          const visionTag = visionModel ? (visionModel.name || visionModel.model) : '';
+
+          // 2. Identify Coder models
+          const coderModel = rawModels.find((m: any) => {
+            const name = (m.name || m.model || '').toLowerCase();
+            return /coder|code|python|starcoder|dev/i.test(name);
+          });
+          const coderTag = coderModel ? (coderModel.name || coderModel.model) : '';
+
+          // 3. Identify General Reasoning models (excluding pure embeddings and rerankers)
+          const generalCandidates = rawModels.filter((m: any) => {
+            const name = (m.name || m.model || '').toLowerCase();
+            return !/embed|nomic|bge|minilm|rerank/i.test(name) && !/vl|vision/i.test(name);
+          });
+
+          // Sort by parameter/byte size descending so premier reasoning model is preferred
+          generalCandidates.sort((a: any, b: any) => (b.size || 0) - (a.size || 0));
+
+          const bestGeneralModel = generalCandidates[0] || rawModels[0];
+          const bestGeneralTag = bestGeneralModel ? (bestGeneralModel.name || bestGeneralModel.model) : (merged[0] || '');
+
+          const updates: Partial<AntigravityStore> = {
+            availableModels: merged,
+            isServerOnline: true
+          };
+
+          const currentGeneral = get().selectedGeneralModel;
+          if (!currentGeneral || !merged.includes(currentGeneral)) {
+            updates.selectedGeneralModel = bestGeneralTag;
+            updates.selectedModel = bestGeneralTag;
+            updateDefaultPipelineModels(bestGeneralTag);
+            if (bestGeneralTag) {
+              get().warmupModelCacheAction(bestGeneralTag).catch(() => null);
+            }
+          }
+
+          const currentCoder = get().selectedCodingModel;
+          if (!currentCoder || !merged.includes(currentCoder)) {
+            updates.selectedCodingModel = coderTag || bestGeneralTag;
+          }
+
+          if (visionTag) {
+            updates.selectedVisionEngine = visionTag;
+          }
+
+          set(updates);
           return merged;
         }
       }
@@ -1522,7 +1589,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
     const totalStart = performance.now();
     const requestId = `req-${Date.now()}`;
-    const activeModel = get().selectedGeneralModel || get().selectedModel || 'qwen3:14b';
+    const activeModel = get().selectedGeneralModel || get().selectedModel || resolveOllamaModelTag();
     useTelemetryStore.getState().resetExecutionState(requestId, prompt, activeModel);
 
     const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1538,7 +1605,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     const routing = classifyIntent(prompt, currentAttachedFiles, uploadedFiles, previousUserPrompts);
     const routerDurationMs = Math.round(performance.now() - routerStart);
 
-    // 2. DIRECT_QA Intent Execution Path (Answers immediately, no router/workplan pipeline)
+    // 2. DIRECT_QA Intent Execution Path (Answers immediately with live streaming tokens)
     if (routing.intent === 'DIRECT_QA') {
       useTelemetryStore.getState().updateExecutionRetrieval(requestId, { status: 'not_required' });
 
@@ -1552,8 +1619,37 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
       set({ isExecuting: true });
 
+      // Add response step immediately so the user sees assistant response container with pulsing cursor
+      const respStepId = `step-${Date.now()}-resp`;
+      addStepToActiveSession({
+        id: respStepId,
+        type: 'response',
+        content: '',
+        groundedStatus: 'grounded',
+        timestamp: now()
+      });
+
       const modelStart = performance.now();
-      const chatRes = await generateChatbotResponse(prompt, previousUserPrompts, activeModel, '', requestId);
+      let hasReceivedContentToken = false;
+
+      const chatRes = await generateChatbotResponse(
+        prompt,
+        previousUserPrompts,
+        activeModel,
+        '',
+        requestId,
+        (token, accumulated, isThinking) => {
+          if (isThinking && !hasReceivedContentToken) {
+            const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
+            get().updateStepInActiveSession(respStepId, {
+              content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
+            });
+          } else {
+            hasReceivedContentToken = true;
+            get().updateStepInActiveSession(respStepId, { content: accumulated });
+          }
+        }
+      );
       const modelDurationMs = Math.round(performance.now() - modelStart);
       const totalDurationMs = Math.round(performance.now() - totalStart);
 
@@ -1568,12 +1664,10 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         get().addValidationAuditLog(chatRes.auditLog);
       }
 
-      addStepToActiveSession({
-        id: `step-${Date.now()}-resp`,
-        type: 'response',
+      // Finalize the step with completed text & status
+      get().updateStepInActiveSession(respStepId, {
         content: chatRes.text,
-        groundedStatus: chatRes.groundedStatus,
-        timestamp: now()
+        groundedStatus: chatRes.groundedStatus
       });
 
       set({ isExecuting: false });
@@ -1846,7 +1940,7 @@ Passing to local specialist models to assemble the execution plan.`;
     set({ activeProposedPlan: null });
     setIsExecuting(true);
 
-    const activeModel = get().selectedGeneralModel || get().selectedModel || 'qwen3:14b';
+    const activeModel = get().selectedGeneralModel || get().selectedModel || resolveOllamaModelTag();
     const userFiles = approvedPlan.userUploadFiles || [];
 
     useTelemetryStore.getState().startJob({
@@ -1937,7 +2031,7 @@ Passing to local specialist models to assemble the execution plan.`;
 Describe titles, authors, text, headings, diagrams, numbers, equipment tags, and any other visual content present clearly and thoroughly.`;
 
             const visionDesc = resolveModelForCapability('vision', undefined, get().arsenalModels);
-            const visionModelTag = visionDesc.tag || 'qwen2.5vl:7b';
+            const visionModelTag = visionDesc.tag || resolveOllamaModelTag('vision');
 
             console.log(`[VISION STEP DIAGNOSTIC] Calling Vision LLM (${visionModelTag})...`, {
               imageName: imageFile.name,

@@ -93,6 +93,7 @@ export const MainWorkspaceView: React.FC = () => {
     setNetworkModalOpen,
     isExecuting,
     selectedModel,
+    selectedGeneralModel,
     isThinkHarderMode,
     toggleThinkHarderMode
   } = useAntigravityStore();
@@ -358,7 +359,7 @@ export const MainWorkspaceView: React.FC = () => {
               <div className="mt-8 flex items-center gap-4 text-xs text-[var(--text-secondary)] opacity-80">
                 <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[var(--accent-success)]" /> 100% On-Premise Local</span>
                 <span className="w-1 h-1 rounded-full bg-[var(--border-subtle)]"></span>
-                <span>Qwen3-8B &amp; Qwen2.5-VL Local Engines</span>
+                <span>{selectedGeneralModel || 'Local Sovereign Engine'}</span>
               </div>
             </div>
           ) : (
@@ -526,6 +527,8 @@ export const MainWorkspaceView: React.FC = () => {
                     }
 
                     // Direct conversational response from General LLM
+                    const isCurrentStreaming = isExecuting && step.id === sessionSteps[sessionSteps.length - 1]?.id;
+
                     return (
                       <div key={step.id} className="max-w-3xl mx-auto w-full flex items-start gap-3 py-3 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-sans shadow-sm animate-in fade-in duration-150">
                         <div className="w-7 h-7 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center text-cyan-400 font-bold shrink-0 shadow-sm">
@@ -543,6 +546,9 @@ export const MainWorkspaceView: React.FC = () => {
                           </div>
                           <div className="text-[13px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap select-text font-sans">
                             {formatCleanText(step.content)}
+                            {isCurrentStreaming && (
+                              <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse align-middle rounded-sm" />
+                            )}
                           </div>
                         </div>
                       </div>
@@ -552,12 +558,12 @@ export const MainWorkspaceView: React.FC = () => {
                   return null;
                 })}
 
-                {isExecuting && (
+                {isExecuting && !sessionSteps.some(s => s.type === 'response') && (
                   <div className="max-w-3xl mx-auto w-full flex items-center gap-3 p-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl animate-pulse font-mono text-xs text-[var(--text-secondary)]">
                     <Sparkles className="w-4 h-4 text-[var(--accent-primary)] animate-spin" />
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-[var(--text-primary)]">
-                        {selectedModel ? selectedModel : 'Local Reasoning Engine'}
+                        {selectedModel ? selectedModel : (selectedGeneralModel || 'Local Sovereign Engine')}
                       </span>
                       <span>generating response...</span>
                     </div>

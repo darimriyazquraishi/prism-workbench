@@ -953,7 +953,7 @@ namespace LUMI.Desktop
         }
 
         private static System.Diagnostics.Process _visionProcess = null;
-        public static string ActiveModelName = "Qwen3VL-8B-Instruct-Q4_K_M.gguf";
+        public static string ActiveModelName = "Local Sovereign Model";
 
         public static bool StartModelServer(string customModelPath)
         {
@@ -966,7 +966,6 @@ namespace LUMI.Desktop
                 {
                     Path.Combine(_baseDir, "llama_server", "llama-server.exe"),
                     Path.Combine(_baseDir, "llama", "llama-server.exe"),
-                    @"F:\corewithin\llama\llama-server.exe",
                     "llama-server"
                 };
 
@@ -984,12 +983,12 @@ namespace LUMI.Desktop
 
                 if (string.IsNullOrEmpty(serverExe) || !File.Exists(customModelPath)) return false;
 
-                // Check for mmproj in model directory or default
+                // Check for mmproj in model directory or models directory
                 string dir = Path.GetDirectoryName(customModelPath);
                 string mmprojPath = null;
                 if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                 {
-                    foreach (var f in Directory.GetFiles(dir, "*mmproj*.gguf"))
+                    foreach (var f in Directory.GetFiles(dir, "*mmproj*.gguf", SearchOption.AllDirectories))
                     {
                         mmprojPath = f;
                         break;
@@ -997,10 +996,21 @@ namespace LUMI.Desktop
                 }
                 if (string.IsNullOrEmpty(mmprojPath))
                 {
-                    string defaultMmproj = Path.Combine(_baseDir, "models", "qwen3-vl-8b", "mmproj-Qwen3VL-8B-Instruct-F16.gguf");
-                    if (File.Exists(defaultMmproj)) mmprojPath = defaultMmproj;
-                    else if (File.Exists(@"F:\corewithin\models\qwen3-vl-8b\mmproj-Qwen3VL-8B-Instruct-F16.gguf"))
-                        mmprojPath = @"F:\corewithin\models\qwen3-vl-8b\mmproj-Qwen3VL-8B-Instruct-F16.gguf";
+                    string modelsDir = Path.Combine(_baseDir, "models");
+                    if (!Directory.Exists(modelsDir))
+                    {
+                        var parent = Directory.GetParent(_baseDir);
+                        if (parent != null && Directory.Exists(Path.Combine(parent.FullName, "models")))
+                            modelsDir = Path.Combine(parent.FullName, "models");
+                    }
+                    if (Directory.Exists(modelsDir))
+                    {
+                        foreach (var f in Directory.GetFiles(modelsDir, "*mmproj*.gguf", SearchOption.AllDirectories))
+                        {
+                            mmprojPath = f;
+                            break;
+                        }
+                    }
                 }
 
                 string args = string.Format("-m \"{0}\" --port 8080 -ngl 99 -c 4096", customModelPath);
@@ -1046,7 +1056,6 @@ namespace LUMI.Desktop
                 {
                     Path.Combine(_baseDir, "llama", "llama-server.exe"),
                     Path.Combine(_baseDir, "llama_server", "llama-server.exe"),
-                    @"F:\corewithin\llama\llama-server.exe",
                     "llama-server"
                 };
 
@@ -1064,30 +1073,72 @@ namespace LUMI.Desktop
 
                 if (string.IsNullOrEmpty(visionExe)) return false;
 
-                string[] possibleModels = new string[]
+                // Dynamically locate models directory
+                string modelsDir = Path.Combine(_baseDir, "models");
+                if (!Directory.Exists(modelsDir))
                 {
-                    Path.Combine(_baseDir, "models", "qwen3-vl-8b", "Qwen3VL-8B-Instruct-Q4_K_M.gguf"),
-                    @"F:\corewithin\models\qwen3-vl-8b\Qwen3VL-8B-Instruct-Q4_K_M.gguf"
-                };
-
-                string[] possibleMmprojs = new string[]
-                {
-                    Path.Combine(_baseDir, "models", "qwen3-vl-8b", "mmproj-Qwen3VL-8B-Instruct-F16.gguf"),
-                    @"F:\corewithin\models\qwen3-vl-8b\mmproj-Qwen3VL-8B-Instruct-F16.gguf"
-                };
+                    var parent = Directory.GetParent(_baseDir);
+                    if (parent != null && Directory.Exists(Path.Combine(parent.FullName, "models")))
+                    {
+                        modelsDir = Path.Combine(parent.FullName, "models");
+                    }
+                }
 
                 string modelPath = null;
-                foreach (string m in possibleModels) { if (File.Exists(m)) { modelPath = m; break; } }
-
                 string mmprojPath = null;
-                foreach (string p in possibleMmprojs) { if (File.Exists(p)) { mmprojPath = p; break; } }
 
-                if (string.IsNullOrEmpty(modelPath) || string.IsNullOrEmpty(mmprojPath)) return false;
+                if (Directory.Exists(modelsDir))
+                {
+                    var allGgufs = Directory.GetFiles(modelsDir, "*.gguf", SearchOption.AllDirectories);
+                    
+                    // Look for multimodal projector
+                    foreach (var f in allGgufs)
+                    {
+                        if (Path.GetFileName(f).IndexOf("mmproj", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            mmprojPath = f;
+                            break;
+                        }
+                    }
+
+                    // Look for vision model first (has vl/vision in filename)
+                    foreach (var f in allGgufs)
+                    {
+                        string fn = Path.GetFileName(f);
+                        if (fn.IndexOf("mmproj", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                        if (fn.IndexOf("vl", StringComparison.OrdinalIgnoreCase) >= 0 || fn.IndexOf("vision", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            modelPath = f;
+                            break;
+                        }
+                    }
+
+                    // If no explicit vision model, use any general GGUF model
+                    if (string.IsNullOrEmpty(modelPath))
+                    {
+                        foreach (var f in allGgufs)
+                        {
+                            if (Path.GetFileName(f).IndexOf("mmproj", StringComparison.OrdinalIgnoreCase) < 0)
+                            {
+                                modelPath = f;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(modelPath)) return false;
+
+                string args = string.Format("-m \"{0}\" --port 8080 -ngl 99 -c 4096", modelPath);
+                if (!string.IsNullOrEmpty(mmprojPath) && File.Exists(mmprojPath))
+                {
+                    args += string.Format(" --mmproj \"{0}\"", mmprojPath);
+                }
 
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = visionExe,
-                    Arguments = string.Format("-m \"{0}\" --mmproj \"{1}\" --port 8080 -ngl 99 -c 4096", modelPath, mmprojPath),
+                    Arguments = args,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,

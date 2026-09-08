@@ -13,11 +13,11 @@ import { useAntigravityStore } from '../../store/useAntigravityStore';
 
 const BOOT_LOG_SEQUENCE = [
   '[SYSTEM] Initializing LUMI sovereign runtime v2.4...',
-  '[HARDWARE] Device 0: NVIDIA GeForce RTX 4070 SUPER (12,282 MB VRAM)',
-  '[REASONING] Initializing primary reasoning engine (Qwen3 14B)... [ONLINE]',
+  '[HARDWARE] Device 0: NVIDIA GPU VRAM Allocation Active',
+  '[REASONING] Initializing primary sovereign reasoning engine... [ONLINE]',
   '[MULTIMODAL] Pre-loading vision tensor graph & mmproj... [ONLINE]',
   '[DOCUMENT] PDF rasterization & OCR parsing pipeline... [READY]',
-  '[VRAM] Allocating KV cache tensor pages (4,096 tokens, Flash Attention 2)...',
+  '[VRAM] Allocating KV cache tensor pages (Flash Attention active)...',
   '[VRAM] 99 layers offloaded directly to GPU memory (Zero-lag warmup active)...',
   '[AIRGAP] Zero outbound telemetry verified (strict loopback bound)...',
   '[READY] All sovereign intelligence pipelines primed for input.'

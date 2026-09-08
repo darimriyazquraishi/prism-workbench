@@ -565,8 +565,8 @@ export const ModelManagementView: React.FC = () => {
 
                 <div className="pt-2 border-t border-[var(--border-subtle)] font-mono text-[10px] flex items-center justify-between">
                   <span className="text-[var(--text-secondary)]">Active Model:</span>
-                  <span className="font-bold text-cyan-400 truncate max-w-[110px]" title={reasoningModel?.name || 'Qwen 3 14B'}>
-                    {reasoningModel ? reasoningModel.name : 'Qwen 3 14B'}
+                  <span className="font-bold text-cyan-400 truncate max-w-[110px]" title={reasoningModel?.name || 'Primary Reasoning LLM'}>
+                    {reasoningModel ? reasoningModel.name : 'Primary Reasoning LLM'}
                   </span>
                 </div>
               </div>
@@ -589,8 +589,8 @@ export const ModelManagementView: React.FC = () => {
 
                 <div className="pt-2 border-t border-[var(--border-subtle)] font-mono text-[10px] flex items-center justify-between">
                   <span className="text-[var(--text-secondary)]">Active Model:</span>
-                  <span className="font-bold text-sky-400 truncate max-w-[110px]" title={visionModel?.name || 'Qwen 3 VL 8B'}>
-                    {visionModel ? visionModel.name : 'Qwen 3 VL 8B'}
+                  <span className="font-bold text-sky-400 truncate max-w-[110px]" title={visionModel?.name || 'Vision & OCR Engine'}>
+                    {visionModel ? visionModel.name : 'Vision & OCR Engine'}
                   </span>
                 </div>
               </div>
@@ -613,8 +613,8 @@ export const ModelManagementView: React.FC = () => {
 
                 <div className="pt-2 border-t border-[var(--border-subtle)] font-mono text-[10px] flex items-center justify-between">
                   <span className="text-[var(--text-secondary)]">Active Model:</span>
-                  <span className="font-bold text-amber-400 truncate max-w-[110px]" title={coderModel?.name || 'Qwen 2.5 Coder 7B'}>
-                    {coderModel ? coderModel.name : 'Qwen 2.5 Coder 7B'}
+                  <span className="font-bold text-amber-400 truncate max-w-[110px]" title={coderModel?.name || 'Code & Math Engine'}>
+                    {coderModel ? coderModel.name : 'Code & Math Engine'}
                   </span>
                 </div>
               </div>
@@ -637,8 +637,8 @@ export const ModelManagementView: React.FC = () => {
 
                 <div className="pt-2 border-t border-[var(--border-subtle)] font-mono text-[10px] flex items-center justify-between">
                   <span className="text-[var(--text-secondary)]">Active Model:</span>
-                  <span className="font-bold text-emerald-400 truncate max-w-[110px]" title={embeddingModel?.name || 'Qwen 3 Embedding 0.6B'}>
-                    {embeddingModel ? embeddingModel.name : 'Qwen 3 Embedding 0.6B'}
+                  <span className="font-bold text-emerald-400 truncate max-w-[110px]" title={embeddingModel?.name || 'Local Embedding Engine'}>
+                    {embeddingModel ? embeddingModel.name : 'Local Embedding Engine'}
                   </span>
                 </div>
               </div>
