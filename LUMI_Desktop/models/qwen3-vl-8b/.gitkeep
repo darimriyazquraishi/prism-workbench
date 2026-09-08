@@ -1,1 +1,2 @@
-﻿# Placeholder for qwen3-vl-8b model weights. Download model files here.
+# Dedicated folder for Qwen3-VL-8B-Instruct (Q4_K_M GGUF + mmproj F16)
+# Large weights are excluded from Git. Download to this directory.

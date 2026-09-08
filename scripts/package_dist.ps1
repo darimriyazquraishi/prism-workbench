@@ -24,10 +24,15 @@ if (Test-Path "$DestinationPath\dist") {
     Remove-Item -Path "$DestinationPath\dist" -Recurse -Force
 }
 New-Item -ItemType Directory -Path "$DestinationPath\dist" -Force | Out-Null
-if (Test-Path "F:\corewithin\dist\client") {
+Copy-Item "F:\corewithin\dist\*" -Destination "$DestinationPath\dist" -Recurse -Force
+if (Test-Path "F:\corewithin\dist\client\index.html") {
+    # Ensure index.html and assets are also present at root of dist for direct serving
     Copy-Item "F:\corewithin\dist\client\*" -Destination "$DestinationPath\dist" -Recurse -Force
-} else {
-    Copy-Item "F:\corewithin\dist\*" -Destination "$DestinationPath\dist" -Recurse -Force
+    # Ensure dist\client is also intact
+    if (-not (Test-Path "$DestinationPath\dist\client")) {
+        New-Item -ItemType Directory -Path "$DestinationPath\dist\client" -Force | Out-Null
+        Copy-Item "F:\corewithin\dist\client\*" -Destination "$DestinationPath\dist\client" -Recurse -Force
+    }
 }
 
 # 4. Demo Notes & Datasets (demo)

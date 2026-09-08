@@ -1,1 +1,2 @@
-﻿# Placeholder for qwen3-embedding-0.6b model weights. Download model files here.
+# Dedicated folder for Qwen3-Embedding-0.6B
+# Large weights are excluded from Git. Download to this directory.
