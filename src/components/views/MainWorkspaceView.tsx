@@ -22,7 +22,10 @@ import {
   BookOpen,
   FileCode,
   User,
-  Zap
+  Zap,
+  RotateCw,
+  Pencil,
+  Copy
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 import { PlanApprovalCard } from '../agent/PlanApprovalCard';
@@ -49,20 +52,29 @@ function formatCleanText(content?: string): string {
         text = parsed.summary;
       } else if (parsed.message) {
         text = parsed.message;
+      } else if (parsed.final_answer) {
+        text = parsed.final_answer;
       } else {
         text = Object.entries(parsed)
           .map(([k, v]) => `• ${k.replace(/_/g, ' ')}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
           .join('\n');
       }
     } catch {
-      // Keep original text
+      // Not parseable, proceed with raw text
     }
   }
 
-  // Remove markdown asterisks (**bold** -> bold, *bullet -> bullet) and unescape quotes
-  text = text.replace(/\*\*(.*?)\*\*/g, '$1');
-  text = text.replace(/(^|[^\\])\*(?!\s)(.*?)\*/g, '$1$2');
-  text = text.replace(/\\"/g, '"');
+  // Strip excessive markdown wrapping quotes if present
+  if (text.startsWith('```json')) {
+    text = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    try {
+      const inner = JSON.parse(text);
+      if (typeof inner === 'string') text = inner;
+      else if (inner.answer) text = inner.answer;
+      else if (inner.response) text = inner.response;
+      else if (inner.summary) text = inner.summary;
+    } catch {}
+  }
 
   return text;
 }
@@ -95,7 +107,9 @@ export const MainWorkspaceView: React.FC = () => {
     selectedModel,
     selectedGeneralModel,
     isThinkHarderMode,
-    toggleThinkHarderMode
+    toggleThinkHarderMode,
+    regenerateResponse,
+    editUserMessageAndRegenerate
   } = useAntigravityStore();
 
   const [promptText, setPromptText] = useState('');
@@ -103,8 +117,41 @@ export const MainWorkspaceView: React.FC = () => {
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [showDocSelector, setShowDocSelector] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const [copiedStepId, setCopiedStepId] = useState<string | null>(null);
+  const [regeneratingStepId, setRegeneratingStepId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const handleCopy = async (stepId: string, text?: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(formatCleanText(text));
+      setCopiedStepId(stepId);
+      setTimeout(() => setCopiedStepId(null), 2000);
+    } catch (e) {
+      console.error('Failed to copy', e);
+    }
+  };
+
+  const startEditing = (step: any) => {
+    setEditingStepId(step.id);
+    setEditingText(step.content || '');
+  };
+
+  const cancelEditing = () => {
+    setEditingStepId(null);
+    setEditingText('');
+  };
+
+  const saveAndRegenerateEdit = async (stepId: string) => {
+    if (!editingText.trim() || isExecuting) return;
+    const newContent = editingText.trim();
+    setEditingStepId(null);
+    setEditingText('');
+    await editUserMessageAndRegenerate(stepId, newContent);
+  };
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const sessionSteps = activeSession ? activeSession.steps : [];
@@ -368,15 +415,29 @@ export const MainWorkspaceView: React.FC = () => {
               <div className="flex-1 overflow-y-auto p-4 space-y-5">
                 {sessionSteps.map((step) => {
                   if (step.type === 'user_input') {
+                    const isEditing = editingStepId === step.id;
+
                     return (
-                      <div key={step.id} className="max-w-3xl mx-auto w-full pt-1">
-                        <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 shadow-sm space-y-2">
+                      <div key={step.id} className="max-w-3xl mx-auto w-full pt-1 group">
+                        <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 shadow-sm space-y-2 transition-all">
                           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
                             <span className="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
                               <User className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
                               User Directive
                             </span>
-                            <span className="font-mono text-[10px] text-[var(--text-tertiary)]">{step.timestamp}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px] text-[var(--text-tertiary)]">{step.timestamp}</span>
+                              {!isEditing && !isExecuting && (
+                                <button
+                                  onClick={() => startEditing(step)}
+                                  title="Edit message & regenerate"
+                                  className="opacity-70 group-hover:opacity-100 hover:text-[var(--accent-primary)] text-[var(--text-tertiary)] p-1 rounded hover:bg-[var(--bg-elevated)] transition-all flex items-center gap-1 text-[11px]"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                  <span className="text-[10px] font-mono">Edit</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {step.attachedFiles && step.attachedFiles.length > 0 && (
@@ -390,7 +451,48 @@ export const MainWorkspaceView: React.FC = () => {
                             </div>
                           )}
 
-                          <div className="text-sm text-[var(--text-primary)] font-sans leading-relaxed whitespace-pre-wrap">{step.content}</div>
+                          {isEditing ? (
+                            <div className="space-y-2 pt-1">
+                              <textarea
+                                value={editingText}
+                                onChange={(e) => setEditingText(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                    e.preventDefault();
+                                    saveAndRegenerateEdit(step.id);
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    cancelEditing();
+                                  }
+                                }}
+                                rows={3}
+                                autoFocus
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--accent-primary)]/50 focus:border-[var(--accent-primary)] rounded-lg p-3 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] resize-y font-sans leading-relaxed"
+                              />
+                              <div className="flex items-center justify-between text-[11px] text-[var(--text-tertiary)]">
+                                <span>Ctrl + Enter to send • Esc to cancel</span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={cancelEditing}
+                                    disabled={isExecuting}
+                                    className="px-2.5 py-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => saveAndRegenerateEdit(step.id)}
+                                    disabled={!editingText.trim() || isExecuting}
+                                    className="px-3 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90 disabled:opacity-50 text-white font-medium rounded-md shadow-sm transition-all flex items-center gap-1.5"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    Save & Regenerate
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-[var(--text-primary)] font-sans leading-relaxed whitespace-pre-wrap">{step.content}</div>
+                          )}
                         </div>
                       </div>
                     );
@@ -528,13 +630,15 @@ export const MainWorkspaceView: React.FC = () => {
 
                     // Direct conversational response from General LLM
                     const isCurrentStreaming = isExecuting && step.id === sessionSteps[sessionSteps.length - 1]?.id;
+                    const isCopied = copiedStepId === step.id;
+                    const isRegenerating = isExecuting && regeneratingStepId === step.id;
 
                     return (
-                      <div key={step.id} className="max-w-3xl mx-auto w-full flex items-start gap-3 py-3 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-sans shadow-sm animate-in fade-in duration-150">
+                      <div key={step.id} className="max-w-3xl mx-auto w-full group flex items-start gap-3 py-3 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-sans shadow-sm animate-in fade-in duration-150">
                         <div className="w-7 h-7 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center text-cyan-400 font-bold shrink-0 shadow-sm">
                           L
                         </div>
-                        <div className="flex-1 space-y-1.5 min-w-0">
+                        <div className="flex-1 space-y-2 min-w-0">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-[var(--text-primary)]">LUMI</span>
@@ -550,6 +654,47 @@ export const MainWorkspaceView: React.FC = () => {
                               <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse align-middle rounded-sm" />
                             )}
                           </div>
+
+                          {/* Action Bar: Copy & Regenerate */}
+                          {!isCurrentStreaming && step.content && !step.content.startsWith('💭 *Thinking...*') && (
+                            <div className="flex items-center gap-2 pt-1 border-t border-[var(--border-subtle)]/50 text-[11px] text-[var(--text-tertiary)]">
+                              <button
+                                onClick={() => handleCopy(step.id, step.content)}
+                                title="Copy response"
+                                className="hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] px-2 py-0.5 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                {isCopied ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                    <span className="text-emerald-400">Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" />
+                                    <span>Copy</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                onClick={async () => {
+                                  if (isExecuting) return;
+                                  setRegeneratingStepId(step.id);
+                                  try {
+                                    await regenerateResponse(step.id);
+                                  } finally {
+                                    setRegeneratingStepId(null);
+                                  }
+                                }}
+                                disabled={isExecuting}
+                                title="Regenerate this response"
+                                className="hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 px-2 py-0.5 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <RotateCw className={`w-3 h-3 ${isRegenerating ? 'animate-spin text-cyan-400' : ''}`} />
+                                <span>Regenerate</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

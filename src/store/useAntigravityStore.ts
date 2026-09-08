@@ -208,12 +208,13 @@ export async function queryLocalChatbotLLM(
   previousPrompts: string[] = [],
   contextText: string = '',
   requestId?: string,
-  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void
+  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void,
+  conversationHistory?: import('../services/localLlmService').ConversationTurn[]
 ): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   try {
     const pipelineRes = await executeValidationAndRoutingPipeline(promptText, contextText, {
       initialModel: model || defaultPipelineConfig.initialModel
-    }, requestId, onToken);
+    }, requestId, onToken, conversationHistory);
     return {
       text: pipelineRes.finalAnswer,
       auditLog: pipelineRes.auditLog,
@@ -307,7 +308,8 @@ export async function generateChatbotResponse(
   activeModel?: string,
   contextText: string = '',
   requestId?: string,
-  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void
+  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void,
+  conversationHistory?: import('../services/localLlmService').ConversationTurn[]
 ): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   let rawP = promptText.trim();
   let p = rawP.toLowerCase();
@@ -405,7 +407,7 @@ export async function generateChatbotResponse(
   }
 
   // Fallback Reasoning Engine: Call the actual validation and routing pipeline
-  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId, onToken);
+  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId, onToken, conversationHistory);
 }
 
 export interface PreviewFile {
@@ -562,6 +564,8 @@ interface AntigravityStore {
 
   // Plan Approval Flow
   proposePlanForTask: (prompt: string, flowType?: 'flow_a_inspection' | 'flow_b_coding') => Promise<void>;
+  regenerateResponse: (stepId?: string) => Promise<void>;
+  editUserMessageAndRegenerate: (stepId: string, newContent: string) => Promise<void>;
   approveProposedPlan: (plan: ProposedExecutionPlan) => Promise<void>;
   rejectProposedPlan: (userFeedback?: string) => void;
   runIndustrialDemo: (demoType: 'inspection' | 'pump_mtbf' | 'pid_vision' | 'sop_search') => Promise<void>;
@@ -1628,11 +1632,24 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
 
     const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    // Retrieve previous user prompts from active session for short-term context & push-back resolution
+    // Retrieve previous user prompts & full conversation history from active session
     const activeSess = get().sessions.find(s => s.id === get().activeSessionId);
     const previousUserPrompts: string[] = activeSess
       ? activeSess.steps.filter(s => s.type === 'user_input' && typeof s.content === 'string').map(s => s.content!)
       : [];
+
+    const conversationHistory: import('../services/localLlmService').ConversationTurn[] = [];
+    if (activeSess) {
+      for (const st of activeSess.steps) {
+        if (st.type === 'user_input' && typeof st.content === 'string' && st.content.trim()) {
+          conversationHistory.push({ role: 'user', content: st.content.trim() });
+        } else if (st.type === 'response' && typeof st.content === 'string' && st.content.trim()) {
+          if (!st.content.startsWith('💭 *Thinking...*')) {
+            conversationHistory.push({ role: 'assistant', content: st.content.trim() });
+          }
+        }
+      }
+    }
 
     // 1. Lightweight Intent Classification inside Chatbot's Turn
     const routerStart = performance.now();
@@ -1682,7 +1699,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
             hasReceivedContentToken = true;
             get().updateStepInActiveSession(respStepId, { content: accumulated });
           }
-        }
+        },
+        conversationHistory
       );
       const modelDurationMs = Math.round(performance.now() - modelStart);
       const totalDurationMs = Math.round(performance.now() - totalStart);
@@ -1959,6 +1977,193 @@ Passing to local specialist models to assemble the execution plan.`;
       isExternal: false,
       modelOrTool: activeModel ? `${activeModel} & Router (${contract.deliverable_name})` : `Multi-Agent Router (${contract.deliverable_name})`
     });
+  },
+
+  regenerateResponse: async (stepId?: string) => {
+    const activeSess = get().sessions.find(s => s.id === get().activeSessionId);
+    if (!activeSess) return;
+
+    let targetIdx = -1;
+    if (stepId) {
+      targetIdx = activeSess.steps.findIndex(s => s.id === stepId);
+    } else {
+      for (let i = activeSess.steps.length - 1; i >= 0; i--) {
+        if (activeSess.steps[i].type === 'response') {
+          targetIdx = i;
+          break;
+        }
+      }
+    }
+
+    if (targetIdx === -1) return;
+
+    let userStepIdx = -1;
+    for (let i = targetIdx - 1; i >= 0; i--) {
+      if (activeSess.steps[i].type === 'user_input') {
+        userStepIdx = i;
+        break;
+      }
+    }
+
+    if (userStepIdx === -1) return;
+
+    const userPrompt = activeSess.steps[userStepIdx].content || '';
+    const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const activeModel = get().selectedGeneralModel || get().selectedModel || resolveOllamaModelTag();
+
+    const truncatedSteps = activeSess.steps.slice(0, userStepIdx + 1);
+
+    const conversationHistory: import('../services/localLlmService').ConversationTurn[] = [];
+    for (let i = 0; i < userStepIdx; i++) {
+      const st = truncatedSteps[i];
+      if (st.type === 'user_input' && typeof st.content === 'string' && st.content.trim()) {
+        conversationHistory.push({ role: 'user', content: st.content.trim() });
+      } else if (st.type === 'response' && typeof st.content === 'string' && st.content.trim()) {
+        if (!st.content.startsWith('💭 *Thinking...*')) {
+          conversationHistory.push({ role: 'assistant', content: st.content.trim() });
+        }
+      }
+    }
+
+    const respStepId = `step-${Date.now()}-resp`;
+    const updatedSteps = [
+      ...truncatedSteps,
+      {
+        id: respStepId,
+        type: 'response' as const,
+        content: '',
+        groundedStatus: 'grounded' as const,
+        timestamp: now()
+      }
+    ];
+
+    set(state => ({
+      sessions: state.sessions.map(s => s.id === activeSess.id ? { ...s, steps: updatedSteps } : s),
+      isExecuting: true
+    }));
+
+    const requestId = `req-${Date.now()}`;
+    useTelemetryStore.getState().resetExecutionState(requestId, userPrompt, activeModel);
+
+    let hasReceivedContentToken = false;
+    const previousPrompts = conversationHistory.filter(c => c.role === 'user').map(c => c.content);
+
+    const chatRes = await generateChatbotResponse(
+      userPrompt,
+      previousPrompts,
+      activeModel,
+      '',
+      requestId,
+      (token, accumulated, isThinking) => {
+        if (isThinking && !hasReceivedContentToken) {
+          const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
+          get().updateStepInActiveSession(respStepId, {
+            content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
+          });
+        } else {
+          hasReceivedContentToken = true;
+          get().updateStepInActiveSession(respStepId, { content: accumulated });
+        }
+      },
+      conversationHistory
+    );
+
+    if (chatRes.auditLog) {
+      get().addValidationAuditLog(chatRes.auditLog);
+    }
+
+    get().updateStepInActiveSession(respStepId, {
+      content: chatRes.text,
+      groundedStatus: chatRes.groundedStatus
+    });
+
+    set({ isExecuting: false });
+    useTelemetryStore.getState().completeCurrentExecution(requestId);
+  },
+
+  editUserMessageAndRegenerate: async (stepId: string, newContent: string) => {
+    const activeSess = get().sessions.find(s => s.id === get().activeSessionId);
+    if (!activeSess) return;
+
+    const stepIdx = activeSess.steps.findIndex(s => s.id === stepId);
+    if (stepIdx === -1) return;
+
+    const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const activeModel = get().selectedGeneralModel || get().selectedModel || resolveOllamaModelTag();
+
+    const truncatedSteps = activeSess.steps.slice(0, stepIdx + 1).map((st, i) => {
+      if (i === stepIdx) {
+        return { ...st, content: newContent, timestamp: now() };
+      }
+      return st;
+    });
+
+    const conversationHistory: import('../services/localLlmService').ConversationTurn[] = [];
+    for (let i = 0; i < stepIdx; i++) {
+      const st = truncatedSteps[i];
+      if (st.type === 'user_input' && typeof st.content === 'string' && st.content.trim()) {
+        conversationHistory.push({ role: 'user', content: st.content.trim() });
+      } else if (st.type === 'response' && typeof st.content === 'string' && st.content.trim()) {
+        if (!st.content.startsWith('💭 *Thinking...*')) {
+          conversationHistory.push({ role: 'assistant', content: st.content.trim() });
+        }
+      }
+    }
+
+    const respStepId = `step-${Date.now()}-resp`;
+    const updatedSteps = [
+      ...truncatedSteps,
+      {
+        id: respStepId,
+        type: 'response' as const,
+        content: '',
+        groundedStatus: 'grounded' as const,
+        timestamp: now()
+      }
+    ];
+
+    set(state => ({
+      sessions: state.sessions.map(s => s.id === activeSess.id ? { ...s, steps: updatedSteps } : s),
+      isExecuting: true
+    }));
+
+    const requestId = `req-${Date.now()}`;
+    useTelemetryStore.getState().resetExecutionState(requestId, newContent, activeModel);
+
+    let hasReceivedContentToken = false;
+    const previousPrompts = conversationHistory.filter(c => c.role === 'user').map(c => c.content);
+
+    const chatRes = await generateChatbotResponse(
+      newContent,
+      previousPrompts,
+      activeModel,
+      '',
+      requestId,
+      (token, accumulated, isThinking) => {
+        if (isThinking && !hasReceivedContentToken) {
+          const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
+          get().updateStepInActiveSession(respStepId, {
+            content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
+          });
+        } else {
+          hasReceivedContentToken = true;
+          get().updateStepInActiveSession(respStepId, { content: accumulated });
+        }
+      },
+      conversationHistory
+    );
+
+    if (chatRes.auditLog) {
+      get().addValidationAuditLog(chatRes.auditLog);
+    }
+
+    get().updateStepInActiveSession(respStepId, {
+      content: chatRes.text,
+      groundedStatus: chatRes.groundedStatus
+    });
+
+    set({ isExecuting: false });
+    useTelemetryStore.getState().completeCurrentExecution(requestId);
   },
 
   approveProposedPlan: async (approvedPlan) => {

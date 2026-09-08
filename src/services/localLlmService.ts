@@ -6,10 +6,19 @@ import type {
   KbGuidanceRef
 } from '../types/antigravity';
 
+export interface ConversationTurn {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export const DEFAULT_FACTUAL_SYSTEM_PROMPT = 
+  'You are a knowledgeable, factually rigorous AI assistant. Provide accurate, truthful, and well-verified responses. Accurately identify fictional works, characters, creators, titles, technical concepts, and historical facts without hallucinating. If uncertain about a specific detail, state your uncertainty explicitly.';
+
 export interface LocalLlmOptions {
   model?: string;
   systemPrompt?: string;
   userPrompt: string;
+  conversationHistory?: ConversationTurn[];
   formatJson?: boolean;
   images?: string[]; // base64 strings
   temperature?: number;
@@ -164,15 +173,13 @@ export function resolveOllamaModelTag(requested?: string): string {
 export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmResult> {
   const startTime = performance.now();
 
-  // If Think Harder (Max Power) mode is enabled, inject deep reasoning directives and expand compute
-  let effectiveSystemPrompt = options.systemPrompt || '';
+  // Use high-rigor factual system prompt by default
+  let effectiveSystemPrompt = options.systemPrompt || DEFAULT_FACTUAL_SYSTEM_PROMPT;
   if (options.thinkHarder) {
     const thinkHarderDirective = `\n\n[MAX POWER REASONING MODE: THINK HARDER ACTIVE]\n- Systematically analyze the underlying problem, assumptions, and constraints.\n- Break the task down into clear intermediate sub-steps with explicit logical justification.\n- Rigorously check edge cases, counterarguments, and potential failure modes.\n- Ensure deliverables strictly conform to required contracts and syntax.`;
     effectiveSystemPrompt = effectiveSystemPrompt ? (effectiveSystemPrompt + thinkHarderDirective) : thinkHarderDirective.trim();
-  } else if (!options.formatJson) {
-    // For standard casual / conversational queries, guide the model to be direct and responsive
-    const directDirective = `\nRespond directly and helpfully to the user without an extended internal chain-of-thought monologue.`;
-    effectiveSystemPrompt = effectiveSystemPrompt ? (effectiveSystemPrompt + directDirective) : directDirective.trim();
+  } else if (options.formatJson) {
+    effectiveSystemPrompt = effectiveSystemPrompt + '\nRespond strictly with valid JSON conforming to the requested schema.';
   }
 
   // 1. Multimodal Vision Handling: If images attached, prioritize the CUDA llama-server on port 8080 (native mmproj support)
@@ -184,6 +191,7 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
         body: JSON.stringify({
           messages: [
             ...(effectiveSystemPrompt ? [{ role: 'system', content: effectiveSystemPrompt }] : []),
+            ...(options.conversationHistory || []).slice(-10).map(t => ({ role: t.role, content: t.content })),
             {
               role: 'user',
               content: [
@@ -279,6 +287,20 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
   const messages: { role: string; content: string; images?: string[] }[] = [];
   if (effectiveSystemPrompt) {
     messages.push({ role: 'system', content: effectiveSystemPrompt });
+  }
+
+  // Inject prior conversation turns if provided for multi-turn conversational awareness
+  if (options.conversationHistory && options.conversationHistory.length > 0) {
+    // Keep the most recent 16 turns to remain safely within context window
+    const recentHistory = options.conversationHistory.slice(-16);
+    for (const turn of recentHistory) {
+      if (turn.content && typeof turn.content === 'string' && turn.content.trim()) {
+        messages.push({
+          role: turn.role,
+          content: turn.content.length > 3000 ? turn.content.slice(0, 3000) + '...' : turn.content
+        });
+      }
+    }
   }
 
   const userMsg: { role: string; content: string; images?: string[] } = {

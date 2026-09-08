@@ -1,4 +1,4 @@
-import { callLocalLlm, parseOrRepairJson } from './localLlmService';
+import { callLocalLlm, parseOrRepairJson, DEFAULT_FACTUAL_SYSTEM_PROMPT, type ConversationTurn } from './localLlmService';
 import { defaultPipelineConfig, type PipelineConfig } from '../config/pipelineConfig';
 import type { ValidationResult, ValidationAuditLog } from '../types/antigravity';
 import { useTelemetryStore } from '../store/telemetryStore';
@@ -113,7 +113,8 @@ export async function executeValidationAndRoutingPipeline(
   sourceContext: string,
   overrideConfig: Partial<PipelineConfig> = {},
   requestId?: string,
-  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void
+  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void,
+  conversationHistory?: ConversationTurn[]
 ): Promise<PipelineExecutionResult> {
   const cfg: PipelineConfig = { ...defaultPipelineConfig, ...overrideConfig };
   const logId = `val-log-${Date.now()}`;
@@ -123,7 +124,11 @@ export async function executeValidationAndRoutingPipeline(
   if (!cfg.validationEnabled) {
     const initialRes = await callLocalLlm({
       model: cfg.initialModel,
+      systemPrompt: sourceContext && sourceContext.trim()
+        ? 'You are a precise, grounded assistant. Answer the user prompt using available evidence. Do not hallucinate or invent details.'
+        : DEFAULT_FACTUAL_SYSTEM_PROMPT,
       userPrompt: `Context:\n${sourceContext}\n\nUser Question:\n${userQuery}`,
+      conversationHistory,
       onToken
     });
     const mockValidation: ValidationResult = {
@@ -171,8 +176,9 @@ export async function executeValidationAndRoutingPipeline(
     model: cfg.initialModel,
     systemPrompt: hasSourceContext
       ? 'You are a precise, grounded assistant. Answer the user prompt using available evidence. Do not hallucinate or invent details.'
-      : 'You are a helpful, concise assistant. Answer the user prompt directly.',
+      : DEFAULT_FACTUAL_SYSTEM_PROMPT,
     userPrompt: initialPrompt,
+    conversationHistory,
     temperature: 0.2,
     onToken
   });
