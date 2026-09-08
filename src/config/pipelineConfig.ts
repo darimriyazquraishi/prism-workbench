@@ -9,11 +9,12 @@ export interface PipelineConfig {
 }
 
 export const defaultPipelineConfig: PipelineConfig = {
-  initialModel: 'qwen3:8b',
+  initialModel: 'qwen3:14b',
   generalReasoningModel: 'qwen3:14b',
-  validatorModel: 'qwen3:8b',
+  validatorModel: 'qwen3:14b',
   confidenceThreshold: 0.75,
   maxRoutingAttempts: 2,
   validationEnabled: true,
   developerLogsEnabled: true
 };
+

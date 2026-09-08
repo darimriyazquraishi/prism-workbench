@@ -266,11 +266,13 @@ export const MainWorkspaceView: React.FC = () => {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      const toSend = promptText.trim() || 'Read inspection findings and generate deliverable.';
-                      clearAttachments();
-                      proposePlanForTask(toSend, 'flow_a_inspection');
-                      setPromptText('');
-                      setShowSlashMenu(false);
+                      const toSend = promptText.trim();
+                      if (toSend) {
+                        clearAttachments();
+                        proposePlanForTask(toSend);
+                        setPromptText('');
+                        setShowSlashMenu(false);
+                      }
                     }
                   }}
                 />
@@ -339,7 +341,7 @@ export const MainWorkspaceView: React.FC = () => {
                       onClick={() => {
                         if (promptText.trim()) {
                           clearAttachments();
-                          proposePlanForTask(promptText, 'flow_a_inspection');
+                          proposePlanForTask(promptText.trim());
                           setPromptText('');
                           setShowSlashMenu(false);
                         }
@@ -514,9 +516,35 @@ export const MainWorkspaceView: React.FC = () => {
                   }
 
                   if (step.type === 'response') {
+                    // Only show deliverable card if an artifact was actually generated
+                    if (step.artifacts && step.artifacts.length > 0) {
+                      return (
+                        <div key={step.id} className="max-w-3xl mx-auto w-full">
+                          <TaskResultView step={step} proposedPlan={activeProposedPlan || undefined} />
+                        </div>
+                      );
+                    }
+
+                    // Direct conversational response from General LLM
                     return (
-                      <div key={step.id} className="max-w-3xl mx-auto w-full">
-                        <TaskResultView step={step} proposedPlan={activeProposedPlan || undefined} />
+                      <div key={step.id} className="max-w-3xl mx-auto w-full flex items-start gap-3 py-3 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-sans shadow-sm animate-in fade-in duration-150">
+                        <div className="w-7 h-7 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center text-cyan-400 font-bold shrink-0 shadow-sm">
+                          L
+                        </div>
+                        <div className="flex-1 space-y-1.5 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-[var(--text-primary)]">LUMI</span>
+                              <span className="text-[10px] font-mono text-[var(--text-tertiary)]">{step.timestamp}</span>
+                            </div>
+                            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                              Local Air-Gapped
+                            </span>
+                          </div>
+                          <div className="text-[13px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap select-text font-sans">
+                            {formatCleanText(step.content)}
+                          </div>
+                        </div>
                       </div>
                     );
                   }

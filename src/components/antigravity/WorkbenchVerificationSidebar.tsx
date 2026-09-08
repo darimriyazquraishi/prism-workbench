@@ -16,7 +16,7 @@ import {
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 
 export const WorkbenchVerificationSidebar: React.FC = () => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [pingLatencies, setPingLatencies] = useState<{ [key: string]: number }>({});
 

@@ -98,7 +98,7 @@ export const LumiLauncher: React.FC = () => {
   useEffect(() => {
     if (isLauncherOpen && !isBooting) {
       checkEngineStatuses();
-      const poll = setInterval(() => checkEngineStatuses(), 5000);
+      const poll = setInterval(() => checkEngineStatuses(), 20000);
       return () => clearInterval(poll);
     }
   }, [isLauncherOpen, isBooting, checkEngineStatuses]);

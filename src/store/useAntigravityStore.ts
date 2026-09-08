@@ -897,6 +897,8 @@ const initialSessions: AntigravitySession[] = [
   }
 ];
 
+let lastEngineCheckTime = 0;
+
 export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   // Launcher & Model Cache State
   isLauncherOpen: true,
@@ -923,9 +925,15 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     warmingUp: false
   },
 
-  checkEngineStatuses: async () => {
+  checkEngineStatuses: async (force: boolean = false) => {
+    const now = Date.now();
+    if (!force && now - lastEngineCheckTime < 10000) {
+      return;
+    }
+    lastEngineCheckTime = now;
+
     try {
-      const res = await fetch('/api/launcher/status', { signal: AbortSignal.timeout(1500) }).catch(() => null);
+      const res = await fetch('/api/launcher/status', { signal: AbortSignal.timeout(800) }).catch(() => null);
       if (res && res.ok) {
         const data = await res.json();
         set({
@@ -939,8 +947,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       }
     } catch {}
 
-    const ollamaCheck = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false);
-    const visionCheck = await fetch('http://127.0.0.1:8080/health', { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false);
+    const ollamaCheck = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(600) }).then(r => r.ok).catch(() => false);
+    const visionCheck = await fetch('http://127.0.0.1:8080/health', { signal: AbortSignal.timeout(600) }).then(r => r.ok).catch(() => false);
     set({
       engineStatuses: {
         ollama: ollamaCheck,
