@@ -1,0 +1,50 @@
+[
+  {
+    "id": "audit-1788964501221-d5v3",
+    "timestamp": "2026-09-09T14:35:01.221Z",
+    "action": "DELETE",
+    "path": "F:/corewithin/_task_exec_1788964501123.py",
+    "status": "allowed",
+    "details": "Deleted file"
+  },
+  {
+    "id": "audit-1788964501127-ngyt",
+    "timestamp": "2026-09-09T14:35:01.127Z",
+    "action": "COMMAND",
+    "path": "python _task_exec_1788964501123.py",
+    "status": "allowed",
+    "details": "Executed in user workspace"
+  },
+  {
+    "id": "audit-1788964501125-6beo",
+    "timestamp": "2026-09-09T14:35:01.125Z",
+    "action": "CREATE",
+    "path": "F:/corewithin/_task_exec_1788964501123.py",
+    "status": "allowed",
+    "details": "Created file _task_exec_1788964501123.py"
+  },
+  {
+    "id": "audit-1788964389345-mtk7",
+    "timestamp": "2026-09-09T14:33:09.345Z",
+    "action": "DELETE",
+    "path": "F:/corewithin/_task_exec_1788964389126.py",
+    "status": "allowed",
+    "details": "Deleted file"
+  },
+  {
+    "id": "audit-1788964389133-z908",
+    "timestamp": "2026-09-09T14:33:09.133Z",
+    "action": "COMMAND",
+    "path": "python _task_exec_1788964389126.py",
+    "status": "allowed",
+    "details": "Executed in user workspace"
+  },
+  {
+    "id": "audit-1788964389129-c717",
+    "timestamp": "2026-09-09T14:33:09.130Z",
+    "action": "CREATE",
+    "path": "F:/corewithin/_task_exec_1788964389126.py",
+    "status": "allowed",
+    "details": "Created file _task_exec_1788964389126.py"
+  }
+]

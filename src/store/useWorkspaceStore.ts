@@ -583,14 +583,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const explicitFileMatch = trimmed.match(/(?:(?:file|in|to|for|at|from|component)\s+)?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)/i);
       const explicitFilePath = explicitFileMatch ? explicitFileMatch[1].replace(/\\/g, '/') : null;
       
-      const isTargetingCurrentFile = /(?:this\s+file|current\s+file|active\s+file|@activeTab)/i.test(trimmed) || 
-                                    (/^(?:fix|edit|modify|update|refactor|add\s+to\s+this)\b/i.test(trimmed) && !explicitFilePath);
+      const isTargetingCurrentFile = /(?:this\s+file|current\s+file|active\s+file|@activeTab|same\s+pdf|this\s+pdf|the\s+pdf|same\s+file|this\s+file|the\s+file|same\s+doc|same\s+document|add\s+another\s+text|add\s+text|in\s+the\s+same|in\s+this|in\s+it|to\s+it|modify\s+it|edit\s+it|update\s+it)\b/i.test(trimmed) || 
+                                    (/^(?:fix|edit|modify|update|refactor|add\s+to\s+this|append)\b/i.test(trimmed) && !explicitFilePath);
 
       let candidatePath: string | null = null;
       if (explicitFilePath) {
         candidatePath = explicitFilePath;
       } else if (isTargetingCurrentFile && activeTab) {
         candidatePath = activeTab.path;
+      } else if (isTargetingCurrentFile) {
+        // Look through recent assistant messages for the last created/modified file path
+        for (let i = get().aiMessages.length - 1; i >= 0; i--) {
+          const msg = get().aiMessages[i];
+          if (msg.role === 'assistant') {
+            const pathMatch = msg.content.match(/(?:at|for|file:?|to)\s+[`'"]?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)[`'"]?/i) ||
+                              msg.content.match(/[`'"]([a-zA-Z0-9_\-./\\]+\.(?:pdf|py|js|ts|tsx|jsx|html|css|json|md))[`'"]/i);
+            if (pathMatch) {
+              candidatePath = pathMatch[1].replace(/\\/g, '/');
+              break;
+            }
+          }
+        }
       }
 
       let inspectedFile: { path: string; content: string; size: number; extension: string } | null = null;
@@ -622,7 +635,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const isReasoningTask = /^(explain|analyze|why|what\s+is|how\s+does|plan|architecture|review|understand)\b/i.test(trimmed);
       const isDeleteTask = /^delete\s+/i.test(trimmed);
       const isCodingTask = !isReasoningTask && (
-        /^(create|write|fix|modify|update|refactor|add|implement|generate|build|make)\b/i.test(trimmed) ||
+        /^(create|write|fix|modify|update|refactor|add|implement|generate|build|make|append)\b/i.test(trimmed) ||
+        /(?:add\s+another|add\s+text|in\s+the\s+same|the\s+same\s+pdf|this\s+pdf|the\s+pdf)/i.test(trimmed) ||
         trimmed.includes('bug') || trimmed.includes('component') || trimmed.includes('code') || trimmed.includes('function') || trimmed.includes('pdf') || trimmed.includes('script')
       );
 
@@ -687,16 +701,40 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         : `General Reasoning Agent (${modelDesc.name})`;
 
       const systemPrompt = isCodingTask
-        ? `You are LUMI's Coding Agent. You create directories, inspect files, and write robust code.
-When asked to perform a coding or generation task, provide clean, executable, production-ready code inside a single markdown code block with appropriate language identifier.
-Preserve existing syntax patterns, exports, and styles. Explain key design decisions briefly.`
+        ? `You are LUMI's Autonomous Workspace Coding Agent. You inspect existing workspace files, create directories, and write robust code.
+Workstation Runtime Environment:
+- OS: Windows
+- Python 3.14 with reportlab, os, sys pre-installed.
+- Node.js runtime available.
+
+STRICT RULES FOR CODE GENERATION:
+1. When asked to edit, modify, or add text/content to an existing PDF or file, provide the complete, updated runnable Python script (using reportlab) that regenerates or updates the file with ALL required contents (both the original text and newly requested text).
+2. NEVER output installation commands like 'pip install' or 'npm install'. All necessary libraries are pre-installed.
+3. Provide ONLY ONE executable code block containing the complete, self-contained, working script.
+4. When writing multiple text strings on a canvas, use appropriate Y coordinates so lines do not collide (e.g. y=750 for line 1, y=720 for line 2).
+5. Never output infinite loops or duplicate lines. Keep explanations brief after the code block.`
         : `You are LUMI's General Reasoning Agent. You analyze project architecture, explain code, debug logic, and plan structural changes across workspace files. Provide insightful, rigorously verified reasoning.`;
 
       let agentUserPrompt = `[Workspace: ${get().workspaceName}]\n[Root: ${get().workspaceRoot}]\n`;
-      if (inspectedFile) {
-        agentUserPrompt += `\n[Inspected File: ${inspectedFile.path} (${inspectedFile.size} bytes)]\n\`\`\`${inspectedFile.extension}\n${inspectedFile.content.slice(0, 10000)}\n\`\`\`\n`;
+      if (candidatePath) {
+        agentUserPrompt += `[Target File: ${candidatePath}]\n`;
       }
-      agentUserPrompt += `\n[User Task]: ${trimmed}`;
+      if (inspectedFile && inspectedFile.extension !== 'pdf') {
+        agentUserPrompt += `\n[Inspected File Content: ${inspectedFile.path} (${inspectedFile.size} bytes)]\n\`\`\`${inspectedFile.extension}\n${inspectedFile.content.slice(0, 10000)}\n\`\`\`\n`;
+      }
+
+      // Append conversation history (up to last 6 turns) so edits have full context of previous code
+      const recentHistory = get().aiMessages.slice(-6);
+      if (recentHistory.length > 0) {
+        agentUserPrompt += `\n[Conversation History]:\n`;
+        for (const msg of recentHistory) {
+          const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
+          const snippet = msg.content.length > 1500 ? msg.content.slice(0, 1500) + '...' : msg.content;
+          agentUserPrompt += `${roleLabel}:\n${snippet}\n\n`;
+        }
+      }
+
+      agentUserPrompt += `[User Request]: ${trimmed}`;
 
       // 4. Query the Local LLM (Ollama / GPU)
       const llmResult = await callLocalLlm({
@@ -709,22 +747,46 @@ Preserve existing syntax patterns, exports, and styles. Explain key design decis
       const responseText = llmResult.content || 'I completed the task analysis.';
 
       // 5. Code modification & Action Execution handling
-      const codeBlockMatch = responseText.match(/```(?:[a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/);
-      const generatedCode = codeBlockMatch ? codeBlockMatch[1].trim() : null;
+      // Extract all code blocks
+      const codeBlocks: { lang: string; code: string }[] = [];
+      const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/g;
+      let blockMatch;
+      while ((blockMatch = codeBlockRegex.exec(responseText)) !== null) {
+        codeBlocks.push({
+          lang: (blockMatch[1] || '').toLowerCase(),
+          code: blockMatch[2].trim()
+        });
+      }
+
+      // Filter out installation shell snippets (e.g. pip install, npm install, sh, bash)
+      const executableBlocks = codeBlocks.filter(b => {
+        if (['sh', 'bash', 'cmd', 'powershell', 'shell'].includes(b.lang)) return false;
+        if (/^\s*(?:pip|npm|yarn|pnpm)\s+install\b/m.test(b.code)) return false;
+        return true;
+      });
+
+      // Pick the best executable block (preferably python/js/ts or longest)
+      const selectedBlock = executableBlocks.find(b => ['python', 'py', 'javascript', 'js', 'typescript', 'ts'].includes(b.lang)) ||
+                            executableBlocks[0] ||
+                            codeBlocks[0] ||
+                            null;
+
+      const generatedCode = selectedBlock ? selectedBlock.code : null;
 
       let proposedDiff: { path: string; action: 'modify' | 'create' | 'delete'; originalContent?: string; newContent?: string } | null = null;
       let executedScriptSuccess = false;
       let scriptOutput = '';
 
       if (isCodingTask && generatedCode) {
-        const isPythonScript = /```(?:python|py)\b/i.test(responseText) ||
+        const isPythonScript = (selectedBlock?.lang === 'python' || selectedBlock?.lang === 'py') ||
                                /(?:import\s+[a-zA-Z0-9_.]+|from\s+[a-zA-Z0-9_.]+\s+import)/.test(generatedCode) ||
                                /(?:def\s+[a-zA-Z0-9_]+\s*\(|if\s+__name__\s*==)/.test(generatedCode);
         const isNodeScript = !isPythonScript && (
-          /```(?:javascript|js)\b/i.test(responseText) ||
+          ['javascript', 'js', 'typescript', 'ts'].includes(selectedBlock?.lang || '') ||
           /(?:const\s+.*=\s*require\(|import\s+.*from\s+['"])/.test(generatedCode)
         );
-        const isActionExecutionTask = /pdf|image|chart|plot|run|execute|script|generate|make|render/i.test(trimmed);
+        const isActionExecutionTask = /pdf|image|chart|plot|run|execute|script|generate|make|render|add\s+text|in\s+the\s+same|the\s+same\s+pdf|append|edit|modify/i.test(trimmed) ||
+                                      (candidatePath && /\.pdf$/i.test(candidatePath));
 
         // A) If LLM generated an executable script to satisfy the user's action task, execute it directly
         if ((isPythonScript || isNodeScript) && isActionExecutionTask) {
@@ -762,6 +824,11 @@ Preserve existing syntax patterns, exports, and styles. Explain key design decis
             });
 
             await get().refreshTree();
+
+            // If a candidate file was targeted, reopen it so viewer updates
+            if (candidatePath) {
+              await get().openFileInTab(candidatePath);
+            }
 
             if (execData.success || (execData.stdout && !execData.stderr)) {
               executedScriptSuccess = true;

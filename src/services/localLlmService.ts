@@ -566,26 +566,151 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
 }
 
 /**
+ * Deeply sanitizes and robustly parses JSON emitted by local LLM models.
+ * Handles markdown fences, prose wrapping, trailing commas, comments,
+ * Python literals (True/False/None), single quotes, and truncated bracket repair.
+ */
+export function cleanAndParseJson<T>(rawText: string): T {
+  if (!rawText || typeof rawText !== 'string') {
+    throw new Error('Cannot parse empty or non-string input as JSON');
+  }
+
+  const trimmed = rawText.trim();
+
+  // Step 1: Direct parse attempt
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {}
+
+  // Step 2: Extract JSON from markdown fences if present
+  let text = trimmed;
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch) {
+    text = fenceMatch[1].trim();
+    try {
+      return JSON.parse(text) as T;
+    } catch {}
+  }
+
+  // Step 3: Find outermost boundaries { ... } or [ ... ]
+  const firstBrace = text.indexOf('{');
+  const firstBracket = text.indexOf('[');
+  let startIdx = -1;
+  let endIdx = -1;
+
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    startIdx = firstBrace;
+    endIdx = text.lastIndexOf('}');
+  } else if (firstBracket !== -1) {
+    startIdx = firstBracket;
+    endIdx = text.lastIndexOf(']');
+  }
+
+  if (startIdx !== -1) {
+    if (endIdx !== -1 && endIdx > startIdx) {
+      text = text.substring(startIdx, endIdx + 1);
+    } else {
+      text = text.substring(startIdx);
+    }
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {}
+
+  // Step 4: Strip multi-line comments and single-line comments
+  text = text.replace(/\/\*[\s\S]*?\*\//g, '');
+  text = text.replace(/(?<!:)\/\/[^\r\n]*/g, '');
+
+  // Step 5: Convert Python constants (True, False, None) to JSON (true, false, null)
+  text = text.replace(/:\s*True\b/g, ': true')
+             .replace(/:\s*False\b/g, ': false')
+             .replace(/:\s*None\b/g, ': null');
+
+  // Step 6: Strip trailing commas before closing braces and brackets
+  text = text.replace(/,\s*([\}\]])/g, '$1');
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {}
+
+  // Step 7: Fix single-quoted keys and properties
+  // 'key': -> "key":
+  text = text.replace(/'([a-zA-Z0-9_\-\s]+)'\s*:/g, '"$1":');
+
+  // Step 8: Fix unquoted object keys
+  // { key: "value" } -> { "key": "value" }
+  text = text.replace(/([\{\s,])([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+
+  // Strip trailing commas again after regex transforms
+  text = text.replace(/,\s*([\}\]])/g, '$1');
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {}
+
+  // Step 9: Balance unclosed braces or brackets from truncated model output
+  let openBraces = 0;
+  let openBrackets = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (ch === '{') openBraces++;
+      else if (ch === '}') openBraces = Math.max(0, openBraces - 1);
+      else if (ch === '[') openBrackets++;
+      else if (ch === ']') openBrackets = Math.max(0, openBrackets - 1);
+    }
+  }
+
+  if (inString) {
+    text += '"';
+  }
+  text = text.replace(/[,:\s]+$/, '');
+  while (openBraces > 0 || openBrackets > 0) {
+    if (openBrackets > 0) {
+      text += ']';
+      openBrackets--;
+    } else if (openBraces > 0) {
+      text += '}';
+      openBraces--;
+    }
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch (finalErr: any) {
+    throw new Error(`JSON sanitization failed: ${finalErr.message}. Processed text: ${text.slice(0, 200)}...`);
+  }
+}
+
+/**
  * Extracts and parses JSON from model output, with retry/repair if parsing fails
  */
 export async function parseOrRepairJson<T>(rawText: string, modelTag: string, schemaDescription: string): Promise<T> {
-  // Clean markdown fencing
-  let cleaned = rawText.trim();
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
-  }
-
-  // Attempt 1: Direct JSON.parse
+  // Attempt 1: Advanced robust algorithmic parsing
   try {
-    return JSON.parse(cleaned) as T;
+    return cleanAndParseJson<T>(rawText);
   } catch (initialParseError: any) {
-    console.warn('Initial JSON parse failed. Attempting repair with local reasoning model...', initialParseError);
+    console.warn('Initial algorithmic JSON parse failed. Attempting repair with local reasoning model...', initialParseError);
 
     // Attempt 2: Ask the model to repair the JSON syntax
     try {
-      const repairPrompt = `The following text was supposed to be valid JSON conforming to this schema:\n${schemaDescription}\n\nHowever, it failed JSON.parse with error: ${initialParseError.message}\n\nPlease output ONLY the fixed, valid JSON. Do not include markdown commentary, explanations, or backticks.\n\nINVALID JSON:\n${cleaned}`;
+      const repairPrompt = `The following text was supposed to be valid JSON conforming to this schema:\n${schemaDescription}\n\nHowever, it failed JSON.parse with error: ${initialParseError.message}\n\nPlease output ONLY the fixed, valid JSON. Do not include markdown commentary, explanations, or backticks.\n\nINVALID JSON:\n${rawText.slice(0, 4000)}`;
 
       const repairResult = await callLocalLlm({
         model: modelTag,
@@ -595,17 +720,10 @@ export async function parseOrRepairJson<T>(rawText: string, modelTag: string, sc
         temperature: 0.1
       });
 
-      let repairCleaned = repairResult.content.trim();
-      if (repairCleaned.startsWith('```json')) {
-        repairCleaned = repairCleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
-      } else if (repairCleaned.startsWith('```')) {
-        repairCleaned = repairCleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-
-      return JSON.parse(repairCleaned) as T;
+      return cleanAndParseJson<T>(repairResult.content);
     } catch (repairError: any) {
       throw new Error(
-        `JSON Validation Failed: The local model produced invalid structured output and could not be repaired. Error: ${initialParseError.message}. Snippet: ${cleaned.slice(0, 200)}...`
+        `JSON Validation Failed: The local model produced invalid structured output and could not be repaired. Error: ${initialParseError.message}. Snippet: ${rawText.slice(0, 200)}...`
       );
     }
   }
