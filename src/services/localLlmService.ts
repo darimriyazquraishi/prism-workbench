@@ -24,6 +24,7 @@ export interface LocalLlmOptions {
   temperature?: number;
   numCtx?: number;
   thinkHarder?: boolean;
+  timeoutMs?: number;
   onToken?: (token: string, accumulated: string, isThinking?: boolean) => void;
 }
 
@@ -87,7 +88,13 @@ export async function warmupModelCache(modelTag?: string): Promise<{ success: bo
         model: resolved,
         messages: [{ role: 'user', content: 'Warmup cache ping' }],
         stream: false,
-        options: { num_predict: 1 }
+        options: {
+          num_predict: 1,
+          num_gpu: 99,
+          main_gpu: 0,
+          num_ctx: 2048,
+          f16_kv: true
+        }
       })
     });
     if (res.ok) {
@@ -166,6 +173,78 @@ export function resolveOllamaModelTag(requested?: string): string {
 }
 
 /**
+ * Efficient streaming reader for Ollama ndjson / chunked responses.
+ * Continuously resets the heartbeat timeout as long as tokens/chunks are arriving.
+ */
+async function readOllamaStream(
+  res: Response,
+  onToken?: (token: string, accumulated: string, isThinking?: boolean) => void,
+  onChunkHeartbeat?: () => void
+): Promise<{ text: string; bytesReceived: number }> {
+  if (!res.body) {
+    const data = await res.json().catch(() => ({}));
+    const text = data?.message?.content || data?.message?.thinking || '';
+    return { text, bytesReceived: new TextEncoder().encode(JSON.stringify(data)).length };
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let accumulatedContent = '';
+  let accumulatedThinking = '';
+  let buffer = '';
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      totalBytes += value.byteLength;
+      onChunkHeartbeat?.();
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const chunk = JSON.parse(trimmed);
+        const thinking = chunk.message?.thinking || '';
+        const content = chunk.message?.content || '';
+        if (thinking) {
+          accumulatedThinking += thinking;
+          onToken?.(thinking, accumulatedContent || accumulatedThinking, true);
+        }
+        if (content) {
+          accumulatedContent += content;
+          onToken?.(content, accumulatedContent, false);
+        }
+      } catch {}
+    }
+  }
+
+  if (buffer.trim()) {
+    try {
+      const chunk = JSON.parse(buffer.trim());
+      const thinking = chunk.message?.thinking || '';
+      const content = chunk.message?.content || '';
+      if (thinking) {
+        accumulatedThinking += thinking;
+        onToken?.(thinking, accumulatedContent || accumulatedThinking, true);
+      }
+      if (content) {
+        accumulatedContent += content;
+        onToken?.(content, accumulatedContent, false);
+      }
+    } catch {}
+  }
+
+  const text = accumulatedContent || accumulatedThinking;
+  return { text, bytesReceived: totalBytes || new TextEncoder().encode(text).length };
+}
+
+/**
  * Executes a live inference request to local Ollama (11434) or CUDA Vision Server (8080).
  * Supports real-time token streaming via options.onToken.
  * Measures exact latency and bytes transferred.
@@ -207,7 +286,7 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
           temperature: options.thinkHarder ? 0.15 : (options.temperature ?? 0.2),
           stream: Boolean(options.onToken)
         }),
-        signal: AbortSignal.timeout(120000)
+        signal: AbortSignal.timeout(options.timeoutMs ?? (options.thinkHarder ? 360000 : 240000))
       });
 
       if (visionRes.ok) {
@@ -317,21 +396,41 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
 
   messages.push(userMsg);
 
-  // Context window: 32,768 for Think Harder, 16,384 for vision, 8,192 default
-  const defaultNumCtx = options.numCtx ?? (options.thinkHarder ? 32768 : (options.images && options.images.length > 0 ? 16384 : 8192));
+  // Estimate prompt tokens to size context window dynamically
+  const estimatedPromptTokens = Math.ceil(
+    messages.reduce((acc, m) => acc + (m.content?.length || 0) + (m.images?.length ? 1500 : 0), 0) / 3.5
+  );
+
+  const desiredOutputTokens = options.thinkHarder ? 4096 : 3500;
+  const calculatedContext = Math.max(estimatedPromptTokens + desiredOutputTokens + 1024, 4096);
+
+  // Sizing context intelligently: On 4GB-8GB GPUs (e.g. RTX 3050 Laptop), allocating large 8k-32k context
+  // forces Ollama to allocate massive KV caches that exceed VRAM capacity, evicting model weights
+  // onto slow CPU system RAM. Sizing context conservatively (defaulting to 2048 when estimated tokens allow,
+  // or dynamically scaling to what the prompt needs) guarantees 100% of model layers stay in GPU VRAM!
+  const defaultNumCtx = options.numCtx ?? (
+    options.thinkHarder
+      ? Math.min(Math.max(calculatedContext, 2048), estimatedPromptTokens > 6000 ? 8192 : 4096)
+      : (estimatedPromptTokens <= 1400
+          ? 2048
+          : Math.min(calculatedContext, 4096))
+  );
   const numPredict = options.thinkHarder ? 4096 : 3500;
   const temperature = options.thinkHarder ? 0.15 : (options.temperature ?? 0.2);
-  const isStreaming = Boolean(options.onToken);
 
+  // ALWAYS stream: true from Ollama with explicit GPU offloading:
   const requestBody = JSON.stringify({
     model: modelTag,
     messages,
-    stream: isStreaming,
+    stream: true,
     format: options.formatJson ? 'json' : undefined,
     options: {
       temperature,
       num_ctx: defaultNumCtx,
-      num_predict: numPredict
+      num_predict: numPredict,
+      num_gpu: 99,
+      main_gpu: 0,
+      f16_kv: true
     }
   });
 
@@ -340,10 +439,27 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
   let responseText = '';
   let bytesReceived = 0;
 
+  // Timeout configuration:
+  // - Initial budget: generous time (4-6 minutes) for cold model loading and prompt ingestion.
+  // - Heartbeat inactivity: 75 seconds between chunks. If the model is outputting tokens, it will never timeout!
+  const initialTimeoutMs = options.timeoutMs ?? (options.thinkHarder ? 360000 : 240000);
+  const chunkInactivityMs = 75000;
+  let isStreamActive = false;
+
   try {
     const controller = new AbortController();
-    const timeoutDuration = options.images && options.images.length > 0 ? 120000 : 90000;
-    const timeout = setTimeout(() => controller.abort(), timeoutDuration);
+
+    let currentTimeout = setTimeout(() => {
+      controller.abort();
+    }, initialTimeoutMs);
+
+    const onChunkHeartbeat = () => {
+      isStreamActive = true;
+      clearTimeout(currentTimeout);
+      currentTimeout = setTimeout(() => {
+        controller.abort();
+      }, chunkInactivityMs);
+    };
 
     const res = await fetch(`${OLLAMA_BASE}/api/chat`, {
       method: 'POST',
@@ -352,11 +468,10 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
       signal: controller.signal
     });
 
-    clearTimeout(timeout);
-
     if (!res.ok) {
+      clearTimeout(currentTimeout);
       const errBody = await res.text().catch(() => '');
-      // If context length was exceeded, automatically retry once with expanded 32,768 context
+      // If context length was exceeded, automatically retry once with expanded context
       if (
         (errBody.includes('exceed_context_size_error') ||
          errBody.includes('exceeds the available context size')) &&
@@ -366,60 +481,36 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
         const retryBody = JSON.stringify({
           model: modelTag,
           messages,
-          stream: isStreaming,
+          stream: true,
           format: options.formatJson ? 'json' : undefined,
           options: {
             temperature: options.temperature ?? 0.2,
-            num_ctx: 32768,
-            num_predict: 3500
+            num_ctx: Math.min(defaultNumCtx * 2, 8192),
+            num_predict: 3500,
+            num_gpu: 99,
+            main_gpu: 0,
+            f16_kv: true
           }
         });
+
+        currentTimeout = setTimeout(() => {
+          controller.abort();
+        }, initialTimeoutMs);
+
         const retryRes = await fetch(`${OLLAMA_BASE}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: retryBody,
           signal: controller.signal
         });
-        if (retryRes.ok) {
-          if (isStreaming && retryRes.body) {
-            const reader = retryRes.body.getReader();
-            const decoder = new TextDecoder();
-            let accumulatedContent = '';
-            let accumulatedThinking = '';
-            let buffer = '';
 
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
-                try {
-                  const chunk = JSON.parse(trimmed);
-                  const thinking = chunk.message?.thinking || '';
-                  const content = chunk.message?.content || '';
-                  if (thinking) {
-                    accumulatedThinking += thinking;
-                    options.onToken?.(thinking, accumulatedContent || accumulatedThinking, true);
-                  }
-                  if (content) {
-                    accumulatedContent += content;
-                    options.onToken?.(content, accumulatedContent, false);
-                  }
-                } catch {}
-              }
-            }
-            responseText = accumulatedContent || accumulatedThinking;
-            bytesReceived = new TextEncoder().encode(responseText).length;
-          } else {
-            const retryData = await retryRes.json();
-            responseText = retryData?.message?.content || retryData?.message?.thinking || '';
-            bytesReceived = new TextEncoder().encode(JSON.stringify(retryData)).length;
-          }
+        if (retryRes.ok) {
+          const streamResult = await readOllamaStream(retryRes, options.onToken, onChunkHeartbeat);
+          clearTimeout(currentTimeout);
+          responseText = streamResult.text;
+          bytesReceived = streamResult.bytesReceived;
         } else {
+          clearTimeout(currentTimeout);
           const retryErr = await retryRes.text().catch(() => '');
           throw new Error(extractCleanErrorMessage(retryErr || retryRes.statusText, retryRes.status));
         }
@@ -427,63 +518,10 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
         throw new Error(extractCleanErrorMessage(errBody || res.statusText, res.status));
       }
     } else {
-      // Handle streaming or JSON response
-      if (isStreaming && res.body) {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulatedContent = '';
-        let accumulatedThinking = '';
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            try {
-              const chunk = JSON.parse(trimmed);
-              const thinking = chunk.message?.thinking || '';
-              const content = chunk.message?.content || '';
-              if (thinking) {
-                accumulatedThinking += thinking;
-                options.onToken?.(thinking, accumulatedContent || accumulatedThinking, true);
-              }
-              if (content) {
-                accumulatedContent += content;
-                options.onToken?.(content, accumulatedContent, false);
-              }
-            } catch {}
-          }
-        }
-
-        if (buffer.trim()) {
-          try {
-            const chunk = JSON.parse(buffer.trim());
-            const thinking = chunk.message?.thinking || '';
-            const content = chunk.message?.content || '';
-            if (thinking) {
-              accumulatedThinking += thinking;
-              options.onToken?.(thinking, accumulatedContent || accumulatedThinking, true);
-            }
-            if (content) {
-              accumulatedContent += content;
-              options.onToken?.(content, accumulatedContent, false);
-            }
-          } catch {}
-        }
-
-        responseText = accumulatedContent || accumulatedThinking;
-        bytesReceived = new TextEncoder().encode(responseText).length;
-      } else {
-        const data = await res.json();
-        responseText = data?.message?.content || data?.message?.thinking || '';
-        bytesReceived = new TextEncoder().encode(JSON.stringify(data)).length;
-      }
+      const streamResult = await readOllamaStream(res, options.onToken, onChunkHeartbeat);
+      clearTimeout(currentTimeout);
+      responseText = streamResult.text;
+      bytesReceived = streamResult.bytesReceived;
     }
 
     if (options.images && options.images.length > 0) {
@@ -494,9 +532,13 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
       });
     }
   } catch (err: any) {
-    const durationMs = Math.round(performance.now() - startTime);
     if (err.name === 'AbortError') {
-      throw new Error(`Local model execution timed out after ${options.images && options.images.length > 0 ? 120 : 90} seconds on model '${modelTag}'. Please ensure Ollama server is responsive.`);
+      const stage = isStreamActive ? 'during token generation' : 'while loading model or processing prompt';
+      const timeoutSec = Math.round((isStreamActive ? chunkInactivityMs : initialTimeoutMs) / 1000);
+      throw new Error(
+        `Local model execution timed out after ${timeoutSec}s (${stage}) on model '${modelTag}'. ` +
+        `Hint: For 4GB VRAM GPUs, disabling 'Think Harder' will run faster by reducing memory load.`
+      );
     }
     if (err.message && (err.message.toLowerCase().includes('fetch') || err.name === 'TypeError')) {
       throw new Error(
@@ -735,6 +777,7 @@ export async function generateXlsxStructureWithQwen(
   userPrompt: string,
   sourceMaterial: string,
   deterministicCalcs?: { formula: string; result: any; summary: string },
+  ragContext: KbGuidanceRef[] = [],
   modelTag?: string
 ): Promise<{ data: XlsxStructuredContent; audit: LocalLlmResult }> {
   const resolvedModel = resolveOllamaModelTag(modelTag);
@@ -760,6 +803,10 @@ export async function generateXlsxStructureWithQwen(
     ? `Formula Applied: ${deterministicCalcs.formula}\nCalculations: ${JSON.stringify(deterministicCalcs.result)}\nSummary: ${deterministicCalcs.summary}`
     : 'No prior calculation results.';
 
+  const ragSection = ragContext && ragContext.length > 0
+    ? ragContext.map(r => `[Standard: ${r.title}]\n${r.snippet}`).join('\n\n')
+    : 'No relevant guidelines retrieved.';
+
   const systemPrompt = `You are the quantitative spreadsheet architect for Lumi Sovereign AI Workbench.
 Your job is to structure an Excel workbook (.xlsx) with clean, professional financial/engineering tables.
 You MUST determine:
@@ -776,6 +823,9 @@ ${userPrompt}
 
 INPUT DATA & TASK CONTEXT:
 ${sourceMaterial || 'General industrial financial and reliability data.'}
+
+RETRIEVED KNOWLEDGE BASE GUIDELINES & STANDARDS:
+${ragSection}
 
 DETERMINISTIC CALCULATION FINDINGS:
 ${calcSection}
@@ -805,9 +855,14 @@ Synthesize the complete workbook schema now.`;
 export async function generatePythonCodeWithQwen(
   userPrompt: string,
   sourceData: string,
+  ragContext: KbGuidanceRef[] = [],
   modelTag?: string
 ): Promise<{ code: string; explanation: string; audit: LocalLlmResult }> {
   const resolvedModel = resolveOllamaModelTag(modelTag || 'coder');
+  const ragSection = ragContext && ragContext.length > 0
+    ? ragContext.map(r => `[Standard: ${r.title}]\n${r.snippet}`).join('\n\n')
+    : 'No relevant standards retrieved.';
+
   const systemPrompt = `You are a world-class senior Python engineer in an air-gapped industrial computing environment.
 Your job is to write complete, bug-free, self-contained, and deterministic Python code fulfilling the user's requirements.
 Follow these rules:
@@ -821,6 +876,9 @@ ${userPrompt}
 
 AVAILABLE DATA / SPECIFICATION:
 ${sourceData || 'Standard industrial dataset specifications.'}
+
+RETRIEVED KNOWLEDGE BASE STANDARDS:
+${ragSection}
 
 Write the complete Python calculation script now.`;
 

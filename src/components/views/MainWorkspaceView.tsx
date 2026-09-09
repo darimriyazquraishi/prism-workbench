@@ -225,13 +225,18 @@ export const MainWorkspaceView: React.FC = () => {
                 {/* Attached File Pills */}
                 {attachedFiles.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 mb-2 pb-2 border-b border-[var(--border-subtle)]">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--accent-primary)] font-semibold flex items-center gap-1 mr-1">
+                      <span>📄</span> Attached Context:
+                    </span>
                     {attachedFiles.map((file) => (
-                      <div key={file} className="flex items-center gap-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-md text-[11px] font-mono text-[var(--text-primary)]">
-                        <FileText className="w-3 h-3 text-[var(--accent-primary)]" />
-                        <span className="truncate max-w-[150px]">{file}</span>
+                      <div key={file} className="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--accent-primary)]/30 px-2 py-0.5 rounded-md text-[11px] font-mono text-[var(--text-primary)] shadow-sm">
+                        <FileText className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                        <span className="truncate max-w-[180px] font-medium">{file}</span>
                         <button 
+                          type="button"
                           onClick={() => removeAttachedFile(file)}
-                          className="p-0.5 hover:text-rose-400 cursor-pointer"
+                          className="p-0.5 hover:text-rose-400 cursor-pointer rounded transition-colors"
+                          title="Remove attached file"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -316,7 +321,6 @@ export const MainWorkspaceView: React.FC = () => {
                       e.preventDefault();
                       const toSend = promptText.trim();
                       if (toSend) {
-                        clearAttachments();
                         proposePlanForTask(toSend);
                         setPromptText('');
                         setShowSlashMenu(false);
@@ -725,13 +729,18 @@ export const MainWorkspaceView: React.FC = () => {
                     {/* Attached File Pills */}
                     {attachedFiles.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5 mb-2 pb-2 border-b border-[var(--border-subtle)]">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--accent-primary)] font-semibold flex items-center gap-1 mr-1">
+                          <span>📄</span> Attached Context:
+                        </span>
                         {attachedFiles.map((file) => (
-                          <div key={file} className="flex items-center gap-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-md text-[11px] font-mono text-[var(--text-primary)]">
-                            <FileText className="w-3 h-3 text-[var(--accent-primary)]" />
-                            <span className="truncate max-w-[150px]">{file}</span>
+                          <div key={file} className="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--accent-primary)]/30 px-2 py-0.5 rounded-md text-[11px] font-mono text-[var(--text-primary)] shadow-sm">
+                            <FileText className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                            <span className="truncate max-w-[180px] font-medium">{file}</span>
                             <button 
+                              type="button"
                               onClick={() => removeAttachedFile(file)}
-                              className="p-0.5 hover:text-rose-400 cursor-pointer"
+                              className="p-0.5 hover:text-rose-400 cursor-pointer rounded transition-colors"
+                              title="Remove attached file"
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -749,7 +758,6 @@ export const MainWorkspaceView: React.FC = () => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           if (followUpText.trim()) {
-                            clearAttachments();
                             proposePlanForTask(followUpText.trim());
                             setFollowUpText('');
                           }
@@ -792,7 +800,6 @@ export const MainWorkspaceView: React.FC = () => {
                         <button 
                           onClick={() => {
                             if (followUpText.trim()) {
-                              clearAttachments();
                               proposePlanForTask(followUpText.trim());
                               setFollowUpText('');
                             }

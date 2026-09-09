@@ -167,7 +167,13 @@ export async function generatePptxDeliverable(
     blob,
     approvalStatus: 'approved',
     slideCount: qwenContent.slides.length,
-    slides: processedSlides.map(s => ({ title: s.title, bullets: s.bullets, layout: s.layout }))
+    slides: processedSlides.map(s => ({
+      title: s.title,
+      bullets: s.bullets,
+      layout: s.layout,
+      purpose: qwenContent.slides.find(q => q.title === s.title)?.purpose,
+      notes: s.notes
+    }))
   };
 
   return { artifact, slides: processedSlides };
@@ -376,7 +382,8 @@ export async function generateDocxDeliverable(
     createdAt: new Date().toLocaleTimeString(),
     downloadUrl,
     blob,
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    structuredDocx: qwenContent
   };
 }
 
@@ -437,7 +444,8 @@ export async function generateXlsxDeliverable(
     createdAt: new Date().toLocaleTimeString(),
     downloadUrl,
     blob,
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    structuredXlsx: qwenContent
   };
 }
 
@@ -467,6 +475,7 @@ export function generateCodeDeliverable(
     createdAt: new Date().toLocaleTimeString(),
     downloadUrl,
     blob,
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    codeContent: pythonCode
   };
 }

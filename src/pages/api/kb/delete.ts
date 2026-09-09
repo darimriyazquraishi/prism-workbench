@@ -1,17 +1,17 @@
 import type { APIRoute } from 'astro';
 import fs from 'fs/promises';
 import path from 'path';
-import { readKbIndex, writeKbIndex, ensureStorageDir } from './files';
+import { readKbFiles, writeKbFiles, ensureStorageDir } from './files';
 
 export const prerender = false;
 
 const STORAGE_DIR = path.resolve(process.cwd(), 'sovereign-ai-workbench', 'data', 'knowledge');
 
-export const DELETE: APIRoute = async ({ request }) => {
+export const DELETE: APIRoute = async ({ request, url }) => {
   try {
     await ensureStorageDir();
     const body = await request.json().catch(() => ({}));
-    const filename = body.filename || body.id;
+    const filename = body.filename || body.id || body.name || url?.searchParams.get('filename') || url?.searchParams.get('id') || url?.searchParams.get('name');
 
     if (!filename) {
       return new Response(JSON.stringify({ success: false, error: 'Filename or ID required for deletion' }), {
@@ -20,22 +20,35 @@ export const DELETE: APIRoute = async ({ request }) => {
       });
     }
 
-    const existingFiles = await readKbIndex();
-    const targetFile = existingFiles.find(f => f.filename === filename || f.id === filename || f.name === filename);
+    const existingFiles = await readKbFiles();
+    const targetFile = existingFiles.find(
+      f => f.filename === filename || f.id === filename || f.name === filename
+    );
 
     const safeFilename = targetFile ? targetFile.filename : filename.replace(/[^a-zA-Z0-9._-]/g, '_');
     const targetPath = path.join(STORAGE_DIR, safeFilename);
 
+    const USER_UPLOADS_DIR = path.resolve(process.cwd(), 'workspaces', 'user_workspace', 'Uploads');
+    const userUploadPath = path.join(USER_UPLOADS_DIR, safeFilename);
+
     try {
       await fs.unlink(targetPath);
-    } catch (e) {
-      // Ignore error if file physically missing
-    }
+    } catch (e) {}
 
-    const updatedFiles = existingFiles.filter(f => f.filename !== safeFilename && f.id !== filename && f.name !== filename);
-    await writeKbIndex(updatedFiles);
+    try {
+      await fs.unlink(userUploadPath);
+    } catch (e) {}
 
-    return new Response(JSON.stringify({ success: true, message: `Successfully deleted ${safeFilename}`, files: updatedFiles }), {
+    const updatedFiles = existingFiles.filter(
+      f => f.filename !== safeFilename && f.id !== filename && f.name !== filename
+    );
+    await writeKbFiles(updatedFiles);
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: `Successfully deleted ${safeFilename}`, 
+      files: updatedFiles 
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -48,7 +61,6 @@ export const DELETE: APIRoute = async ({ request }) => {
   }
 };
 
-// Also support POST for clients that don't send DELETE body easily
 export const POST: APIRoute = async (context) => {
   return DELETE(context);
 };

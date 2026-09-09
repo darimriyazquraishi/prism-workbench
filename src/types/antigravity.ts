@@ -198,7 +198,10 @@ export interface ArtifactItem {
   blob?: Blob;
   approvalStatus?: 'draft' | 'approved';
   slideCount?: number;
-  slides?: { title: string; bullets: string[]; layout?: string }[];
+  slides?: { title: string; bullets: string[]; layout?: string; purpose?: string; notes?: string }[];
+  structuredDocx?: DocxStructuredContent;
+  structuredXlsx?: XlsxStructuredContent;
+  codeContent?: string;
 }
 
 export interface PptxSlide {

@@ -36,6 +36,7 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
     selectedModel, 
     setRightPaneOpen, 
     setActiveRightTab,
+    setActivePreviewArtifact,
     isExecuting,
     approveProposedPlan
   } = useAntigravityStore();
@@ -86,9 +87,10 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
     }
   };
 
-  // Open preview in right pane
+  // Open preview modal and sync with right pane
   const handlePreviewArtifact = (art: ArtifactItem) => {
     setPreviewingArtifactId(art.id);
+    setActivePreviewArtifact(art);
     setActiveRightTab('artifacts');
     setRightPaneOpen(true);
   };
@@ -289,7 +291,8 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
               return (
                 <div 
                   key={art.id} 
-                  className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm group"
+                  onClick={() => handlePreviewArtifact(art)}
+                  className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/60 hover:bg-[var(--bg-surface)] cursor-pointer transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm group"
                 >
                   <div className="flex items-start gap-3 min-w-0">
                     <div className="p-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border-subtle)] group-hover:scale-105 transition-transform">
@@ -328,7 +331,10 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 self-end md:self-center flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[var(--border-subtle)] w-full md:w-auto justify-end">
                     <button
-                      onClick={() => handlePreviewArtifact(art)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePreviewArtifact(art);
+                      }}
                       className="px-3 py-1.5 rounded-lg bg-[var(--bg-base)] hover:bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
                     >
                       <Eye className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
@@ -338,6 +344,7 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
                     <a
                       href={downloadHref}
                       download={art.name}
+                      onClick={(e) => e.stopPropagation()}
                       className="px-4 py-1.5 rounded-lg bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 font-semibold text-xs transition-opacity cursor-pointer flex items-center gap-1.5 shadow"
                     >
                       <Download className="w-3.5 h-3.5" />

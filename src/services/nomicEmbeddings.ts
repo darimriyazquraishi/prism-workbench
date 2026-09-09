@@ -137,7 +137,14 @@ export async function generateNomicEmbeddingAsync(text: string): Promise<number[
     const res = await fetch(`${OLLAMA_BASE}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'nomic-embed-text', prompt: text }),
+      body: JSON.stringify({
+        model: 'nomic-embed-text',
+        prompt: text,
+        options: {
+          num_gpu: 99,
+          main_gpu: 0
+        }
+      }),
       signal: controller.signal
     }).catch(() => null);
 

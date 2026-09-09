@@ -8,19 +8,34 @@ import node from '@astrojs/node';
 // https://astro.build/config
 export default defineConfig({
   adapter: node({ mode: 'standalone' }),
+  security: {
+    checkOrigin: false
+  },
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
     server: {
-      proxy: {
-        '/api': {
-          target: 'http://127.0.0.1:8000',
-          changeOrigin: true
-        },
-        '/static': {
-          target: 'http://127.0.0.1:8000',
-          changeOrigin: true
-        }
+      watch: {
+        ignored: [
+          '**/sovereign-ai-workbench/**',
+          '**/workspaces/**',
+          '**/models/**',
+          '**/dist/**',
+          '**/LUMI_Desktop/**',
+          '**/demo/**',
+          '**/per_design/**',
+          '**/llama_server/**',
+          '**/*.log',
+          /[\\/]sovereign-ai-workbench[\\/]/,
+          /[\\/]workspaces[\\/]/,
+          /[\\/]models[\\/]/,
+          /[\\/]dist[\\/]/,
+          /[\\/]LUMI_Desktop[\\/]/,
+          /[\\/]demo[\\/]/,
+          /[\\/]per_design[\\/]/,
+          /[\\/]llama_server[\\/]/,
+          /\.log$/
+        ]
       }
     }
   }

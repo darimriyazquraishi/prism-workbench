@@ -125,7 +125,7 @@ export async function executeValidationAndRoutingPipeline(
     const initialRes = await callLocalLlm({
       model: cfg.initialModel,
       systemPrompt: sourceContext && sourceContext.trim()
-        ? 'You are a precise, grounded assistant. Answer the user prompt using available evidence. Do not hallucinate or invent details.'
+        ? 'You are a precise, factually rigorous assistant. Answer the user prompt strictly using the supplied document context. Do not extrapolate, invent, or hallucinate facts not present in the supplied source context. If the supplied document context does not contain the answer, explicitly state that the information is not provided in the document.'
         : DEFAULT_FACTUAL_SYSTEM_PROMPT,
       userPrompt: `Context:\n${sourceContext}\n\nUser Question:\n${userQuery}`,
       conversationHistory,
@@ -175,7 +175,7 @@ export async function executeValidationAndRoutingPipeline(
   const initialRes = await callLocalLlm({
     model: cfg.initialModel,
     systemPrompt: hasSourceContext
-      ? 'You are a precise, grounded assistant. Answer the user prompt using available evidence. Do not hallucinate or invent details.'
+      ? 'You are a precise, factually rigorous assistant. Answer the user prompt strictly using the supplied document context. Do not extrapolate, invent, or hallucinate facts not present in the supplied source context. If the supplied document context does not contain the answer, explicitly state that the information is not provided in the document.'
       : DEFAULT_FACTUAL_SYSTEM_PROMPT,
     userPrompt: initialPrompt,
     conversationHistory,

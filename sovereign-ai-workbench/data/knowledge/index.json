@@ -1,5 +1,55 @@
 [
   {
+    "id": "doc-1788950586297-ea8e896f",
+    "name": "testFile.js",
+    "filename": "testFile_6295.js",
+    "path": "C:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace\\Uploads\\nested\\app\\testFile_6295.js",
+    "sizeBytes": 58,
+    "mimeType": "text/javascript",
+    "uploadedAt": "2026-09-09T10:43:06.297Z",
+    "formattedDate": "Sep 9, 2026, 04:13 PM"
+  },
+  {
+    "id": "doc-1788950570050-7305e698",
+    "name": "package.json",
+    "filename": "package.json",
+    "path": "C:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace\\Uploads\\nested\\config\\package.json",
+    "sizeBytes": 40,
+    "mimeType": "application/json",
+    "uploadedAt": "2026-09-09T10:42:50.050Z",
+    "formattedDate": "Sep 9, 2026, 04:12 PM"
+  },
+  {
+    "id": "doc-1788943030761-40e98128",
+    "name": "Line_04_CR_102_acceptance.txt",
+    "filename": "Line_04_CR_102_acceptance_0744.txt",
+    "path": "C:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace\\Uploads\\Line_04_CR_102_acceptance_0744.txt",
+    "sizeBytes": 78,
+    "mimeType": "text/plain",
+    "uploadedAt": "2026-09-09T08:37:10.761Z",
+    "formattedDate": "Sep 9, 2026, 02:07 PM"
+  },
+  {
+    "id": "doc-1788942710031-1c4d88a8",
+    "name": "Line_04_CR_102_test2.txt",
+    "filename": "Line_04_CR_102_test2.txt",
+    "path": "C:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace\\Uploads\\Line_04_CR_102_test2.txt",
+    "sizeBytes": 137,
+    "mimeType": "text/plain",
+    "uploadedAt": "2026-09-09T08:31:50.031Z",
+    "formattedDate": "Sep 9, 2026, 02:01 PM"
+  },
+  {
+    "id": "doc-1788942641942-1c4d88a8",
+    "name": "Line_04_CR_102_test.txt",
+    "filename": "Line_04_CR_102_test.txt",
+    "path": "C:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace\\Uploads\\Line_04_CR_102_test.txt",
+    "sizeBytes": 137,
+    "mimeType": "text/plain",
+    "uploadedAt": "2026-09-09T08:30:41.942Z",
+    "formattedDate": "Sep 9, 2026, 02:00 PM"
+  },
+  {
     "id": "kb-doc-safety",
     "name": "01_Refinery_Safety_Protocol.pdf",
     "filename": "01_Refinery_Safety_Protocol.pdf",
@@ -98,15 +148,5 @@
     "mimeType": "application/pdf",
     "uploadedAt": "2026-09-06T01:27:16.753299",
     "formattedDate": "Sep 06, 2026, 01:27 AM"
-  },
-  {
-    "id": "kb-1788683754706",
-    "name": "parsed_knowledge.json",
-    "filename": "parsed_knowledge.json",
-    "path": "/home/aidl/darim/prism-workbench/sovereign-ai-workbench/data/knowledge/parsed_knowledge.json",
-    "sizeBytes": 17553,
-    "mimeType": "application/octet-stream",
-    "uploadedAt": "2026-09-06T14:05:54.706389",
-    "formattedDate": "Sep 06, 2026, 02:05 PM"
   }
 ]

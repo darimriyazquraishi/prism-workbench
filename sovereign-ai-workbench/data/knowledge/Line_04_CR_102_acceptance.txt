@@ -1,0 +1,7 @@
+SENTINEL_INSPECTION_AUDIT_REPORT
+Line: 04-CR-102
+Nominal Wall Thickness: 5.50 mm
+Measured Minimum Thickness: 4.65 mm
+Corrosion Rate: 0.12 mm/year
+Remaining Safe Life: 12.5 years
+Recommendation: Safe for continuous operation until next turnaround in 2028.

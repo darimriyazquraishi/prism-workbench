@@ -41,18 +41,53 @@ export const LumiLauncher: React.FC = () => {
     toggleThinkHarderMode
   } = useAntigravityStore();
 
-  const [isBooting, setIsBooting] = useState(true);
-  const [bootLogs, setBootLogs] = useState<string[]>([]);
+  const isAlreadyBooted = typeof window !== 'undefined' && (
+    sessionStorage.getItem('lumi_booted') === 'true' || 
+    localStorage.getItem('lumi_booted') === 'true'
+  );
+
+  const [isBooting, setIsBooting] = useState(!isAlreadyBooted);
+  const [bootLogs, setBootLogs] = useState<string[]>(isAlreadyBooted ? BOOT_LOG_SEQUENCE : []);
+  const [showTerminalLogs, setShowTerminalLogs] = useState(false);
   const [loadingModelPath, setLoadingModelPath] = useState<string | null>(null);
   const [loadSuccessMsg, setLoadSuccessMsg] = useState<string | null>(null);
   const [isBrowsingFolder, setIsBrowsingFolder] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  const hasBootedOnceRef = useRef(isAlreadyBooted);
+
+  const handleSkipSequence = () => {
+    hasBootedOnceRef.current = true;
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('lumi_booted', 'true');
+    }
+    setBootLogs(BOOT_LOG_SEQUENCE);
+    setIsBooting(false);
+  };
+
+  const handleCloseLauncher = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('lumi_booted', 'true');
+      sessionStorage.setItem('lumi_launched', 'true');
+      localStorage.setItem('lumi_launched', 'true');
+    }
+    setLauncherOpen(false);
+  };
 
   // 1. Auto-start all inference engines, vision, pdf parser, and stream activation code
   useEffect(() => {
     if (!isLauncherOpen) return;
 
+    if (hasBootedOnceRef.current) {
+      setIsBooting(false);
+      checkEngineStatuses();
+      return;
+    }
+
+    hasBootedOnceRef.current = true;
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('lumi_booted', 'true');
+    }
     let isMounted = true;
     setIsBooting(true);
     setBootLogs([]);
@@ -100,7 +135,7 @@ export const LumiLauncher: React.FC = () => {
       const poll = setInterval(() => checkEngineStatuses(), 20000);
       return () => clearInterval(poll);
     }
-  }, [isLauncherOpen, isBooting, checkEngineStatuses]);
+  }, [isLauncherOpen, isBooting]);
 
   // Handle native folder browse
   const handleBrowseFolder = async () => {
@@ -182,7 +217,7 @@ export const LumiLauncher: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={() => setLauncherOpen(false)}
+            onClick={handleCloseLauncher}
             className="text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer px-2.5 py-1 rounded border border-neutral-800 hover:border-neutral-700"
           >
             Skip to App &rarr;
@@ -201,7 +236,7 @@ export const LumiLauncher: React.FC = () => {
                   <span>Initializing sovereign intelligence engines...</span>
                 </div>
                 <button 
-                  onClick={() => setIsBooting(false)}
+                  onClick={handleSkipSequence}
                   className="text-[11px] text-neutral-500 hover:text-neutral-300 underline cursor-pointer"
                 >
                   Skip sequence
@@ -347,15 +382,41 @@ export const LumiLauncher: React.FC = () => {
 
                 <div className="flex items-center gap-2 text-[11px] text-neutral-400">
                   <button 
-                    onClick={() => setIsBooting(true)}
-                    title="View Boot Terminal"
-                    className="p-1 hover:text-neutral-200 text-neutral-500 rounded cursor-pointer transition-colors"
+                    onClick={() => setShowTerminalLogs(prev => !prev)}
+                    title={showTerminalLogs ? "Hide Boot Terminal" : "View Boot Terminal"}
+                    className={`p-1 rounded cursor-pointer transition-colors ${showTerminalLogs ? 'text-cyan-400 bg-neutral-800' : 'text-neutral-500 hover:text-neutral-200'}`}
                   >
                     <Terminal className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
               </div>
+
+              {/* Collapsible Boot Terminal Viewer */}
+              {showTerminalLogs && (
+                <div className="space-y-2 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between text-xs text-neutral-400">
+                    <span className="font-mono text-[11px] text-cyan-400">System Boot Diagnostics</span>
+                    <button
+                      onClick={() => setShowTerminalLogs(false)}
+                      className="text-[10px] text-neutral-500 hover:text-neutral-300 cursor-pointer"
+                    >
+                      Hide logs
+                    </button>
+                  </div>
+                  <div className="bg-black/90 rounded-lg p-3 font-mono text-[11px] leading-relaxed text-neutral-300 h-36 overflow-y-auto border border-neutral-800 select-text">
+                    {(bootLogs.length > 0 ? bootLogs : BOOT_LOG_SEQUENCE).map((line, i) => (
+                      <div key={i} className="py-0.5 flex items-start gap-2">
+                        <span className="text-neutral-600 select-none">&gt;</span>
+                        <span className={line.includes('[READY]') ? 'text-emerald-400 font-semibold' : line.includes('[REASONING]') ? 'text-cyan-300' : line.includes('[MULTIMODAL]') ? 'text-purple-300' : 'text-neutral-300'}>
+                          {line}
+                        </span>
+                      </div>
+                    ))}
+                    <div ref={terminalEndRef} />
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -364,7 +425,7 @@ export const LumiLauncher: React.FC = () => {
         {/* 3. Footer with Launch Button */}
         <div className="px-6 py-4 border-t border-neutral-800 bg-neutral-950/60 flex items-center justify-end">
           <button
-            onClick={() => setLauncherOpen(false)}
+            onClick={handleCloseLauncher}
             className="flex items-center gap-2 px-5 py-2 rounded-lg bg-neutral-100 hover:bg-white text-neutral-900 font-medium text-xs transition-colors cursor-pointer shadow-sm"
           >
             <span>Launch LUMI Workbench</span>

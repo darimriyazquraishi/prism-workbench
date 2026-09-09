@@ -1,5 +1,5 @@
 {
-  "name": "prism-workbench",
+  "name": "lumi",
   "type": "module",
   "version": "0.0.1",
   "engines": {
@@ -23,6 +23,8 @@
     "clsx": "^2.1.1",
     "docx": "^9.7.1",
     "lucide-react": "^1.39.0",
+    "mammoth": "^1.12.2",
+    "pdf-parse": "^2.4.5",
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

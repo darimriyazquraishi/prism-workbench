@@ -1,5 +1,5 @@
 import { t as __exportAll } from "./rolldown-runtime_D7D4PA-g.mjs";
-import { i as writeKbIndex, r as readKbIndex, t as ensureStorageDir } from "./files_CxNoRQQl.mjs";
+import { i as writeKbFiles, r as readKbFiles, t as ensureStorageDir } from "./files_CmObFPfj.mjs";
 import fs from "fs/promises";
 import path from "path";
 //#region src/pages/api/kb/delete.ts
@@ -9,11 +9,11 @@ var delete_exports = /* @__PURE__ */ __exportAll({
 	prerender: () => false
 });
 var STORAGE_DIR = path.resolve(process.cwd(), "sovereign-ai-workbench", "data", "knowledge");
-var DELETE = async ({ request }) => {
+var DELETE = async ({ request, url }) => {
 	try {
 		await ensureStorageDir();
 		const body = await request.json().catch(() => ({}));
-		const filename = body.filename || body.id;
+		const filename = body.filename || body.id || body.name || url?.searchParams.get("filename") || url?.searchParams.get("id") || url?.searchParams.get("name");
 		if (!filename) return new Response(JSON.stringify({
 			success: false,
 			error: "Filename or ID required for deletion"
@@ -21,15 +21,20 @@ var DELETE = async ({ request }) => {
 			status: 400,
 			headers: { "Content-Type": "application/json" }
 		});
-		const existingFiles = await readKbIndex();
+		const existingFiles = await readKbFiles();
 		const targetFile = existingFiles.find((f) => f.filename === filename || f.id === filename || f.name === filename);
 		const safeFilename = targetFile ? targetFile.filename : filename.replace(/[^a-zA-Z0-9._-]/g, "_");
 		const targetPath = path.join(STORAGE_DIR, safeFilename);
+		const USER_UPLOADS_DIR = path.resolve(process.cwd(), "workspaces", "user_workspace", "Uploads");
+		const userUploadPath = path.join(USER_UPLOADS_DIR, safeFilename);
 		try {
 			await fs.unlink(targetPath);
 		} catch (e) {}
+		try {
+			await fs.unlink(userUploadPath);
+		} catch (e) {}
 		const updatedFiles = existingFiles.filter((f) => f.filename !== safeFilename && f.id !== filename && f.name !== filename);
-		await writeKbIndex(updatedFiles);
+		await writeKbFiles(updatedFiles);
 		return new Response(JSON.stringify({
 			success: true,
 			message: `Successfully deleted ${safeFilename}`,

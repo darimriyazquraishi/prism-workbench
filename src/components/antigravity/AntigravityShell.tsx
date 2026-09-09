@@ -4,9 +4,11 @@ import { AntigravityStatusBar } from './AntigravityStatusBar';
 import { MainWorkspaceView } from '../views/MainWorkspaceView';
 import { ModelManagementView } from '../views/ModelManagementView';
 import { WorkflowKnowledgeView } from '../views/WorkflowKnowledgeView';
+import { IdeWorkspaceView } from '../views/IdeWorkspaceView';
 import { CommandPalette } from '../modals/CommandPalette';
 import { SecurityStatusModal } from '../modals/SecurityStatusModal';
 import { FilePreviewModal } from '../modals/FilePreviewModal';
+import { DeliverablePreviewModal } from '../modals/DeliverablePreviewModal';
 import { UserSettingsModal } from '../modals/UserSettingsModal';
 import { ServerHealthModal } from '../modals/ServerHealthModal';
 import { LumiLauncher } from '../launcher/LumiLauncher';
@@ -22,11 +24,12 @@ import {
   Settings, 
   MessageSquare, 
   Trash2,
-  Layers
+  Layers,
+  FolderTree
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 
-export type ActiveScreenView = 'workspace' | 'models' | 'workflow';
+export type ActiveScreenView = 'workspace' | 'models' | 'workflow' | 'ide';
 
 export const AntigravityShell: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<ActiveScreenView>('workspace');
@@ -46,8 +49,13 @@ export const AntigravityShell: React.FC = () => {
     createNewSession,
     selectSession,
     deleteSession,
-    setLauncherOpen
+    setLauncherOpen,
+    loadKnowledgeBaseFromDisk
   } = useAntigravityStore();
+
+  useEffect(() => {
+    loadKnowledgeBaseFromDisk();
+  }, [loadKnowledgeBaseFromDisk]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -124,6 +132,17 @@ export const AntigravityShell: React.FC = () => {
               >
                 <Book className="w-4 h-4" />
                 <span>Knowledge Base</span>
+              </button>
+              <button
+                onClick={() => setActiveScreen('ide')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm font-medium ${
+                  activeScreen === 'ide'
+                    ? 'text-[var(--text-primary)] bg-[var(--bg-elevated)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                }`}
+              >
+                <FolderTree className="w-4 h-4 text-purple-400" />
+                <span>IDE Explorer</span>
               </button>
               <button
                 onClick={() => setLauncherOpen(true)}
@@ -260,18 +279,23 @@ export const AntigravityShell: React.FC = () => {
           </button>
         </div>
 
-        {/* Main Content */}
+        {/* Main Content - Persistent views prevent remounts & preserve state */}
         <div className="flex-1 flex overflow-hidden bg-[var(--bg-base)]">
-          {activeScreen === 'workspace' && (
-            <>
-              <div className="flex-1 flex overflow-hidden min-w-0">
-                <MainWorkspaceView />
-              </div>
-              <WorkbenchVerificationSidebar />
-            </>
-          )}
-          {activeScreen === 'models' && <ModelManagementView />}
-          {activeScreen === 'workflow' && <WorkflowKnowledgeView />}
+          <div className={`flex-1 flex overflow-hidden min-w-0 ${activeScreen === 'workspace' ? '' : 'hidden'}`}>
+            <div className="flex-1 flex overflow-hidden min-w-0">
+              <MainWorkspaceView />
+            </div>
+            <WorkbenchVerificationSidebar />
+          </div>
+          <div className={`flex-1 flex overflow-hidden min-w-0 ${activeScreen === 'models' ? '' : 'hidden'}`}>
+            <ModelManagementView />
+          </div>
+          <div className={`flex-1 flex overflow-hidden min-w-0 ${activeScreen === 'workflow' ? '' : 'hidden'}`}>
+            <WorkflowKnowledgeView />
+          </div>
+          <div className={`flex-1 flex overflow-hidden min-w-0 ${activeScreen === 'ide' ? '' : 'hidden'}`}>
+            <IdeWorkspaceView />
+          </div>
         </div>
       </div>
 
@@ -283,6 +307,7 @@ export const AntigravityShell: React.FC = () => {
       <CommandPalette onRunScenario={(_prompt, _file) => runIndustrialDemo('inspection')} />
       <SecurityStatusModal />
       <FilePreviewModal />
+      <DeliverablePreviewModal />
       <UserSettingsModal />
       <ServerHealthModal />
     </div>

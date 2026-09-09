@@ -6,6 +6,7 @@ import type {
   SkillItem, 
   KnowledgeItem,
   ProposedExecutionPlan,
+  ProposedStepItem,
   NetworkAuditLog,
   TaskType,
   DeliverableFormat,
@@ -21,6 +22,7 @@ import type {
 import { defaultPipelineConfig, updateDefaultPipelineModels, type PipelineConfig } from '../config/pipelineConfig';
 import { executeValidationAndRoutingPipeline } from '../services/answerValidatorService';
 import { useTelemetryStore } from './telemetryStore';
+import { useWorkspaceStore } from './useWorkspaceStore';
 import { searchKnowledgeBaseWithNomic, chunkDocumentText } from '../services/nomicEmbeddings';
 import {
   generatePptxDeliverable,
@@ -62,6 +64,8 @@ export interface UploadedFile {
   source_type: 'USER_UPLOAD';
   task_id?: string;
   session_id?: string;
+  relativePath?: string;
+  sha256?: string;
 }
 
 export function classifyIntent(
@@ -105,13 +109,13 @@ export function classifyIntent(
   const asksForDocGen = asksForPPT || asksForExcel || asksForWord || /\b(create a document|generate a report|compile a document|draft an official)\b/.test(p);
 
   // Vision / OCR requirements
-  const asksForVision = /\b(ocr|scanned|read the image|inspect drawing|image analysis|photo|scanned report|novel|book|picture|image|photo|cover|diagram|chart)\b/.test(p) || realFiles.some(f => /\.(png|jpg|jpeg|webp|pdf|gif|bmp)$/i.test(f));
+  const asksForVision = /\b(ocr|scanned|read the image|inspect drawing|image analysis|photo|scanned report|novel|book|picture|image|photo|cover|diagram|chart)\b/.test(p) || realFiles.some(f => /\.(png|jpg|jpeg|webp|pdf|gif|bmp)$/i.test(f) && (p.includes('image') || p.includes('drawing') || p.includes('picture') || p.includes('photo') || p.includes('cover') || p.includes('diagram')));
 
   // Python execution / calculation script requirements
   const asksForPython = /\b(python|script|docker|compute mtbf|calculate corrosion|run code|execute code|python cost calculation)\b/.test(p);
 
-  // Explicit RAG / SOP lookup requirements
-  const asksForRAG = /\b(sop|manual|guideline|guidelines|company standard|knowledge base|retrieval|cross-reference|cross reference|sop-ops|api 570|ppe|permit to work|ptw|safety protocol|confidential|information classification|inspection report|approval note|procurement|equipment maintenance|engineering calculation)\b/.test(p);
+  // Explicit RAG / SOP / Document lookup requirements
+  const asksForRAG = /\b(sop|manual|manuals|guideline|guidelines|standard|standards|policy|policies|knowledge|knowledge base|retrieval|cross-reference|cross reference|reference|references|specification|specifications|sop-ops|api 570|ppe|permit to work|ptw|safety protocol|confidential|information classification|inspection report|approval note|procurement|equipment maintenance|engineering calculation)\b/.test(p);
 
   // Domain workflow request markers
   const isDomainWorkflowRequest = /\b(turnaround plan|pump-102|cdu-5|unit 3)\b/.test(p);
@@ -151,11 +155,11 @@ export function classifyIntent(
   // 4. Conversational / Factual / Q&A Direct Intent
   const isGreeting = /^(hi|hello|hey|good morning|good afternoon|good evening|greetings|howdy|sup)\b/i.test(p) && p.length < 30;
   const isCasual = /^(how are you|who are you|what can you do|thanks|thank you|bye|cool|awesome|ok|okay|got it)\b/i.test(p) && p.length < 40;
-  const isQuestion = rawP.endsWith('?') || /^(what|whats|what's|how|why|when|where|who|explain|tell|can you|describe|calculate|is there|are there|formula)\b/i.test(p);
+  const isQuestion = rawP.endsWith('?') || /^(what|whats|what's|how|why|when|where|who|explain|tell|can you|describe|calculate|is there|are there|formula|according to|based on)\b/i.test(p);
 
   const requiresWorkflow = (hasRealFiles || asksForDocGen || (asksForPython && asksForDocGen) || asksForRAG || asksForVision || isDomainWorkflowRequest) && !isGreeting && !isCasual;
 
-  if (!requiresWorkflow || (isQuestion && !hasRealFiles && !asksForDocGen && !isDomainWorkflowRequest && !asksForRAG && !asksForVision)) {
+  if (!requiresWorkflow || (isQuestion && !asksForDocGen && !isDomainWorkflowRequest && !asksForVision)) {
     return {
       intent: 'DIRECT_QA',
       requires_workflow: false,
@@ -163,7 +167,7 @@ export function classifyIntent(
       requires_rag: asksForRAG || asksForPPT || asksForWord,
       requires_python: false,
       requires_document_generation: false,
-      input_files: [],
+      input_files: realFiles,
       output_format: null,
       deliverable: null,
       reason: 'Direct Q&A / Conversational request'
@@ -302,6 +306,118 @@ export function detectModelInfo(filename: string, fullPath?: string, sizeBytes?:
   };
 }
 
+/**
+ * Resolves full document text context from attached files, active context dropdown,
+ * open IDE tabs, SQLite database, or natural language references in the user prompt.
+ */
+export async function resolveDocumentContextForPrompt(
+  prompt: string,
+  attachedFileNames: string[] = []
+): Promise<{ contextText: string; sourcesUsed: string[] }> {
+  const store = useAntigravityStore.getState();
+  const lowerPrompt = prompt.toLowerCase();
+  const candidateFiles = new Set<string>();
+
+  // 1. Explicitly attached file names in current message
+  for (const name of attachedFileNames) {
+    if (name && name.trim()) candidateFiles.add(name.trim());
+  }
+
+  // 2. Currently selected document context in dropdown
+  if (store.activeDocumentContext && store.activeDocumentContext !== 'No active context') {
+    candidateFiles.add(store.activeDocumentContext.trim());
+  }
+
+  // 3. Known uploaded files mentioned by filename in user prompt
+  for (const uf of store.uploadedFiles) {
+    if (lowerPrompt.includes(uf.name.toLowerCase())) {
+      candidateFiles.add(uf.name);
+    }
+  }
+
+  // 4. Natural language cues indicating reference to uploaded/open documents
+  const referencesCurrentDoc = /\b(this document|uploaded file|the file|this file|the document|the pdf|attached document|attached file|this report|my document|my file|the spreadsheet|the data|according to the document|based on the document|based on the file|use this document|based on the uploaded file)\b/i.test(prompt);
+
+  if (candidateFiles.size === 0 && referencesCurrentDoc) {
+    if (store.uploadedFiles.length > 0) {
+      candidateFiles.add(store.uploadedFiles[store.uploadedFiles.length - 1].name);
+    } else {
+      try {
+        const activeTabId = useWorkspaceStore.getState().activeTabId;
+        const activeTab = useWorkspaceStore.getState().openTabs.find(t => t.id === activeTabId);
+        if (activeTab) {
+          candidateFiles.add(activeTab.name);
+        }
+      } catch {}
+    }
+  }
+
+  if (candidateFiles.size === 0) {
+    return { contextText: '', sourcesUsed: [] };
+  }
+
+  const contextBlocks: string[] = [];
+  const sourcesUsed: string[] = [];
+
+  for (const filename of candidateFiles) {
+    let docContent = '';
+
+    // Check store.uploadedFiles
+    const uf = store.uploadedFiles.find(u => u.name.toLowerCase() === filename.toLowerCase());
+    if (uf && uf.content && uf.content.trim()) {
+      docContent = uf.content.trim();
+    }
+
+    // Check workspace openTabs
+    if (!docContent) {
+      try {
+        const tab = useWorkspaceStore.getState().openTabs.find(
+          t => t.name.toLowerCase() === filename.toLowerCase() || t.path.toLowerCase().endsWith(filename.toLowerCase())
+        );
+        if (tab) {
+          docContent = (tab.extractedText || tab.content || '').trim();
+        }
+      } catch {}
+    }
+
+    // Query backend /api/workspace/file
+    if (!docContent) {
+      try {
+        const res = await fetch(`/api/workspace/file?path=${encodeURIComponent('Uploads/' + filename)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && (data.extractedText || data.content)) {
+            docContent = (data.extractedText || data.content || '').trim();
+          }
+        }
+      } catch {}
+    }
+
+    // Fallback: search knowledgeItems
+    if (!docContent) {
+      const kb = store.knowledgeItems.find(k => k.title.toLowerCase() === filename.toLowerCase() || (k as any).filename?.toLowerCase() === filename.toLowerCase());
+      if (kb && kb.content) {
+        docContent = kb.content.trim();
+      }
+    }
+
+    if (docContent) {
+      sourcesUsed.push(filename);
+      const truncated = docContent.length > 15000 
+        ? docContent.slice(0, 15000) + '\n...[Content truncated for context window]' 
+        : docContent;
+      contextBlocks.push(`[Referenced Document: ${filename}]\n${truncated}`);
+    }
+  }
+
+  if (contextBlocks.length === 0) {
+    return { contextText: '', sourcesUsed: [] };
+  }
+
+  const contextText = `### REFERENCED DOCUMENT CONTEXT\n\n${contextBlocks.join('\n\n---\n\n')}`;
+  return { contextText, sourcesUsed };
+}
+
 export async function generateChatbotResponse(
   promptText: string,
   previousUserPrompts: string[] = [],
@@ -322,6 +438,11 @@ export async function generateChatbotResponse(
       rawP = prevQ.trim();
       p = rawP.toLowerCase();
     }
+  }
+
+  // When external document context is provided, bypass small-talk/math shortcuts to guarantee grounded answer
+  if (contextText && contextText.trim()) {
+    return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId, onToken, conversationHistory);
   }
 
   const cleanP = p.replace(/^[^\w\s]+|[^\w\s]+$/g, '').trim();
@@ -504,6 +625,8 @@ interface AntigravityStore {
   isRightPaneOpen: boolean;
   isSidebarOpen: boolean;
   selectedArtifactId: string | null;
+  activePreviewArtifact: ArtifactItem | null;
+  allArtifacts: ArtifactItem[];
 
   // Skills & KIs
   skills: SkillItem[];
@@ -513,6 +636,8 @@ interface AntigravityStore {
   addKnowledgeBaseDoc: (doc: Omit<KnowledgeItem, 'id' | 'source_type'>) => void;
   removeKnowledgeBaseDoc: (id: string) => void;
   queryKnowledgeBase: (prompt: string, taskType: string) => KbSearchResult;
+  loadKnowledgeBaseFromDisk: () => Promise<void>;
+  syncKnowledgeBase: (files: any[]) => void;
 
   // Modals & Network Egress Proof
   isCommandPaletteOpen: boolean;
@@ -580,6 +705,8 @@ interface AntigravityStore {
   toggleSidebar: () => void;
   setRightPaneOpen: (val: boolean) => void;
   setSelectedArtifactId: (id: string | null) => void;
+  setActivePreviewArtifact: (art: ArtifactItem | null) => void;
+  addArtifact: (art: ArtifactItem) => void;
 
   // Modals
   setCommandPaletteOpen: (val: boolean) => void;
@@ -909,8 +1036,16 @@ let lastEngineCheckTime = 0;
 
 export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   // Launcher & Model Cache State
-  isLauncherOpen: true,
-  setLauncherOpen: (open: boolean) => set({ isLauncherOpen: open }),
+  isLauncherOpen: typeof window !== 'undefined'
+    ? (sessionStorage.getItem('lumi_launched') !== 'true' && localStorage.getItem('lumi_launched') !== 'true')
+    : false,
+  setLauncherOpen: (open: boolean) => {
+    if (!open && typeof window !== 'undefined') {
+      sessionStorage.setItem('lumi_launched', 'true');
+      localStorage.setItem('lumi_launched', 'true');
+    }
+    set({ isLauncherOpen: open });
+  },
   selectedGeneralModel: '',
   setSelectedGeneralModel: (model: string) => {
     updateDefaultPipelineModels(model);
@@ -1158,9 +1293,57 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   isRightPaneOpen: true,
   isSidebarOpen: true,
   selectedArtifactId: 'art-docx-001',
+  activePreviewArtifact: null,
+  allArtifacts: [],
 
   skills: initialSkills,
   knowledgeItems: initialKIs,
+
+  setActivePreviewArtifact: (art) => set({ 
+    activePreviewArtifact: art,
+    selectedArtifactId: art?.id || null
+  }),
+
+  addArtifact: (art) => set((state) => ({
+    allArtifacts: [art, ...state.allArtifacts.filter(a => a.id !== art.id)]
+  })),
+
+  loadKnowledgeBaseFromDisk: async () => {
+    try {
+      const res = await fetch('/api/kb/files');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.files)) {
+          get().syncKnowledgeBase(data.files);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load Knowledge Base files from disk:', err);
+    }
+  },
+
+  syncKnowledgeBase: (files: any[]) => {
+    if (!Array.isArray(files) || files.length === 0) return;
+    const newItems: KnowledgeItem[] = files.map((f) => ({
+      id: f.id || `kb-${f.filename}`,
+      title: f.name || f.filename,
+      summary: f.summary || `${f.name}: Document guidance and standards.`,
+      path: f.path || `/sovereign-ai-workbench/data/knowledge/${f.filename}`,
+      totalChunks: f.totalChunks || 1,
+      source_type: 'KNOWLEDGE_BASE',
+      document_type: f.document_type || 'guideline',
+      category: f.category || 'General',
+      content: f.content || ''
+    }));
+
+    set((state) => {
+      const existingMap = new Map(state.knowledgeItems.map(k => [k.id, k]));
+      for (const item of newItems) {
+        existingMap.set(item.id, item);
+      }
+      return { knowledgeItems: Array.from(existingMap.values()) };
+    });
+  },
 
   addKnowledgeBaseDoc: (doc) => set((state) => ({
     knowledgeItems: [
@@ -1249,14 +1432,18 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       const remaining = state.sessions.filter(s => s.id !== id);
       if (remaining.length === 0) {
         const freshId = `sess-${Date.now()}`;
+        const freshSession: AntigravitySession = {
+          id: freshId,
+          title: 'New Chat',
+          createdAt: 'Just now',
+          model: state.selectedModel || 'qwen3:8b',
+          mode: state.activeMode || 'agent',
+          attachedFiles: [],
+          status: 'idle',
+          steps: []
+        };
         return {
-          sessions: [{
-            id: freshId,
-            title: 'New Chat',
-            startedAt: new Date().toLocaleTimeString(),
-            status: 'in_progress',
-            steps: []
-          }],
+          sessions: [freshSession],
           activeSessionId: freshId,
           projectTitle: 'LUMI - Local Unified Multimodal Intelligence',
           activeTaskStarted: false,
@@ -1518,6 +1705,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
         : `${(file.size / 1024).toFixed(1)} KB`;
 
+      const initialRel = (file as any).relativePath || (file as any).webkitRelativePath || file.name;
+
       newUploadedFiles.push({
         id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         name: file.name,
@@ -1527,6 +1716,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         extension,
         dataUrl,
         content,
+        relativePath: initialRel,
         uploadedAt: new Date().toLocaleTimeString(),
         source_type: 'USER_UPLOAD',
         session_id: get().activeSessionId,
@@ -1547,6 +1737,47 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
           : state.activeDocumentContext
       };
     });
+
+    // Real server upload: stores into workspaces/user_workspace/Uploads/, extracts text via pdf-parse/mammoth/xlsx, and records into SQLite
+    try {
+      const formData = new FormData();
+      for (const file of filesArray) {
+        formData.append('files', file);
+        const rel = (file as any).relativePath || (file as any).webkitRelativePath || file.name;
+        formData.append('paths', rel);
+      }
+      const res = await fetch('/api/kb/upload', {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.files)) {
+          set((state) => ({
+            uploadedFiles: state.uploadedFiles.map((uf) => {
+              const matched = json.files.find((jf: any) => jf.name === uf.name || jf.original_name === uf.name);
+              if (matched) {
+                return {
+                  ...uf,
+                  id: matched.id || uf.id,
+                  content: matched.extracted_text || matched.content || uf.content,
+                  sha256: matched.sha256,
+                  relativePath: matched.relative_path || `Uploads/${matched.filename}`
+                };
+              }
+              return uf;
+            })
+          }));
+
+          // Trigger workspace tree refresh so newly uploaded files appear in IDE Explorer
+          try {
+            useWorkspaceStore.getState().refreshTree();
+          } catch {}
+        }
+      }
+    } catch (uploadErr) {
+      console.warn('[UPLOAD] Background server sync warning:', uploadErr);
+    }
   },
 
   removeUploadedFile: (id) => set((state) => {
@@ -1656,9 +1887,20 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     const routing = classifyIntent(prompt, currentAttachedFiles, uploadedFiles, previousUserPrompts);
     const routerDurationMs = Math.round(performance.now() - routerStart);
 
+    // Resolve any attached or referenced document context
+    const { contextText: resolvedDocContext, sourcesUsed } = await resolveDocumentContextForPrompt(prompt, currentAttachedFiles);
+
     // 2. DIRECT_QA Intent Execution Path (Answers immediately with live streaming tokens)
     if (routing.intent === 'DIRECT_QA') {
-      useTelemetryStore.getState().updateExecutionRetrieval(requestId, { status: 'not_required' });
+      if (sourcesUsed.length > 0) {
+        useTelemetryStore.getState().updateExecutionRetrieval(requestId, {
+          status: 'completed',
+          chunksRetrieved: sourcesUsed.length,
+          chunks: sourcesUsed.map(s => ({ title: s, snippet: `Referenced document context (${s})` }))
+        });
+      } else {
+        useTelemetryStore.getState().updateExecutionRetrieval(requestId, { status: 'not_required' });
+      }
 
       addStepToActiveSession({
         id: `step-${Date.now()}-u`,
@@ -1687,7 +1929,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         prompt,
         previousUserPrompts,
         activeModel,
-        '',
+        resolvedDocContext,
         requestId,
         (token, accumulated, isThinking) => {
           if (isThinking && !hasReceivedContentToken) {
@@ -1708,7 +1950,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       console.log(`[PIPELINE LATENCY DIAGNOSTIC] Request ID: ${requestId}
   Prompt: "${prompt.slice(0, 50)}"
   Intent Router: ${routerDurationMs} ms (Intent: DIRECT_QA)
-  RAG Retrieval: SKIPPED (0 ms)
+  Document Context: ${sourcesUsed.length > 0 ? `Loaded ${sourcesUsed.join(', ')}` : 'None'}
   Model Generation & Validation: ${modelDurationMs} ms
   Total Execution Latency: ${totalDurationMs} ms`);
 
@@ -1717,9 +1959,14 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       }
 
       // Finalize the step with completed text & status
+      let finalContent = chatRes.text;
+      if (sourcesUsed.length > 0 && !finalContent.includes('**Sources used:**') && !finalContent.includes('Sources used:')) {
+        finalContent = `${finalContent.trim()}\n\n---\n**Sources used:**\n${sourcesUsed.map(s => `• ${s}`).join('\n')}`;
+      }
+
       get().updateStepInActiveSession(respStepId, {
-        content: chatRes.text,
-        groundedStatus: chatRes.groundedStatus
+        content: finalContent,
+        groundedStatus: sourcesUsed.length > 0 ? 'grounded' : chatRes.groundedStatus
       });
 
       set({ isExecuting: false });
@@ -1731,7 +1978,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         destination: '127.0.0.1:11434',
         protocol: 'HTTP',
         bytesSent: 140 + prompt.length,
-        bytesReceived: (chatRes.text || '').length * 2,
+        bytesReceived: (finalContent || '').length * 2,
         isExternal: false,
         modelOrTool: `${activeModel} (Local Direct Q&A)`
       });
@@ -1781,7 +2028,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       timestamp: now()
     });
 
-    const userUploadFiles = routing.input_files;
+    const userUploadFiles = Array.from(new Set([...routing.input_files, ...sourcesUsed]));
     const fileContextStr = userUploadFiles.length > 0 ? userUploadFiles.join(', ') : 'None attached';
 
     const p = prompt.toLowerCase();
@@ -1795,6 +2042,15 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       taskType = 'inspection_analysis';
     } else if (p.includes('summary') || p.includes('brief') || p.includes('report') || p.includes('pdf')) {
       taskType = 'document_summary';
+    }
+
+    // Dynamic RAG verification: If uploaded knowledge items exist, check if prompt matches any guidelines
+    const availableKb = get().knowledgeItems;
+    if (availableKb.length > 0) {
+      const nomicCheck = searchKnowledgeBaseWithNomic(prompt, availableKb, 3, 0.22);
+      if (nomicCheck.guidance.length > 0) {
+        routing.requires_rag = true;
+      }
     }
 
     const requestedFormat = routing.output_format || 'docx';
@@ -2432,12 +2688,27 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
             ragCount: workflowContext.ragContext.length
           });
 
+          let lastThrottledUpdate = 0;
           const genRes = await callLocalLlm({
             model: activeModel,
             systemPrompt: 'You are Lumi, a sovereign multimodal reasoning assistant. Synthesize a complete and accurate answer grounded strictly in the provided visual findings and source context.',
             userPrompt: reasoningPrompt,
             temperature: 0.3,
-            thinkHarder: get().isThinkHarderMode
+            thinkHarder: get().isThinkHarderMode,
+            onToken: (token, accumulated, isThinking) => {
+              const curNow = performance.now();
+              if (curNow - lastThrottledUpdate > 350) {
+                lastThrottledUpdate = curNow;
+                const snippet = accumulated.length > 140 ? '...' + accumulated.slice(-140) : accumulated;
+                get().updateStepInActiveSession(stepId, {
+                  toolOutput: {
+                    step: step.stepNumber,
+                    action: step.description,
+                    result: isThinking ? `[Thinking...] ${snippet}` : `[Synthesizing...] ${snippet}`
+                  }
+                });
+              }
+            }
           });
 
           workflowContext.llmOutputs['reasoning_synthesis'] = genRes.content;
@@ -2515,12 +2786,14 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
               userFiles
             );
             workflowContext.artifact = pptxRes.artifact;
+            get().addArtifact(pptxRes.artifact);
             stepOutputText = `PPTX renderer compiled ${pptxRes.artifact.slideCount} slides into ${pptxRes.artifact.name} (${(pptxRes.artifact.sizeBytes / 1024).toFixed(1)} KB). Ready for download.`;
           } else if (requestedFormat === 'xlsx') {
             const qwenXlsx = await generateXlsxStructureWithQwen(
               approvedPlan.intentSummary || 'Cost Report',
               workflowContext.extractedContent,
               workflowContext.calculations,
+              workflowContext.ragContext,
               activeModel
             );
             workflowContext.structuredDeliverable = qwenXlsx.data;
@@ -2542,6 +2815,7 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
               userFiles
             );
             workflowContext.artifact = xlsxRes;
+            get().addArtifact(xlsxRes);
             stepOutputText = `XLSX renderer compiled ${qwenXlsx.data.sheets.length} sheets into ${xlsxRes.name} (${(xlsxRes.sizeBytes / 1024).toFixed(1)} KB). Ready for download.`;
           } else if (requestedFormat === 'py') {
             const codeDescriptor = resolveModelForCapability('code', undefined, get().arsenalModels);
@@ -2554,6 +2828,7 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
             const qwenCode = await generatePythonCodeWithQwen(
               approvedPlan.intentSummary || 'Python script calculation',
               contextForCode || workflowContext.extractedContent,
+              workflowContext.ragContext,
               codeModelTag
             );
 
@@ -2574,6 +2849,7 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
               qwenCode.explanation
             );
             workflowContext.artifact = pyRes;
+            get().addArtifact(pyRes);
             stepOutputText = `Qwen2.5-Coder generated Python calculation script ${pyRes.name} (${(pyRes.sizeBytes / 1024).toFixed(1)} KB). Ready for download.`;
           } else {
             // DOCX Approval Note
@@ -2603,6 +2879,7 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
               userFiles
             );
             workflowContext.artifact = docxRes;
+            get().addArtifact(docxRes);
             stepOutputText = `DOCX renderer compiled formal document into ${docxRes.name} (${(docxRes.sizeBytes / 1024).toFixed(1)} KB). Ready for download.`;
           }
         } else {
@@ -2727,6 +3004,7 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
     }
 
     if (finalArtifact) {
+      get().addArtifact(finalArtifact);
       // 4. Contract Validation Gate
       const validationPassed = finalArtifact.type === requestedFormat;
       const validationStepId = `step-${Date.now()}-validation`;

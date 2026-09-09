@@ -1,0 +1,1 @@
+API 570 inspection report for Line 04-CR-102. Measured wall thickness: 4.82mm. Minimum required: 3.20mm. Safe remaining life: 14.2 years.

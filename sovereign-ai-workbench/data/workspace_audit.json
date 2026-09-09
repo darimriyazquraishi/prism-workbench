@@ -1,0 +1,1602 @@
+[
+  {
+    "id": "audit-1788951171215-6351",
+    "timestamp": "2026-09-09T10:52:51.215Z",
+    "action": "WRITE",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace/perimeter.py",
+    "status": "allowed",
+    "details": "Saved 490 bytes"
+  },
+  {
+    "id": "audit-1788950949137-2vw2",
+    "timestamp": "2026-09-09T10:49:09.138Z",
+    "action": "READ",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace/perimeter.py",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788950889126-ul69",
+    "timestamp": "2026-09-09T10:48:09.126Z",
+    "action": "READ",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace/src/test.js",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788950878517-dxlw",
+    "timestamp": "2026-09-09T10:47:58.517Z",
+    "action": "LIST",
+    "path": "[PROTECTED_INTERNAL_PATH]",
+    "status": "blocked",
+    "details": "Attempted to open application internal path as workspace"
+  },
+  {
+    "id": "audit-1788950877832-4knc",
+    "timestamp": "2026-09-09T10:47:57.832Z",
+    "action": "LIST",
+    "path": "[PROTECTED_INTERNAL_PATH]",
+    "status": "blocked",
+    "details": "Attempted to open application internal path as workspace"
+  },
+  {
+    "id": "audit-1788950874247-3npw",
+    "timestamp": "2026-09-09T10:47:54.247Z",
+    "action": "LIST",
+    "path": "[PROTECTED_INTERNAL_PATH]",
+    "status": "blocked",
+    "details": "Attempted to open application internal path as workspace"
+  },
+  {
+    "id": "audit-1788950862485-e22v",
+    "timestamp": "2026-09-09T10:47:42.485Z",
+    "action": "LIST",
+    "path": "[PROTECTED_INTERNAL_PATH]",
+    "status": "blocked",
+    "details": "Attempted to open application internal path as workspace"
+  },
+  {
+    "id": "audit-1788948995011-my4z",
+    "timestamp": "2026-09-09T10:16:35.011Z",
+    "action": "CREATE",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace/area.py",
+    "status": "allowed",
+    "details": "Created file (0 bytes)"
+  },
+  {
+    "id": "audit-1788944103730-mrr1",
+    "timestamp": "2026-09-09T08:55:03.730Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944102678-5ymp",
+    "timestamp": "2026-09-09T08:55:02.678Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944101592-cj2b",
+    "timestamp": "2026-09-09T08:55:01.592Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944100592-393z",
+    "timestamp": "2026-09-09T08:55:00.592Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944099537-3m88",
+    "timestamp": "2026-09-09T08:54:59.537Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944098558-tild",
+    "timestamp": "2026-09-09T08:54:58.558Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944097603-rou2",
+    "timestamp": "2026-09-09T08:54:57.603Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944095709-nxih",
+    "timestamp": "2026-09-09T08:54:55.709Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944094627-6z1b",
+    "timestamp": "2026-09-09T08:54:54.627Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944093522-zq1q",
+    "timestamp": "2026-09-09T08:54:53.522Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944092639-7rm1",
+    "timestamp": "2026-09-09T08:54:52.639Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944091601-czxg",
+    "timestamp": "2026-09-09T08:54:51.601Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944090592-3ssd",
+    "timestamp": "2026-09-09T08:54:50.592Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944088683-xjal",
+    "timestamp": "2026-09-09T08:54:48.683Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944086725-s07k",
+    "timestamp": "2026-09-09T08:54:46.725Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944085659-dfmi",
+    "timestamp": "2026-09-09T08:54:45.659Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944083678-qrl5",
+    "timestamp": "2026-09-09T08:54:43.678Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944082665-rq6v",
+    "timestamp": "2026-09-09T08:54:42.665Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944081741-2k7j",
+    "timestamp": "2026-09-09T08:54:41.741Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944080625-si5h",
+    "timestamp": "2026-09-09T08:54:40.626Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944079654-s1e0",
+    "timestamp": "2026-09-09T08:54:39.654Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944077684-opeo",
+    "timestamp": "2026-09-09T08:54:37.684Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944076661-oina",
+    "timestamp": "2026-09-09T08:54:36.661Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944075592-c16i",
+    "timestamp": "2026-09-09T08:54:35.592Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944074549-pkau",
+    "timestamp": "2026-09-09T08:54:34.549Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944073572-xsug",
+    "timestamp": "2026-09-09T08:54:33.572Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944072562-9icw",
+    "timestamp": "2026-09-09T08:54:32.562Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944071571-4n9s",
+    "timestamp": "2026-09-09T08:54:31.571Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944070613-zco7",
+    "timestamp": "2026-09-09T08:54:30.613Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944069631-ipk4",
+    "timestamp": "2026-09-09T08:54:29.631Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944068612-ttii",
+    "timestamp": "2026-09-09T08:54:28.612Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944067638-1ihi",
+    "timestamp": "2026-09-09T08:54:27.638Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944066550-3s31",
+    "timestamp": "2026-09-09T08:54:26.550Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944065559-61z4",
+    "timestamp": "2026-09-09T08:54:25.559Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944064552-d2v9",
+    "timestamp": "2026-09-09T08:54:24.552Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944063536-3ami",
+    "timestamp": "2026-09-09T08:54:23.536Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944061694-6d3c",
+    "timestamp": "2026-09-09T08:54:21.694Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944060632-7jfz",
+    "timestamp": "2026-09-09T08:54:20.632Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944059594-37n1",
+    "timestamp": "2026-09-09T08:54:19.594Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944058526-514o",
+    "timestamp": "2026-09-09T08:54:18.526Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944057511-rjtr",
+    "timestamp": "2026-09-09T08:54:17.511Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944056640-uhcq",
+    "timestamp": "2026-09-09T08:54:16.640Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944054659-oy9x",
+    "timestamp": "2026-09-09T08:54:14.659Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944052756-hibt",
+    "timestamp": "2026-09-09T08:54:12.756Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944051691-bc2s",
+    "timestamp": "2026-09-09T08:54:11.691Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944050666-77nx",
+    "timestamp": "2026-09-09T08:54:10.666Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944049619-otrd",
+    "timestamp": "2026-09-09T08:54:09.619Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944048580-zm3q",
+    "timestamp": "2026-09-09T08:54:08.580Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944046664-3dew",
+    "timestamp": "2026-09-09T08:54:06.664Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944045601-1rnf",
+    "timestamp": "2026-09-09T08:54:05.601Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944044594-yhfe",
+    "timestamp": "2026-09-09T08:54:04.594Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944043542-y1xz",
+    "timestamp": "2026-09-09T08:54:03.542Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944042566-4shz",
+    "timestamp": "2026-09-09T08:54:02.566Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944041433-wryo",
+    "timestamp": "2026-09-09T08:54:01.433Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944040563-fook",
+    "timestamp": "2026-09-09T08:54:00.563Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944038818-rqoy",
+    "timestamp": "2026-09-09T08:53:58.818Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944037713-0tyz",
+    "timestamp": "2026-09-09T08:53:57.713Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944036590-8juf",
+    "timestamp": "2026-09-09T08:53:56.590Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944035559-1sg5",
+    "timestamp": "2026-09-09T08:53:55.559Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944034635-co9n",
+    "timestamp": "2026-09-09T08:53:54.635Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944032763-h9y4",
+    "timestamp": "2026-09-09T08:53:52.763Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944031718-o1li",
+    "timestamp": "2026-09-09T08:53:51.718Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944030751-podw",
+    "timestamp": "2026-09-09T08:53:50.751Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944029704-nhla",
+    "timestamp": "2026-09-09T08:53:49.704Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944028628-us63",
+    "timestamp": "2026-09-09T08:53:48.628Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944027621-o83g",
+    "timestamp": "2026-09-09T08:53:47.621Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944025796-zonw",
+    "timestamp": "2026-09-09T08:53:45.796Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944024680-zrji",
+    "timestamp": "2026-09-09T08:53:44.680Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944023581-fzqz",
+    "timestamp": "2026-09-09T08:53:43.581Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944022630-6wxj",
+    "timestamp": "2026-09-09T08:53:42.630Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944021553-c8a5",
+    "timestamp": "2026-09-09T08:53:41.553Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944019690-p37t",
+    "timestamp": "2026-09-09T08:53:39.690Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944018653-kqnp",
+    "timestamp": "2026-09-09T08:53:38.653Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944017583-bt11",
+    "timestamp": "2026-09-09T08:53:37.583Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944016613-wqc0",
+    "timestamp": "2026-09-09T08:53:36.613Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944015654-1d0j",
+    "timestamp": "2026-09-09T08:53:35.654Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944014620-0x4i",
+    "timestamp": "2026-09-09T08:53:34.620Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944013671-ha83",
+    "timestamp": "2026-09-09T08:53:33.671Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944012575-k5t8",
+    "timestamp": "2026-09-09T08:53:32.575Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944011443-nx5i",
+    "timestamp": "2026-09-09T08:53:31.443Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944010497-bzuw",
+    "timestamp": "2026-09-09T08:53:30.497Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944009526-arsq",
+    "timestamp": "2026-09-09T08:53:29.526Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944008591-v1fk",
+    "timestamp": "2026-09-09T08:53:28.591Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944007612-wcjq",
+    "timestamp": "2026-09-09T08:53:27.612Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944005760-b10t",
+    "timestamp": "2026-09-09T08:53:25.760Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944004649-shrt",
+    "timestamp": "2026-09-09T08:53:24.650Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944003621-2lyb",
+    "timestamp": "2026-09-09T08:53:23.621Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944002620-m3kb",
+    "timestamp": "2026-09-09T08:53:22.620Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944001629-1whq",
+    "timestamp": "2026-09-09T08:53:21.629Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788944000605-9cfu",
+    "timestamp": "2026-09-09T08:53:20.605Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943999670-pn0p",
+    "timestamp": "2026-09-09T08:53:19.670Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943998605-ozhq",
+    "timestamp": "2026-09-09T08:53:18.605Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943997622-ocvp",
+    "timestamp": "2026-09-09T08:53:17.622Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943996612-04m7",
+    "timestamp": "2026-09-09T08:53:16.612Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943994671-4n0f",
+    "timestamp": "2026-09-09T08:53:14.671Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943993578-7qop",
+    "timestamp": "2026-09-09T08:53:13.578Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943992545-86r6",
+    "timestamp": "2026-09-09T08:53:12.545Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943991625-ck9x",
+    "timestamp": "2026-09-09T08:53:11.625Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943990466-fcf7",
+    "timestamp": "2026-09-09T08:53:10.466Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943989413-vayt",
+    "timestamp": "2026-09-09T08:53:09.413Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943988533-i3jr",
+    "timestamp": "2026-09-09T08:53:08.533Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943987610-wl0y",
+    "timestamp": "2026-09-09T08:53:07.610Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943986656-ud2v",
+    "timestamp": "2026-09-09T08:53:06.656Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943985670-mnyp",
+    "timestamp": "2026-09-09T08:53:05.670Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943984669-pkeq",
+    "timestamp": "2026-09-09T08:53:04.669Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943983693-0xlv",
+    "timestamp": "2026-09-09T08:53:03.693Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943982640-7kyk",
+    "timestamp": "2026-09-09T08:53:02.640Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943981593-wzp5",
+    "timestamp": "2026-09-09T08:53:01.593Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943980493-8t0o",
+    "timestamp": "2026-09-09T08:53:00.493Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943979540-vyui",
+    "timestamp": "2026-09-09T08:52:59.540Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943978523-1npe",
+    "timestamp": "2026-09-09T08:52:58.523Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943977552-x2jl",
+    "timestamp": "2026-09-09T08:52:57.552Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943976590-7wn7",
+    "timestamp": "2026-09-09T08:52:56.590Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943975594-igda",
+    "timestamp": "2026-09-09T08:52:55.594Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943974620-omom",
+    "timestamp": "2026-09-09T08:52:54.620Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943973594-t76g",
+    "timestamp": "2026-09-09T08:52:53.594Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943972577-g8at",
+    "timestamp": "2026-09-09T08:52:52.577Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943971680-8oti",
+    "timestamp": "2026-09-09T08:52:51.680Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943969765-s0lx",
+    "timestamp": "2026-09-09T08:52:49.765Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943968671-vpss",
+    "timestamp": "2026-09-09T08:52:48.671Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943967652-c785",
+    "timestamp": "2026-09-09T08:52:47.652Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943965713-w7rv",
+    "timestamp": "2026-09-09T08:52:45.713Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943964606-sytf",
+    "timestamp": "2026-09-09T08:52:44.606Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943963589-h7a9",
+    "timestamp": "2026-09-09T08:52:43.589Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943962581-wjjf",
+    "timestamp": "2026-09-09T08:52:42.581Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943960681-nkc6",
+    "timestamp": "2026-09-09T08:52:40.681Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943959594-b93u",
+    "timestamp": "2026-09-09T08:52:39.594Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943958534-wazj",
+    "timestamp": "2026-09-09T08:52:38.534Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943957650-59r4",
+    "timestamp": "2026-09-09T08:52:37.650Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943956606-eb2n",
+    "timestamp": "2026-09-09T08:52:36.606Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943955619-n7qy",
+    "timestamp": "2026-09-09T08:52:35.619Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943954602-2rku",
+    "timestamp": "2026-09-09T08:52:34.602Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943953622-9vou",
+    "timestamp": "2026-09-09T08:52:33.622Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943952593-7d5g",
+    "timestamp": "2026-09-09T08:52:32.593Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943951597-m4xv",
+    "timestamp": "2026-09-09T08:52:31.597Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943949653-4mny",
+    "timestamp": "2026-09-09T08:52:29.653Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943948654-1bl1",
+    "timestamp": "2026-09-09T08:52:28.654Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943946716-zkxs",
+    "timestamp": "2026-09-09T08:52:26.716Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943945657-j7fb",
+    "timestamp": "2026-09-09T08:52:25.657Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943944607-1b9g",
+    "timestamp": "2026-09-09T08:52:24.607Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943942714-yut0",
+    "timestamp": "2026-09-09T08:52:22.714Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943940761-wb35",
+    "timestamp": "2026-09-09T08:52:20.761Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943939592-1j7p",
+    "timestamp": "2026-09-09T08:52:19.592Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943938559-l4p6",
+    "timestamp": "2026-09-09T08:52:18.559Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943937636-lhlp",
+    "timestamp": "2026-09-09T08:52:17.636Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943936701-z3y5",
+    "timestamp": "2026-09-09T08:52:16.701Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943935600-er1h",
+    "timestamp": "2026-09-09T08:52:15.600Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943934615-a0p8",
+    "timestamp": "2026-09-09T08:52:14.615Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943932812-caaz",
+    "timestamp": "2026-09-09T08:52:12.812Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943931732-vpvi",
+    "timestamp": "2026-09-09T08:52:11.732Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943930606-dwri",
+    "timestamp": "2026-09-09T08:52:10.606Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943929670-4qwt",
+    "timestamp": "2026-09-09T08:52:09.670Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943928632-5oej",
+    "timestamp": "2026-09-09T08:52:08.632Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943927605-9uui",
+    "timestamp": "2026-09-09T08:52:07.605Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943926541-d2vf",
+    "timestamp": "2026-09-09T08:52:06.541Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943925528-hwxs",
+    "timestamp": "2026-09-09T08:52:05.528Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943923763-211x",
+    "timestamp": "2026-09-09T08:52:03.763Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943922662-0sae",
+    "timestamp": "2026-09-09T08:52:02.662Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943921666-mep1",
+    "timestamp": "2026-09-09T08:52:01.666Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943920709-x6d2",
+    "timestamp": "2026-09-09T08:52:00.709Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943919687-mqpc",
+    "timestamp": "2026-09-09T08:51:59.687Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943917700-ed8z",
+    "timestamp": "2026-09-09T08:51:57.700Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943916646-1bqc",
+    "timestamp": "2026-09-09T08:51:56.646Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943915621-i7va",
+    "timestamp": "2026-09-09T08:51:55.621Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943914665-o4de",
+    "timestamp": "2026-09-09T08:51:54.665Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943913707-5h3z",
+    "timestamp": "2026-09-09T08:51:53.707Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943912048-zdw7",
+    "timestamp": "2026-09-09T08:51:52.048Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943910582-q5vg",
+    "timestamp": "2026-09-09T08:51:50.582Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943909582-hng4",
+    "timestamp": "2026-09-09T08:51:49.582Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943908509-xx0m",
+    "timestamp": "2026-09-09T08:51:48.509Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943907515-ygkw",
+    "timestamp": "2026-09-09T08:51:47.515Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943906513-wwww",
+    "timestamp": "2026-09-09T08:51:46.513Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943905511-wx85",
+    "timestamp": "2026-09-09T08:51:45.511Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943904596-iocd",
+    "timestamp": "2026-09-09T08:51:44.596Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943903627-daig",
+    "timestamp": "2026-09-09T08:51:43.627Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943902545-3rn4",
+    "timestamp": "2026-09-09T08:51:42.545Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943901490-ba78",
+    "timestamp": "2026-09-09T08:51:41.490Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943900532-4o9d",
+    "timestamp": "2026-09-09T08:51:40.532Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943899536-1g9g",
+    "timestamp": "2026-09-09T08:51:39.536Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943897683-0ilo",
+    "timestamp": "2026-09-09T08:51:37.683Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943896616-y68c",
+    "timestamp": "2026-09-09T08:51:36.616Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943894825-5tdl",
+    "timestamp": "2026-09-09T08:51:34.825Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943893718-gw73",
+    "timestamp": "2026-09-09T08:51:33.718Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943892752-3z3j",
+    "timestamp": "2026-09-09T08:51:32.752Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943891643-dqkh",
+    "timestamp": "2026-09-09T08:51:31.643Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943890540-72j4",
+    "timestamp": "2026-09-09T08:51:30.540Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943889554-ghhj",
+    "timestamp": "2026-09-09T08:51:29.554Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943888593-l5y2",
+    "timestamp": "2026-09-09T08:51:28.593Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943886783-x96n",
+    "timestamp": "2026-09-09T08:51:26.783Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943885697-x675",
+    "timestamp": "2026-09-09T08:51:25.697Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943884636-pu30",
+    "timestamp": "2026-09-09T08:51:24.636Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  },
+  {
+    "id": "audit-1788943883600-rqf1",
+    "timestamp": "2026-09-09T08:51:23.600Z",
+    "action": "LIST",
+    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
+    "status": "allowed",
+    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
+  }
+]
