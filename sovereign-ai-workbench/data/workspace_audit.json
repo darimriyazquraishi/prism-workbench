@@ -1,5 +1,13 @@
 [
   {
+    "id": "audit-1788963723480-nx1r",
+    "timestamp": "2026-09-09T14:22:03.480Z",
+    "action": "COMMAND",
+    "path": "python --version",
+    "status": "allowed",
+    "details": "Executed in user workspace"
+  },
+  {
     "id": "audit-1788951171215-6351",
     "timestamp": "2026-09-09T10:52:51.215Z",
     "action": "WRITE",
@@ -1586,14 +1594,6 @@
   {
     "id": "audit-1788943884636-pu30",
     "timestamp": "2026-09-09T08:51:24.636Z",
-    "action": "LIST",
-    "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
-    "status": "allowed",
-    "details": "Generated tree for c:\\Users\\benim\\Downloads\\prism-workbench-main\\workspaces\\user_workspace"
-  },
-  {
-    "id": "audit-1788943883600-rqf1",
-    "timestamp": "2026-09-09T08:51:23.600Z",
     "action": "LIST",
     "path": "c:/Users/benim/Downloads/prism-workbench-main/workspaces/user_workspace",
     "status": "allowed",

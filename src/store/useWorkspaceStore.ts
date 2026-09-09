@@ -717,13 +717,20 @@ Preserve existing syntax patterns, exports, and styles. Explain key design decis
       let scriptOutput = '';
 
       if (isCodingTask && generatedCode) {
-        const isPythonScript = /^\s*(?:import\s+[a-zA-Z0-9_.]+|from\s+[a-zA-Z0-9_.]+\s+import)/.test(generatedCode);
-        const isActionExecutionTask = /pdf|image|chart|plot|run|execute|script|generate|make/i.test(trimmed);
+        const isPythonScript = /```(?:python|py)\b/i.test(responseText) ||
+                               /(?:import\s+[a-zA-Z0-9_.]+|from\s+[a-zA-Z0-9_.]+\s+import)/.test(generatedCode) ||
+                               /(?:def\s+[a-zA-Z0-9_]+\s*\(|if\s+__name__\s*==)/.test(generatedCode);
+        const isNodeScript = !isPythonScript && (
+          /```(?:javascript|js)\b/i.test(responseText) ||
+          /(?:const\s+.*=\s*require\(|import\s+.*from\s+['"])/.test(generatedCode)
+        );
+        const isActionExecutionTask = /pdf|image|chart|plot|run|execute|script|generate|make|render/i.test(trimmed);
 
-        // A) If LLM generated an executable Python script to satisfy the user's action task, execute it directly
-        if (isPythonScript && isActionExecutionTask) {
+        // A) If LLM generated an executable script to satisfy the user's action task, execute it directly
+        if ((isPythonScript || isNodeScript) && isActionExecutionTask) {
           try {
-            const tempScriptName = `_task_exec_${Date.now()}.py`;
+            const ext = isNodeScript ? 'js' : 'py';
+            const tempScriptName = `_task_exec_${Date.now()}.${ext}`;
             await fetch('/api/workspace/tools', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -735,10 +742,11 @@ Preserve existing syntax patterns, exports, and styles. Explain key design decis
               })
             });
 
+            const execCmd = isNodeScript ? `node ${tempScriptName}` : `python ${tempScriptName}`;
             const execRes = await fetch('/api/workspace/terminal', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ command: `python ${tempScriptName}` })
+              body: JSON.stringify({ command: execCmd })
             });
             const execData = await execRes.json().catch(() => ({}));
 
@@ -762,7 +770,7 @@ Preserve existing syntax patterns, exports, and styles. Explain key design decis
 
             executedToolCalls.push({
               tool: 'execute_script',
-              args: { runtime: 'python' },
+              args: { runtime: isNodeScript ? 'node' : 'python' },
               status: executedScriptSuccess ? 'success' : 'failed',
               output: scriptOutput || execData.stderr || execData.error
             });
@@ -774,7 +782,7 @@ Preserve existing syntax patterns, exports, and styles. Explain key design decis
           const targetPath = candidatePath;
           const action = inspectedFile ? ('modify' as const) : ('create' as const);
 
-          if (get().permissionMode === 'assisted') {
+          if (get().permissionMode === 'assisted' && action === 'modify') {
             proposedDiff = {
               path: targetPath,
               action,
@@ -782,7 +790,7 @@ Preserve existing syntax patterns, exports, and styles. Explain key design decis
               newContent: generatedCode
             };
             set({ activeDiffProposal: proposedDiff });
-          } else if (get().permissionMode === 'autonomous') {
+          } else {
             const toolName = action === 'create' ? 'create_file' : 'write_file';
             const writeRes = await fetch('/api/workspace/tools', {
               method: 'POST',
