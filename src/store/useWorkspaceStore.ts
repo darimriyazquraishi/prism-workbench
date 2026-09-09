@@ -59,6 +59,19 @@ export interface AiChatMessage {
     output?: string;
     status?: 'success' | 'failed' | 'completed';
   };
+  imageCard?: {
+    filename: string;
+    path: string;
+    rawUrl: string;
+    prompt: string;
+    modelId: string;
+    modelName: string;
+    modelFile?: string;
+    width: number;
+    height: number;
+    durationMs: number;
+    sizeBytes: number;
+  };
 }
 
 export interface WorkspaceState {
@@ -110,6 +123,9 @@ export interface WorkspaceState {
   toggleTerminal: () => void;
   executeTerminalCommand: (cmd: string) => Promise<void>;
   checkGitStatus: () => Promise<void>;
+  selectedImageModel: string;
+  setSelectedImageModel: (modelId: string) => void;
+  generateWorkspaceImage: (prompt: string, modelId?: string, skipUserMsg?: boolean) => Promise<void>;
   sendWorkspaceAiPrompt: (prompt: string) => Promise<void>;
   approveDiffProposal: () => Promise<void>;
   rejectDiffProposal: () => void;
@@ -131,6 +147,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isTerminalOpen: false,
   terminalHistory: ['LUMI Workspace Terminal Ready. Type commands and press Enter.'],
   isExecutingCommand: false,
+
+  selectedImageModel: 'flux1-schnell',
+  setSelectedImageModel: (modelId: string) => set({ selectedImageModel: modelId }),
 
   permissionMode: 'assisted',
   aiMessages: [
@@ -530,6 +549,81 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch {}
   },
 
+  generateWorkspaceImage: async (prompt: string, modelId?: string, skipUserMsg?: boolean) => {
+    const activeModel = modelId || get().selectedImageModel || 'flux1-schnell';
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt) return;
+
+    if (!skipUserMsg) {
+      const userMsg: AiChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: `🎨 Create Image: "${trimmedPrompt}"`,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      set(state => ({
+        aiMessages: [...state.aiMessages, userMsg],
+        isAiGenerating: true
+      }));
+    } else {
+      set({ isAiGenerating: true });
+    }
+
+    try {
+      const res = await fetch('/api/workspace/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: trimmedPrompt,
+          modelId: activeModel
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.image) {
+        await get().refreshTree();
+        await get().openFileInTab(data.image.path);
+
+        const assistantMsg: AiChatMessage = {
+          id: `asst-${Date.now()}`,
+          role: 'assistant',
+          content: `Generated image with **${data.image.modelName}** in ${(data.image.durationMs / 1000).toFixed(1)}s.`,
+          timestamp: new Date().toLocaleTimeString(),
+          imageCard: data.image
+        };
+
+        set(state => ({
+          isAiGenerating: false,
+          aiMessages: [...state.aiMessages, assistantMsg]
+        }));
+      } else {
+        const errorMsg: AiChatMessage = {
+          id: `asst-${Date.now()}`,
+          role: 'assistant',
+          content: `❌ Image generation error: ${data.error || 'Failed to generate image'}`,
+          timestamp: new Date().toLocaleTimeString()
+        };
+        set(state => ({
+          isAiGenerating: false,
+          aiMessages: [...state.aiMessages, errorMsg]
+        }));
+      }
+    } catch (err: any) {
+      set(state => ({
+        isAiGenerating: false,
+        aiMessages: [
+          ...state.aiMessages,
+          {
+            id: `asst-${Date.now()}`,
+            role: 'assistant',
+            content: `❌ Image generation failed: ${err.message}`,
+            timestamp: new Date().toLocaleTimeString()
+          }
+        ]
+      }));
+    }
+  },
+
   sendWorkspaceAiPrompt: async (prompt: string) => {
     const trimmed = prompt.trim();
     if (!trimmed) return;
@@ -545,6 +639,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       aiMessages: [...state.aiMessages, userMsg],
       isAiGenerating: true
     }));
+
+    // Auto-detect if prompt is an image generation request
+    const imageMatch = trimmed.match(/^(?:\/image\s+|(?:create|generate|make|draw|render)\s+(?:an?\s+)?image\s*(?:of\s+|about\s+|for\s+)?)(.+)$/i);
+    if (imageMatch) {
+      const imgPrompt = imageMatch[1].trim();
+      if (imgPrompt) {
+        await get().generateWorkspaceImage(imgPrompt, undefined, true);
+        return;
+      }
+    }
 
     // 1. Path traversal security check
     if (trimmed.includes('..') || trimmed.includes('../') || trimmed.includes('..\\')) {

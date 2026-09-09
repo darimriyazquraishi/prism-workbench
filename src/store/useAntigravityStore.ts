@@ -660,6 +660,9 @@ interface AntigravityStore {
   deleteSession: (id: string) => void;
   setActiveMode: (mode: 'agent' | 'planning' | 'fast') => void;
   setSelectedModel: (model: string) => void;
+  selectedImageModel: string;
+  setSelectedImageModel: (model: string) => void;
+  generateImageTask: (prompt: string, modelId?: string) => Promise<void>;
   setProjectTitle: (title: string) => void;
   setActiveDocumentContext: (doc: string) => void;
   toggleComputerAccess: () => void;
@@ -1273,6 +1276,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   activeSessionId: initialSessionId,
   activeMode: 'agent',
   selectedModel: '',
+  selectedImageModel: 'flux1-schnell',
+  setSelectedImageModel: (model: string) => set({ selectedImageModel: model }),
   availableModels: [],
   arsenalModels: [],
   attachedFiles: [],
@@ -1848,6 +1853,77 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     });
   },
 
+  generateImageTask: async (prompt: string, modelId?: string) => {
+    const activeModel = modelId || get().selectedImageModel || 'flux1-schnell';
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+
+    const { addStepToActiveSession, setActiveTaskStarted, addArtifact, updateStepInActiveSession } = get();
+    setActiveTaskStarted(true);
+    set({ isExecuting: true });
+
+    const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    addStepToActiveSession({
+      id: `step-${Date.now()}-u`,
+      type: 'user_input',
+      content: `🎨 Create Image: "${trimmed}"`,
+      attachedFiles: [],
+      timestamp: now()
+    });
+
+    const respStepId = `step-${Date.now()}-resp`;
+    const modelDisplayName = activeModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning';
+    addStepToActiveSession({
+      id: respStepId,
+      type: 'response',
+      content: `🎨 Generating image using local **${modelDisplayName}** model...`,
+      timestamp: now()
+    });
+
+    try {
+      const res = await fetch('/api/workspace/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: trimmed, modelId: activeModel })
+      });
+
+      const data = await res.json();
+      if (data.success && data.image) {
+        const artItem: ArtifactItem = {
+          id: `art-${Date.now()}`,
+          name: data.image.filename,
+          type: 'png',
+          path: data.image.path,
+          sizeBytes: data.image.sizeBytes,
+          description: `Generated image: "${trimmed}"`,
+          createdAt: now(),
+          previewUrl: data.image.rawUrl,
+          downloadUrl: data.image.rawUrl
+        };
+        addArtifact(artItem);
+        updateStepInActiveSession(respStepId, {
+          content: `Generated image with **${data.image.modelName}** (${data.image.width}x${data.image.height}) in ${(data.image.durationMs / 1000).toFixed(1)}s.\n\n*Prompt: "${trimmed}"*`,
+          artifacts: [artItem],
+          imageCard: data.image,
+          status: 'success'
+        });
+      } else {
+        updateStepInActiveSession(respStepId, {
+          content: `❌ Image generation failed: ${data.error || 'Unknown error'}`,
+          status: 'error'
+        });
+      }
+    } catch (err: any) {
+      updateStepInActiveSession(respStepId, {
+        content: `❌ Image generation failed: ${err.message}`,
+        status: 'error'
+      });
+    } finally {
+      set({ isExecuting: false });
+    }
+  },
+
   proposePlanForTask: async (prompt, flowType) => {
     const { addStepToActiveSession, setActiveTaskStarted, addNetworkLog, uploadedFiles, attachedFiles, queryKnowledgeBase } = get();
     setActiveTaskStarted(true);
@@ -1855,6 +1931,14 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     const currentAttachedFiles = [...(attachedFiles || get().attachedFiles)];
     // Clear attached files from attach input box immediately so it doesn't linger!
     set({ attachedFiles: [] });
+
+    // Image Generation Intent Detection
+    const isImageGen = /^(?:\/image\s+|(?:create|generate|make|draw|render)\s+(?:an?\s+)?image\b)/i.test(prompt);
+    if (isImageGen) {
+      const cleanedPrompt = prompt.replace(/^(?:\/image\s+|(?:create|generate|make|draw|render)\s+(?:an?\s+)?image\s*(?:of\s+|about\s+|for\s+)?)/i, '').trim() || prompt.trim();
+      await get().generateImageTask(cleanedPrompt);
+      return;
+    }
 
     const totalStart = performance.now();
     const requestId = `req-${Date.now()}`;

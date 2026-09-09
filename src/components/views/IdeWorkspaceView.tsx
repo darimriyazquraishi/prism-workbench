@@ -18,6 +18,7 @@ import {
   Maximize2,
   RefreshCw,
   Eye,
+  Image as ImageIcon,
   ShieldCheck,
   Shield,
   Sparkles,
@@ -84,6 +85,9 @@ export const IdeWorkspaceView: React.FC = () => {
     toggleTerminal,
     executeTerminalCommand,
     checkGitStatus,
+    selectedImageModel,
+    setSelectedImageModel,
+    generateWorkspaceImage,
     sendWorkspaceAiPrompt,
     approveDiffProposal,
     rejectDiffProposal
@@ -124,6 +128,9 @@ export const IdeWorkspaceView: React.FC = () => {
   // AI Chat Pane resizing state
   const [aiChatWidth, setAiChatWidth] = useState<number>(360);
   const [isResizingAiChat, setIsResizingAiChat] = useState<boolean>(false);
+
+  // Create Image Mode state
+  const [isCreateImageMode, setIsCreateImageMode] = useState<boolean>(false);
 
   // Action code dropdown expansion state
   const [expandedActionIds, setExpandedActionIds] = useState<Set<string>>(new Set());
@@ -1119,9 +1126,24 @@ export const IdeWorkspaceView: React.FC = () => {
               <Sparkles className="w-4 h-4 text-[var(--text-primary)]" />
               <span className="text-xs font-semibold text-[var(--text-primary)]">LUMI Workspace AI</span>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] uppercase">
-              {permissionMode}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCreateImageMode(prev => !prev)}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium border cursor-pointer transition-colors flex items-center gap-1 ${
+                  isCreateImageMode
+                    ? 'bg-[var(--text-primary)] text-[var(--bg-base)] border-[var(--text-primary)] font-semibold'
+                    : 'bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-subtle)]'
+                }`}
+                title="Toggle Create Image mode"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>Create Image</span>
+              </button>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] uppercase">
+                {permissionMode}
+              </span>
+            </div>
           </div>
 
           {/* Active Context Chips */}
@@ -1238,6 +1260,55 @@ export const IdeWorkspaceView: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Interactive Image Card */}
+                  {msg.imageCard && (
+                    <div className="mb-2 border border-[var(--border-subtle)] rounded-xl overflow-hidden bg-[var(--bg-surface)] select-none">
+                      <div className="px-2.5 py-1.5 border-b border-[var(--border-subtle)] flex items-center justify-between text-xs bg-[var(--bg-elevated)]">
+                        <div className="flex items-center gap-1.5 font-mono">
+                          <ImageIcon className="w-3.5 h-3.5 text-[var(--text-primary)] shrink-0" />
+                          <span className="font-semibold text-[var(--text-primary)]">{msg.imageCard.modelName}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-[var(--bg-base)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                            {msg.imageCard.width}x{msg.imageCard.height}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-[var(--text-tertiary)]">
+                          {(msg.imageCard.durationMs / 1000).toFixed(1)}s
+                        </span>
+                      </div>
+                      <div className="p-2 bg-[var(--bg-base)] flex flex-col items-center justify-center">
+                        <img
+                          src={msg.imageCard.rawUrl}
+                          alt={msg.imageCard.prompt}
+                          onClick={() => openFileInTab(msg.imageCard!.path)}
+                          className="rounded-lg max-h-72 w-auto object-contain cursor-pointer hover:opacity-95 transition-opacity border border-[var(--border-subtle)] shadow-sm"
+                          title="Click to inspect in document viewer"
+                        />
+                      </div>
+                      <div className="px-2.5 py-2 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] flex items-center justify-between text-xs gap-2">
+                        <span className="text-[11px] text-[var(--text-secondary)] italic truncate flex-1" title={msg.imageCard.prompt}>
+                          "{msg.imageCard.prompt}"
+                        </span>
+                        <div className="flex items-center gap-1.5 font-mono text-[11px] shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openFileInTab(msg.imageCard!.path)}
+                            className="px-2 py-0.5 rounded bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] cursor-pointer transition-colors"
+                          >
+                            Open Tab
+                          </button>
+                          <a
+                            href={msg.imageCard.rawUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-0.5 rounded bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]"
+                          >
+                            Full Res
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {msg.role === 'assistant' ? renderAssistantMessageBody(msg.content) : msg.content}
                 </div>
                 <div className="text-[10px] font-mono text-[var(--text-tertiary)] px-1">
@@ -1257,6 +1328,18 @@ export const IdeWorkspaceView: React.FC = () => {
 
           {/* Quick Prompts Chips */}
           <div className="px-3 py-1.5 border-t border-[var(--border-subtle)] bg-[var(--bg-base)] flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsCreateImageMode(prev => !prev)}
+              className={`px-2 py-0.5 rounded border whitespace-nowrap cursor-pointer transition-colors flex items-center gap-1 ${
+                isCreateImageMode
+                  ? 'bg-[var(--text-primary)] text-[var(--bg-base)] border-[var(--text-primary)] font-semibold'
+                  : 'bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-subtle)]'
+              }`}
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>Create Image</span>
+            </button>
             <button
               onClick={() => {
                 if (activeTab) {
@@ -1285,6 +1368,35 @@ export const IdeWorkspaceView: React.FC = () => {
 
           {/* AI Prompt Input Bar */}
           <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+            {/* Create Image Model Selector Banner */}
+            {isCreateImageMode && (
+              <div className="mb-2 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[var(--text-primary)] animate-pulse" />
+                  <span className="font-semibold text-[var(--text-primary)]">Create Image</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[var(--text-secondary)] font-mono">Model:</span>
+                  <select
+                    value={selectedImageModel}
+                    onChange={(e) => setSelectedImageModel(e.target.value)}
+                    className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)] font-mono outline-none cursor-pointer hover:border-[var(--text-secondary)]"
+                  >
+                    <option value="flux1-schnell">FLUX.1 [schnell] (GGUF)</option>
+                    <option value="sdxl-lightning">SDXL-Lightning (Safetensors)</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateImageMode(false)}
+                    className="p-1 hover:bg-[var(--bg-surface)] rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer"
+                    title="Exit Create Image mode"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="relative flex items-end bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-xl p-2 focus-within:border-[var(--text-primary)] transition-colors">
               <textarea
                 value={aiPromptInput}
@@ -1293,30 +1405,45 @@ export const IdeWorkspaceView: React.FC = () => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     if (aiPromptInput.trim() && !isAiGenerating) {
-                      sendWorkspaceAiPrompt(aiPromptInput);
-                      setAiPromptInput('');
+                      if (isCreateImageMode) {
+                        generateWorkspaceImage(aiPromptInput, selectedImageModel);
+                        setAiPromptInput('');
+                      } else {
+                        sendWorkspaceAiPrompt(aiPromptInput);
+                        setAiPromptInput('');
+                      }
                     }
                   }
                 }}
                 rows={2}
-                placeholder="Ask LUMI to read, create, edit, or test files..."
+                placeholder={
+                  isCreateImageMode
+                    ? `Describe the image to generate with ${selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning'}...`
+                    : "Ask LUMI to read, create, edit, or test files..."
+                }
                 className="w-full bg-transparent border-none outline-none text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] resize-none font-sans"
               />
               <button
                 onClick={() => {
                   if (aiPromptInput.trim() && !isAiGenerating) {
-                    sendWorkspaceAiPrompt(aiPromptInput);
-                    setAiPromptInput('');
+                    if (isCreateImageMode) {
+                      generateWorkspaceImage(aiPromptInput, selectedImageModel);
+                      setAiPromptInput('');
+                    } else {
+                      sendWorkspaceAiPrompt(aiPromptInput);
+                      setAiPromptInput('');
+                    }
                   }
                 }}
                 disabled={!aiPromptInput.trim() || isAiGenerating}
                 className="p-1.5 bg-[var(--text-primary)] hover:opacity-90 disabled:opacity-30 text-[var(--bg-base)] rounded-lg transition-all ml-1 shrink-0 cursor-pointer"
+                title={isCreateImageMode ? "Generate Image" : "Send Prompt"}
               >
-                <Send className="w-3.5 h-3.5" />
+                {isCreateImageMode ? <Sparkles className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
               </button>
             </div>
             <div className="text-[10px] text-[var(--text-tertiary)] font-mono mt-1 flex justify-between">
-              <span>Press Enter to send</span>
+              <span>{isCreateImageMode ? `Using ${selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning'}` : 'Press Enter to send'}</span>
             </div>
           </div>
 

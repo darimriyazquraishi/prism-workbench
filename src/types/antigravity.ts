@@ -146,6 +146,18 @@ export interface TrajectoryStep {
   proposedPlan?: ProposedExecutionPlan;
   isExpanded?: boolean;
   attachedFiles?: string[];
+  imageCard?: {
+    filename: string;
+    path: string;
+    rawUrl: string;
+    prompt: string;
+    modelId: string;
+    modelName: string;
+    width: number;
+    height: number;
+    durationMs: number;
+    sizeBytes: number;
+  };
 }
 
 export interface ValidationResult {

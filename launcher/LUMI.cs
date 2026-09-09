@@ -143,6 +143,51 @@ namespace LUMI.Desktop
                     return;
                 }
 
+                // 2b. Native Workspace Generate Image Endpoint
+                if (urlPath.Equals("/api/workspace/generate-image", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TryProxyToBackend(context, urlPath))
+                    {
+                        return;
+                    }
+                    HandleWorkspaceGenerateImage(context);
+                    return;
+                }
+
+                // 2c. Native Workspace Raw File Serving
+                if (urlPath.Equals("/api/workspace/raw", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TryProxyToBackend(context, urlPath))
+                    {
+                        return;
+                    }
+                    string target = context.Request.QueryString["path"];
+                    if (!string.IsNullOrEmpty(target))
+                    {
+                        string rel = target.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                        string cand = Path.Combine(_baseDir, rel);
+                        if (File.Exists(cand))
+                        {
+                            ServeFile(response, cand);
+                            return;
+                        }
+                        try
+                        {
+                            var parent = Directory.GetParent(_baseDir);
+                            if (parent != null)
+                            {
+                                string parentCand = Path.Combine(parent.FullName, rel);
+                                if (File.Exists(parentCand))
+                                {
+                                    ServeFile(response, parentCand);
+                                    return;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
                 // 3. Check if it's an API request to forward to Node or Python backend
                 if (urlPath.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
                 {
@@ -159,11 +204,12 @@ namespace LUMI.Desktop
                     return;
                 }
 
-                // 2. Direct file lookup in demo/ or models/ or per_design/
+                // 2. Direct file lookup in demo/ or models/ or per_design/ or workspace/
                 string targetFilePath = null;
 
                 if (urlPath.StartsWith("/demo/", StringComparison.OrdinalIgnoreCase) ||
                     urlPath.StartsWith("/models/", StringComparison.OrdinalIgnoreCase) ||
+                    urlPath.StartsWith("/workspace/", StringComparison.OrdinalIgnoreCase) ||
                     urlPath.StartsWith("/per_design/", StringComparison.OrdinalIgnoreCase))
                 {
                     string rel = urlPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
@@ -585,6 +631,131 @@ namespace LUMI.Desktop
             byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
             response.StatusCode = 200;
             response.OutputStream.Write(b, 0, b.Length);
+            response.Close();
+        }
+
+        private void HandleWorkspaceGenerateImage(HttpListenerContext context)
+        {
+            var request = context.Request;
+            var response = context.Response;
+            response.ContentType = "application/json; charset=utf-8";
+
+            if (request.HttpMethod.Equals("GET", StringComparison.OrdinalIgnoreCase))
+            {
+                string modelsJson = "{\"success\":true,\"models\":[{\"id\":\"flux1-schnell\",\"name\":\"FLUX.1 [schnell]\",\"format\":\"GGUF (Q4_K_S)\",\"file\":\"flux1-schnell-Q4_K_S.gguf\",\"path\":\"models/flux1-schnell/flux1-schnell-Q4_K_S.gguf\",\"sizeGb\":6.78,\"installed\":true},{\"id\":\"sdxl-lightning\",\"name\":\"SDXL-Lightning\",\"format\":\"4-Step Safetensors\",\"file\":\"sdxl_lightning_4step.safetensors\",\"path\":\"models/sdxl-lightning/sdxl_lightning_4step.safetensors\",\"sizeGb\":6.94,\"installed\":true}]}";
+                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(modelsJson);
+                response.StatusCode = 200;
+                response.OutputStream.Write(bytes, 0, bytes.Length);
+                response.Close();
+                return;
+            }
+
+            if (request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                string body = ReadRequestBody(request);
+                string prompt = ExtractJsonField(body, "prompt");
+                string modelId = ExtractJsonField(body, "modelId");
+                if (string.IsNullOrEmpty(modelId)) modelId = "flux1-schnell";
+
+                if (string.IsNullOrEmpty(prompt))
+                {
+                    byte[] errBytes = System.Text.Encoding.UTF8.GetBytes("{\"success\":false,\"error\":\"Prompt is required\"}");
+                    response.StatusCode = 400;
+                    response.OutputStream.Write(errBytes, 0, errBytes.Length);
+                    response.Close();
+                    return;
+                }
+
+                string scriptPath = Path.Combine(_baseDir, "scripts", "generate_image.py");
+                string workDir = _baseDir;
+                if (!File.Exists(scriptPath))
+                {
+                    try
+                    {
+                        var parent = Directory.GetParent(_baseDir);
+                        if (parent != null)
+                        {
+                            string alt = Path.Combine(parent.FullName, "scripts", "generate_image.py");
+                            if (File.Exists(alt))
+                            {
+                                scriptPath = alt;
+                                workDir = parent.FullName;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "python",
+                    Arguments = string.Format("\"{0}\" --prompt \"{1}\" --model-id \"{2}\"",
+                        scriptPath,
+                        prompt.Replace("\"", "\\\""),
+                        modelId),
+                    WorkingDirectory = workDir,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                try
+                {
+                    using (var proc = System.Diagnostics.Process.Start(psi))
+                    {
+                        string stdout = proc.StandardOutput.ReadToEnd();
+                        string stderr = proc.StandardError.ReadToEnd();
+                        proc.WaitForExit(180000);
+
+                        string lastLine = "";
+                        string[] lines = stdout.Trim().Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (lines.Length > 0)
+                        {
+                            lastLine = lines[lines.Length - 1].Trim();
+                        }
+
+                        if (lastLine.StartsWith("{") && lastLine.EndsWith("}"))
+                        {
+                            string filename = ExtractJsonField(lastLine, "filename");
+                            string outputPath = ExtractJsonField(lastLine, "output_path").Replace("\\", "/");
+                            string modelName = ExtractJsonField(lastLine, "model_name");
+                            if (string.IsNullOrEmpty(modelName)) modelName = modelId;
+                            string rawUrl = string.Format("/api/workspace/raw?path={0}", Uri.EscapeDataString(outputPath));
+
+                            string wrappedJson = string.Format("{{\"success\":true,\"image\":{{\"filename\":\"{0}\",\"path\":\"{1}\",\"rawUrl\":\"{2}\",\"prompt\":\"{3}\",\"modelId\":\"{4}\",\"modelName\":\"{5}\",\"width\":512,\"height\":512,\"durationMs\":15000,\"sizeBytes\":90000}}}}",
+                                filename, outputPath, rawUrl, prompt.Replace("\"", "\\\""), modelId, modelName.Replace("\"", "\\\""));
+
+                            byte[] outBytes = System.Text.Encoding.UTF8.GetBytes(wrappedJson);
+                            response.StatusCode = 200;
+                            response.OutputStream.Write(outBytes, 0, outBytes.Length);
+                            response.Close();
+                            return;
+                        }
+                        else
+                        {
+                            string errJson = string.Format("{{\"success\":false,\"error\":\"{0}\"}}",
+                                (stderr ?? "Failed to generate image").Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " "));
+                            byte[] errBytes = System.Text.Encoding.UTF8.GetBytes(errJson);
+                            response.StatusCode = 500;
+                            response.OutputStream.Write(errBytes, 0, errBytes.Length);
+                            response.Close();
+                            return;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    string errJson = string.Format("{{\"success\":false,\"error\":\"{0}\"}}", ex.Message.Replace("\"", "\\\""));
+                    byte[] errBytes = System.Text.Encoding.UTF8.GetBytes(errJson);
+                    response.StatusCode = 500;
+                    response.OutputStream.Write(errBytes, 0, errBytes.Length);
+                    response.Close();
+                    return;
+                }
+            }
+
+            response.StatusCode = 405;
             response.Close();
         }
 

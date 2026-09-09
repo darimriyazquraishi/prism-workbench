@@ -109,9 +109,14 @@ export const MainWorkspaceView: React.FC = () => {
     isThinkHarderMode,
     toggleThinkHarderMode,
     regenerateResponse,
-    editUserMessageAndRegenerate
+    editUserMessageAndRegenerate,
+    selectedImageModel,
+    setSelectedImageModel,
+    generateImageTask,
+    setActivePreviewArtifact
   } = useAntigravityStore();
 
+  const [isCreateImageMode, setIsCreateImageMode] = useState(false);
   const [promptText, setPromptText] = useState('');
   const [followUpText, setFollowUpText] = useState('');
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -189,6 +194,7 @@ export const MainWorkspaceView: React.FC = () => {
   };
 
   const slashCommands = [
+    { cmd: '/image', label: 'Create Image with FLUX / SDXL', icon: Sparkles, prompt: 'Create image: ' },
     { cmd: '/inspect', label: 'Run API 570 Wall Thickness Survey Audit', icon: ShieldCheck, prompt: 'Read attached inspection files and evaluate API 570 corrosion limits' },
     { cmd: '/calculate', label: 'Execute Remaining Life & Degradation Math', icon: Calculator, prompt: 'Calculate corrosion rate and safe operating life for Line 04-CR-102' },
     { cmd: '/model', label: 'Switch Primary Local Inference Engine', icon: Cpu, prompt: 'Switch active model router to Qwen2.5-Coder-7B' },
@@ -307,6 +313,35 @@ export const MainWorkspaceView: React.FC = () => {
                   </div>
                 )}
 
+                {/* Create Image Model Selector Banner */}
+                {isCreateImageMode && (
+                  <div className="mb-2 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[var(--accent-primary)] animate-pulse" />
+                      <span className="font-semibold text-[var(--text-primary)]">Create Image</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-[var(--text-secondary)] font-mono">Model:</span>
+                      <select
+                        value={selectedImageModel}
+                        onChange={(e) => setSelectedImageModel(e.target.value)}
+                        className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)] font-mono outline-none cursor-pointer hover:border-[var(--text-secondary)]"
+                      >
+                        <option value="flux1-schnell">FLUX.1 [schnell] (GGUF)</option>
+                        <option value="sdxl-lightning">SDXL-Lightning (Safetensors)</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreateImageMode(false)}
+                        className="p-1 hover:bg-[var(--bg-surface)] rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer"
+                        title="Exit Create Image mode"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <textarea
                   value={promptText}
                   onChange={(e) => {
@@ -314,14 +349,22 @@ export const MainWorkspaceView: React.FC = () => {
                     setPromptText(val);
                     setShowSlashMenu(val.startsWith('/'));
                   }}
-                  placeholder="Type / for commands, or ask your local AI to analyze documents..."
+                  placeholder={
+                    isCreateImageMode
+                      ? `Describe the image to generate with ${selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning'}...`
+                      : "Type / for commands, or ask your local AI to analyze documents..."
+                  }
                   className="w-full bg-transparent border-none text-[15px] text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-tertiary)] resize-none h-14 p-1"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       const toSend = promptText.trim();
                       if (toSend) {
-                        proposePlanForTask(toSend);
+                        if (isCreateImageMode) {
+                          generateImageTask(toSend, selectedImageModel);
+                        } else {
+                          proposePlanForTask(toSend);
+                        }
                         setPromptText('');
                         setShowSlashMenu(false);
                       }
@@ -355,6 +398,21 @@ export const MainWorkspaceView: React.FC = () => {
                       <span>{isThinkHarderMode ? 'Think Harder ON' : 'Think Harder'}</span>
                     </button>
 
+                    {/* Create Image Toggle */}
+                    <button 
+                      type="button"
+                      onClick={() => setIsCreateImageMode(prev => !prev)}
+                      title="Create image with local models"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                        isCreateImageMode 
+                          ? 'bg-[var(--text-primary)] text-[var(--bg-base)] font-bold shadow-md' 
+                          : 'hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent hover:border-[var(--border-subtle)]'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Create Image</span>
+                    </button>
+
                     <button 
                       onClick={() => setShowDocSelector(!showDocSelector)}
                       title="Select active document context"
@@ -380,15 +438,19 @@ export const MainWorkspaceView: React.FC = () => {
                       onClick={() => {
                         if (promptText.trim()) {
                           clearAttachments();
-                          proposePlanForTask(promptText.trim());
+                          if (isCreateImageMode) {
+                            generateImageTask(promptText.trim(), selectedImageModel);
+                          } else {
+                            proposePlanForTask(promptText.trim());
+                          }
                           setPromptText('');
                           setShowSlashMenu(false);
                         }
                       }} 
                       className="p-2 rounded-full bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 cursor-pointer transition-opacity"
-                      title="Submit Task Query"
+                      title={isCreateImageMode ? "Generate Image" : "Submit Task Query"}
                     >
-                      <Search className="w-4 h-4" />
+                      {isCreateImageMode ? <Sparkles className="w-4 h-4" /> : <Search className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -640,6 +702,85 @@ export const MainWorkspaceView: React.FC = () => {
                             )}
                           </div>
 
+                          {/* Image Card Preview */}
+                          {step.imageCard && (
+                            <div className="my-2 border border-[var(--border-subtle)] rounded-xl overflow-hidden bg-[var(--bg-elevated)] shadow-md">
+                              <div className="p-2.5 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 rounded font-mono font-semibold bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/30 text-[11px]">
+                                    {step.imageCard.modelName}
+                                  </span>
+                                  <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                                    {step.imageCard.width}×{step.imageCard.height}
+                                  </span>
+                                  <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                                    {(step.imageCard.durationMs / 1000).toFixed(1)}s
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/40">
+                                  Local Air-Gapped
+                                </span>
+                              </div>
+                              <div 
+                                className="p-2 flex items-center justify-center bg-[#0d0d10] cursor-pointer group/img relative"
+                                onClick={() => {
+                                  setActivePreviewArtifact({
+                                    id: `art-${Date.now()}`,
+                                    name: step.imageCard!.filename,
+                                    type: 'png',
+                                    path: step.imageCard!.path,
+                                    sizeBytes: step.imageCard!.sizeBytes,
+                                    description: step.imageCard!.prompt,
+                                    createdAt: step.timestamp,
+                                    previewUrl: step.imageCard!.rawUrl,
+                                    downloadUrl: step.imageCard!.rawUrl
+                                  });
+                                }}
+                              >
+                                <img
+                                  src={step.imageCard.rawUrl}
+                                  alt={step.imageCard.prompt}
+                                  className="max-h-[380px] w-auto max-w-full rounded-lg object-contain shadow-lg group-hover/img:scale-[1.01] transition-transform"
+                                  title="Click to expand full screen preview"
+                                />
+                              </div>
+                              <div className="px-3 py-2 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] flex items-center justify-between text-xs gap-2">
+                                <span className="text-[11px] text-[var(--text-secondary)] italic truncate flex-1" title={step.imageCard.prompt}>
+                                  "{step.imageCard.prompt}"
+                                </span>
+                                <div className="flex items-center gap-1.5 font-mono text-[11px] shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActivePreviewArtifact({
+                                        id: `art-${Date.now()}`,
+                                        name: step.imageCard!.filename,
+                                        type: 'png',
+                                        path: step.imageCard!.path,
+                                        sizeBytes: step.imageCard!.sizeBytes,
+                                        description: step.imageCard!.prompt,
+                                        createdAt: step.timestamp,
+                                        previewUrl: step.imageCard!.rawUrl,
+                                        downloadUrl: step.imageCard!.rawUrl
+                                      });
+                                    }}
+                                    className="px-2 py-0.5 rounded bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] cursor-pointer transition-colors"
+                                  >
+                                    Preview
+                                  </button>
+                                  <a
+                                    href={step.imageCard.rawUrl}
+                                    download={step.imageCard.filename}
+                                    className="px-2 py-0.5 rounded bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] flex items-center gap-1"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                    <span>Download</span>
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                           {/* Action Bar: Copy & Regenerate */}
                           {!isCurrentStreaming && step.content && !step.content.startsWith('💭 *Thinking...*') && (
                             <div className="flex items-center gap-2 pt-1 border-t border-[var(--border-subtle)]/50 text-[11px] text-[var(--text-tertiary)]">
@@ -730,16 +871,53 @@ export const MainWorkspaceView: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Create Image Model Selector Banner in Follow-up */}
+                    {isCreateImageMode && (
+                      <div className="mb-2 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[var(--accent-primary)] animate-pulse" />
+                          <span className="font-semibold text-[var(--text-primary)]">Create Image</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-[var(--text-secondary)] font-mono">Model:</span>
+                          <select
+                            value={selectedImageModel}
+                            onChange={(e) => setSelectedImageModel(e.target.value)}
+                            className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)] font-mono outline-none cursor-pointer hover:border-[var(--text-secondary)]"
+                          >
+                            <option value="flux1-schnell">FLUX.1 [schnell] (GGUF)</option>
+                            <option value="sdxl-lightning">SDXL-Lightning (Safetensors)</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => setIsCreateImageMode(false)}
+                            className="p-1 hover:bg-[var(--bg-surface)] rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer"
+                            title="Exit Create Image mode"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <textarea
                       value={followUpText}
                       onChange={(e) => setFollowUpText(e.target.value)}
-                      placeholder="Ask a follow-up or provide next instructions..."
+                      placeholder={
+                        isCreateImageMode
+                          ? `Describe the image to generate with ${selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning'}...`
+                          : "Ask a follow-up or provide next instructions..."
+                      }
                       className="w-full bg-transparent border-none text-[14px] text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-tertiary)] resize-none h-12 p-2"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           if (followUpText.trim()) {
-                            proposePlanForTask(followUpText.trim());
+                            if (isCreateImageMode) {
+                              generateImageTask(followUpText.trim(), selectedImageModel);
+                            } else {
+                              proposePlanForTask(followUpText.trim());
+                            }
                             setFollowUpText('');
                           }
                         }
@@ -770,6 +948,21 @@ export const MainWorkspaceView: React.FC = () => {
                           <Zap className={`w-3.5 h-3.5 ${isThinkHarderMode ? 'fill-black' : 'text-amber-400'}`} />
                           <span>{isThinkHarderMode ? 'Think Harder ON' : 'Think Harder'}</span>
                         </button>
+
+                        {/* Create Image Mode Toggle in Follow-up */}
+                        <button 
+                          type="button"
+                          onClick={() => setIsCreateImageMode(prev => !prev)}
+                          title="Create image with local models"
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                            isCreateImageMode 
+                              ? 'bg-[var(--text-primary)] text-[var(--bg-base)] font-bold shadow-md' 
+                              : 'hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent hover:border-[var(--border-subtle)]'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Create Image</span>
+                        </button>
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -781,13 +974,18 @@ export const MainWorkspaceView: React.FC = () => {
                         <button 
                           onClick={() => {
                             if (followUpText.trim()) {
-                              proposePlanForTask(followUpText.trim());
+                              if (isCreateImageMode) {
+                                generateImageTask(followUpText.trim(), selectedImageModel);
+                              } else {
+                                proposePlanForTask(followUpText.trim());
+                              }
                               setFollowUpText('');
                             }
                           }}
                           className="p-1.5 rounded-full bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 cursor-pointer transition-opacity"
+                          title={isCreateImageMode ? "Generate Image" : "Send Query"}
                         >
-                          <Send className="w-4 h-4" />
+                          {isCreateImageMode ? <Sparkles className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                         </button>
                       </div>
                     </div>

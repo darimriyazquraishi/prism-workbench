@@ -37,6 +37,7 @@ export const DeliverablePreviewModal: React.FC = () => {
   const isDocx = art.type === 'docx';
   const isXlsx = art.type === 'xlsx';
   const isCode = art.type === 'py' || art.type === 'json';
+  const isImage = art.type === 'png' || art.name.endsWith('.png') || art.name.endsWith('.jpg') || art.name.endsWith('.jpeg') || art.name.endsWith('.webp');
 
   const slides = art.slides || [];
   const structuredDocx = art.structuredDocx;
@@ -82,7 +83,8 @@ export const DeliverablePreviewModal: React.FC = () => {
               {isDocx && <FileText className="w-5 h-5 text-sky-400" />}
               {isXlsx && <FileSpreadsheet className="w-5 h-5 text-emerald-400" />}
               {isCode && <Code2 className="w-5 h-5 text-indigo-400" />}
-              {!isPptx && !isDocx && !isXlsx && !isCode && <FileCheck className="w-5 h-5 text-teal-400" />}
+              {isImage && <Sparkles className="w-5 h-5 text-fuchsia-400" />}
+              {!isPptx && !isDocx && !isXlsx && !isCode && !isImage && <FileCheck className="w-5 h-5 text-teal-400" />}
             </div>
 
             <div className="min-w-0">
@@ -479,8 +481,37 @@ export const DeliverablePreviewModal: React.FC = () => {
             </div>
           )}
 
+          {/* IMAGE PREVIEW */}
+          {isImage && (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-hidden bg-[#0a0a0c]">
+              <div className="max-h-full max-w-full flex items-center justify-center overflow-auto p-2">
+                <img
+                  src={art.previewUrl || art.downloadUrl || (art.path ? `/api/workspace/files?path=${encodeURIComponent(art.path)}&raw=true` : undefined)}
+                  alt={art.name}
+                  className="max-h-[68vh] max-w-full object-contain rounded-xl shadow-2xl border border-zinc-800"
+                />
+              </div>
+              <div className="mt-3 flex items-center gap-3 text-xs text-zinc-400">
+                <span className="font-mono text-zinc-300 font-medium">{art.name}</span>
+                {art.description && (
+                  <>
+                    <span>•</span>
+                    <span className="italic truncate max-w-md">{art.description}</span>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="ml-2 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* GENERIC / FALLBACK PREVIEW */}
-          {!isPptx && !isDocx && !isXlsx && !isCode && (
+          {!isPptx && !isDocx && !isXlsx && !isCode && !isImage && (
             <div className="flex-1 flex items-center justify-center p-8 text-center">
               <div className="max-w-md space-y-4">
                 <FileCheck className="w-12 h-12 text-zinc-500 mx-auto" />

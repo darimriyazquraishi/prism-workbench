@@ -1,5 +1,61 @@
 [
   {
+    "id": "audit-1788965439008-9tga",
+    "timestamp": "2026-09-09T14:50:39.008Z",
+    "action": "DELETE",
+    "path": "F:/corewithin/_task_exec_1788965438875.py",
+    "status": "allowed",
+    "details": "Deleted file"
+  },
+  {
+    "id": "audit-1788965438878-fhem",
+    "timestamp": "2026-09-09T14:50:38.878Z",
+    "action": "COMMAND",
+    "path": "python _task_exec_1788965438875.py",
+    "status": "allowed",
+    "details": "Executed in user workspace"
+  },
+  {
+    "id": "audit-1788965438876-iyrb",
+    "timestamp": "2026-09-09T14:50:38.876Z",
+    "action": "CREATE",
+    "path": "F:/corewithin/_task_exec_1788965438875.py",
+    "status": "allowed",
+    "details": "Created file _task_exec_1788965438875.py"
+  },
+  {
+    "id": "audit-1788965402350-90xy",
+    "timestamp": "2026-09-09T14:50:02.350Z",
+    "action": "DELETE",
+    "path": "F:/corewithin/_task_exec_1788965402155.py",
+    "status": "allowed",
+    "details": "Deleted file"
+  },
+  {
+    "id": "audit-1788965402161-92nk",
+    "timestamp": "2026-09-09T14:50:02.161Z",
+    "action": "COMMAND",
+    "path": "python _task_exec_1788965402155.py",
+    "status": "allowed",
+    "details": "Executed in user workspace"
+  },
+  {
+    "id": "audit-1788965402156-hln7",
+    "timestamp": "2026-09-09T14:50:02.156Z",
+    "action": "CREATE",
+    "path": "F:/corewithin/_task_exec_1788965402155.py",
+    "status": "allowed",
+    "details": "Created file _task_exec_1788965402155.py"
+  },
+  {
+    "id": "audit-1788965393263-e4l8",
+    "timestamp": "2026-09-09T14:49:53.263Z",
+    "action": "CREATE",
+    "path": "F:/corewithin/sanGHEHan",
+    "status": "allowed",
+    "details": "Created directory sanGHEHan"
+  },
+  {
     "id": "audit-1788964501221-d5v3",
     "timestamp": "2026-09-09T14:35:01.221Z",
     "action": "DELETE",

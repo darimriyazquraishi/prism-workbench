@@ -44,6 +44,10 @@ llama_server/*.exe
 LUMI_Desktop/llama_server/*.exe
 llama_server/*.dll
 LUMI_Desktop/llama_server/*.dll
+/tools/
+/LUMI_Desktop/tools/
+/workspace/
+/sanGHEHan/
 
 # Caches and runtime
 .cache/
