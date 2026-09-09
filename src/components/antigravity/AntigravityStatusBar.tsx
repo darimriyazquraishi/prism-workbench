@@ -14,12 +14,8 @@ import { NetworkMonitorModal } from './NetworkMonitorModal';
 export const AntigravityStatusBar: React.FC = () => {
   const { 
     isExecuting, 
-    selectedModel, 
     isNetworkModalOpen, 
     setNetworkModalOpen, 
-    setSecurityModalOpen,
-    setServerHealthModalOpen,
-    isServerOnline,
     networkLogs 
   } = useAntigravityStore();
   const [isExpanded, setIsExpanded] = useState(true);
@@ -31,7 +27,7 @@ export const AntigravityStatusBar: React.FC = () => {
         onClick={() => setIsExpanded(true)}
         title="Show Status Bar"
       >
-        <span className={`w-1.5 h-1.5 rounded-full ${isServerOnline ? 'bg-[var(--accent-success)]' : 'bg-rose-500'} mr-2`}></span>
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)] mr-2"></span>
         <ChevronUp className="w-3 h-3" />
       </div>
     );
@@ -42,27 +38,15 @@ export const AntigravityStatusBar: React.FC = () => {
       <footer 
         className="h-6 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] text-[var(--text-secondary)] px-3 flex items-center justify-between text-xs font-mono select-none flex-shrink-0 z-20"
       >
-        {/* Left: Connection state & Agent status */}
+        {/* Left: Agent status if executing */}
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setServerHealthModalOpen(true)}
-            title="Click for Server Health Metrics"
-            className="flex items-center gap-1.5 font-medium text-[var(--text-primary)] hover:opacity-80 transition-opacity cursor-pointer text-xs"
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${isServerOnline ? 'bg-[var(--accent-success)]' : 'bg-rose-500'}`}></span>
-            <span>{isServerOnline ? 'Ready' : 'Offline'}</span>
-          </button>
-
           {isExecuting && (
-            <>
-              <div className="h-3 w-[1px] bg-[var(--border-subtle)]"></div>
-              <div className="flex items-center gap-1.5 text-[10px]">
-                <span className="flex items-center gap-1 text-[var(--accent-primary)] font-bold">
-                  <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-ping"></span>
-                  Agents Active...
-                </span>
-              </div>
-            </>
+            <div className="flex items-center gap-1.5 text-[10px]">
+              <span className="flex items-center gap-1 text-[var(--accent-primary)] font-bold">
+                <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-ping"></span>
+                Agents Active...
+              </span>
+            </div>
           )}
         </div>
 

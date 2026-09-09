@@ -551,10 +551,47 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const activeTab = get().openTabs.find(t => t.id === get().activeTabId);
       const executedToolCalls: { tool: string; args: any; status: 'pending' | 'success' | 'failed' | 'requires_approval'; output?: any; error?: string }[] = [];
 
-      // 2. File-aware context discovery:
-      // Look for files specified in prompt or use the active editor tab
-      const pathMatch = trimmed.match(/(?:(?:file|in|to|for|at|from|component)\s+)?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)/i);
-      let candidatePath = pathMatch ? pathMatch[1].replace(/\\/g, '/') : (activeTab ? activeTab.path : null);
+      // 2. Intent Detection & Execution:
+      // A) Create Folder Intent
+      const folderMatch = trimmed.match(/(?:create|make|new|add)\s+(?:a\s+)?(?:folder|directory|dir)\s+(?:named\s+|called\s+)?['"]?([a-zA-Z0-9_\-./\\]+)['"]?/i) ||
+                          trimmed.match(/^mkdir\s+['"]?([a-zA-Z0-9_\-./\\]+)['"]?/i);
+      if (folderMatch) {
+        const folderToCreate = folderMatch[1].replace(/\\/g, '/').replace(/\/$/, '');
+        try {
+          const dirRes = await fetch('/api/workspace/tools', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tool: 'create_directory',
+              args: { path: folderToCreate },
+              permissionMode: 'autonomous',
+              approved: true
+            })
+          });
+          const dirData = await dirRes.json().catch(() => ({}));
+          await get().refreshTree();
+          executedToolCalls.push({
+            tool: 'create_directory',
+            args: { path: folderToCreate },
+            status: dirData.success ? 'success' : 'failed',
+            output: dirData.output
+          });
+        } catch {}
+      }
+
+      // B) File Context Resolution:
+      const explicitFileMatch = trimmed.match(/(?:(?:file|in|to|for|at|from|component)\s+)?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)/i);
+      const explicitFilePath = explicitFileMatch ? explicitFileMatch[1].replace(/\\/g, '/') : null;
+      
+      const isTargetingCurrentFile = /(?:this\s+file|current\s+file|active\s+file|@activeTab)/i.test(trimmed) || 
+                                    (/^(?:fix|edit|modify|update|refactor|add\s+to\s+this)\b/i.test(trimmed) && !explicitFilePath);
+
+      let candidatePath: string | null = null;
+      if (explicitFilePath) {
+        candidatePath = explicitFilePath;
+      } else if (isTargetingCurrentFile && activeTab) {
+        candidatePath = activeTab.path;
+      }
 
       let inspectedFile: { path: string; content: string; size: number; extension: string } | null = null;
 
@@ -581,29 +618,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         } catch {}
       }
 
-      // If no file was found by candidatePath, but active tab exists, inspect active tab
-      if (!inspectedFile && activeTab && !activeTab.isBinary) {
-        inspectedFile = {
-          path: activeTab.path,
-          content: activeTab.content || '',
-          size: activeTab.size || activeTab.content.length,
-          extension: activeTab.extension || 'txt'
-        };
-        executedToolCalls.push({
-          tool: 'read_file',
-          args: { path: inspectedFile.path },
-          status: 'success',
-          output: { size: inspectedFile.size, path: inspectedFile.path }
-        });
-      }
-
       // 3. Task & Agent Routing:
-      // Identify whether this is a Coding Task or General Reasoning Task
       const isReasoningTask = /^(explain|analyze|why|what\s+is|how\s+does|plan|architecture|review|understand)\b/i.test(trimmed);
       const isDeleteTask = /^delete\s+/i.test(trimmed);
       const isCodingTask = !isReasoningTask && (
-        /^(create|write|fix|modify|update|refactor|add|implement|generate|build)\b/i.test(trimmed) ||
-        trimmed.includes('bug') || trimmed.includes('component') || trimmed.includes('code') || trimmed.includes('function')
+        /^(create|write|fix|modify|update|refactor|add|implement|generate|build|make)\b/i.test(trimmed) ||
+        trimmed.includes('bug') || trimmed.includes('component') || trimmed.includes('code') || trimmed.includes('function') || trimmed.includes('pdf') || trimmed.includes('script')
       );
 
       // Handle Delete explicitly if requested
@@ -667,8 +687,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         : `General Reasoning Agent (${modelDesc.name})`;
 
       const systemPrompt = isCodingTask
-        ? `You are LUMI's Coding Agent. You inspect existing workspace files and dependencies before modifying or generating code.
-When asked to create or update code, provide the clean, robust, production-ready implementation inside a single markdown code block with appropriate language identifier.
+        ? `You are LUMI's Coding Agent. You create directories, inspect files, and write robust code.
+When asked to perform a coding or generation task, provide clean, executable, production-ready code inside a single markdown code block with appropriate language identifier.
 Preserve existing syntax patterns, exports, and styles. Explain key design decisions briefly.`
         : `You are LUMI's General Reasoning Agent. You analyze project architecture, explain code, debug logic, and plan structural changes across workspace files. Provide insightful, rigorously verified reasoning.`;
 
@@ -688,54 +708,113 @@ Preserve existing syntax patterns, exports, and styles. Explain key design decis
 
       const responseText = llmResult.content || 'I completed the task analysis.';
 
-      // 5. Code modification handling
+      // 5. Code modification & Action Execution handling
       const codeBlockMatch = responseText.match(/```(?:[a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/);
       const generatedCode = codeBlockMatch ? codeBlockMatch[1].trim() : null;
 
       let proposedDiff: { path: string; action: 'modify' | 'create' | 'delete'; originalContent?: string; newContent?: string } | null = null;
+      let executedScriptSuccess = false;
+      let scriptOutput = '';
 
       if (isCodingTask && generatedCode) {
-        const targetPath = inspectedFile ? inspectedFile.path : (candidatePath || 'src/Component.tsx');
-        const action = inspectedFile ? ('modify' as const) : ('create' as const);
+        const isPythonScript = /^\s*(?:import\s+[a-zA-Z0-9_.]+|from\s+[a-zA-Z0-9_.]+\s+import)/.test(generatedCode);
+        const isActionExecutionTask = /pdf|image|chart|plot|run|execute|script|generate|make/i.test(trimmed);
 
-        if (get().permissionMode === 'assisted') {
-          proposedDiff = {
-            path: targetPath,
-            action,
-            originalContent: inspectedFile ? inspectedFile.content : '',
-            newContent: generatedCode
-          };
-          set({ activeDiffProposal: proposedDiff });
-        } else if (get().permissionMode === 'autonomous') {
-          const toolName = action === 'create' ? 'create_file' : 'write_file';
-          const writeRes = await fetch('/api/workspace/tools', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        // A) If LLM generated an executable Python script to satisfy the user's action task, execute it directly
+        if (isPythonScript && isActionExecutionTask) {
+          try {
+            const tempScriptName = `_task_exec_${Date.now()}.py`;
+            await fetch('/api/workspace/tools', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tool: 'create_file',
+                args: { path: tempScriptName, content: generatedCode },
+                permissionMode: 'autonomous',
+                approved: true
+              })
+            });
+
+            const execRes = await fetch('/api/workspace/terminal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ command: `python ${tempScriptName}` })
+            });
+            const execData = await execRes.json().catch(() => ({}));
+
+            await fetch('/api/workspace/tools', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tool: 'delete_file',
+                args: { path: tempScriptName },
+                permissionMode: 'autonomous',
+                approved: true
+              })
+            });
+
+            await get().refreshTree();
+
+            if (execData.success || (execData.stdout && !execData.stderr)) {
+              executedScriptSuccess = true;
+              scriptOutput = (execData.stdout || '').trim();
+            }
+
+            executedToolCalls.push({
+              tool: 'execute_script',
+              args: { runtime: 'python' },
+              status: executedScriptSuccess ? 'success' : 'failed',
+              output: scriptOutput || execData.stderr || execData.error
+            });
+          } catch (err: any) {
+            console.error('Failed to execute task script:', err);
+          }
+        } else if (candidatePath) {
+          // B) If user specified a file path or asked to edit current file
+          const targetPath = candidatePath;
+          const action = inspectedFile ? ('modify' as const) : ('create' as const);
+
+          if (get().permissionMode === 'assisted') {
+            proposedDiff = {
+              path: targetPath,
+              action,
+              originalContent: inspectedFile ? inspectedFile.content : '',
+              newContent: generatedCode
+            };
+            set({ activeDiffProposal: proposedDiff });
+          } else if (get().permissionMode === 'autonomous') {
+            const toolName = action === 'create' ? 'create_file' : 'write_file';
+            const writeRes = await fetch('/api/workspace/tools', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tool: toolName,
+                args: { path: targetPath, content: generatedCode },
+                permissionMode: 'autonomous',
+                approved: true
+              })
+            });
+            const writeData = await writeRes.json().catch(() => ({}));
+            await get().refreshTree();
+            await get().openFileInTab(targetPath);
+            executedToolCalls.push({
               tool: toolName,
-              args: { path: targetPath, content: generatedCode },
-              permissionMode: 'autonomous',
-              approved: true
-            })
-          });
-          const writeData = await writeRes.json().catch(() => ({}));
-          await get().refreshTree();
-          await get().openFileInTab(targetPath);
-          executedToolCalls.push({
-            tool: toolName,
-            args: { path: targetPath },
-            status: writeData.success ? 'success' : 'failed',
-            output: writeData.output
-          });
+              args: { path: targetPath },
+              status: writeData.success ? 'success' : 'failed',
+              output: writeData.output
+            });
+          }
         }
       }
 
       // 6. Append assistant message to chat
       let finalContent = `**${agentRoleName}**\n\n${responseText}`;
-      if (proposedDiff) {
+      if (executedScriptSuccess) {
+        finalContent += `\n\n---\n✓ **Action Completed:** Executed Python script in workspace. Created required files and directories.${scriptOutput ? ` Output: \`${scriptOutput}\`` : ''}`;
+      } else if (proposedDiff) {
         finalContent += `\n\n---\n⚡ **Diff proposal ready:** Generated ${proposedDiff.action} for \`${proposedDiff.path}\`. Review diff in editor and click **Accept Changes** to save to disk.`;
-      } else if (get().permissionMode === 'autonomous' && isCodingTask && generatedCode) {
-        finalContent += `\n\n---\n✓ **Auto-applied change:** Written to physical disk in autonomous mode.`;
+      } else if (get().permissionMode === 'autonomous' && candidatePath && generatedCode) {
+        finalContent += `\n\n---\n✓ **Auto-applied change:** Written to \`${candidatePath}\` on physical disk in autonomous mode.`;
       }
 
       set(state => ({

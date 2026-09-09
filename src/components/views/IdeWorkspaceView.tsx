@@ -121,6 +121,37 @@ export const IdeWorkspaceView: React.FC = () => {
   const [terminalInput, setTerminalInput] = useState('');
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
+  // AI Chat Pane resizing state
+  const [aiChatWidth, setAiChatWidth] = useState<number>(360);
+  const [isResizingAiChat, setIsResizingAiChat] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isResizingAiChat) return;
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth >= 280 && newWidth <= 800) {
+        setAiChatWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingAiChat(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingAiChat]);
+
   // File & Folder Upload states
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
@@ -1014,8 +1045,20 @@ export const IdeWorkspaceView: React.FC = () => {
 
         </div>
 
-        {/* PANE 3: RIGHT LUMI AI WORKSPACE CO-PILOT (340px) */}
-        <div className="w-80 bg-[var(--bg-surface)] border-l border-[var(--border-subtle)] flex flex-col shrink-0 overflow-hidden">
+        {/* RESIZE HANDLE FOR RIGHT AI PANE */}
+        <div
+          onMouseDown={() => setIsResizingAiChat(true)}
+          className={`w-1 cursor-col-resize hover:bg-[var(--text-secondary)]/40 transition-colors select-none z-10 shrink-0 ${
+            isResizingAiChat ? 'bg-[var(--text-primary)] w-1.5' : 'bg-transparent'
+          }`}
+          title="Drag to resize AI Assistant"
+        />
+
+        {/* PANE 3: RIGHT LUMI AI WORKSPACE CO-PILOT (Resizable) */}
+        <div
+          style={{ width: `${aiChatWidth}px` }}
+          className="bg-[var(--bg-surface)] border-l border-[var(--border-subtle)] flex flex-col shrink-0 overflow-hidden"
+        >
           
           {/* AI Panel Header */}
           <div className="p-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between">

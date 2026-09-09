@@ -20,8 +20,6 @@ import {
   Plus, 
   ChevronDown, 
   Play, 
-  Bell, 
-  Settings, 
   MessageSquare, 
   Trash2,
   Layers,
@@ -39,11 +37,6 @@ export const AntigravityShell: React.FC = () => {
     isSidebarOpen, 
     toggleSidebar,
     setSettingsModalOpen,
-    notifications,
-    clearNotifications,
-    markNotificationRead,
-    isNotificationsOpen,
-    setNotificationsOpen,
     sessions,
     activeSessionId,
     createNewSession,
@@ -206,71 +199,8 @@ export const AntigravityShell: React.FC = () => {
 
 
           </div>
-
-          {/* Bottom Settings & Notifications */}
-          <div className="p-2 relative">
-            <div className="flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-elevated)] rounded-xl transition-colors">
-              <button 
-                onClick={() => setSettingsModalOpen(true)}
-                className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-                title="Application Settings"
-              >
-                <Settings className="w-4 h-4 text-[var(--text-secondary)]" />
-                <span>Settings</span>
-              </button>
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setNotificationsOpen(!isNotificationsOpen);
-                }}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-base)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer relative"
-                title="System Notifications"
-              >
-                <Bell className="w-4 h-4" />
-                {notifications.some(n => !n.read) && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500"></span>
-                )}
-              </button>
-            </div>
-
-            {/* Notification Popover Dropdown */}
-            {isNotificationsOpen && (
-              <div className="absolute bottom-14 left-2 right-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-3 z-50 space-y-2 text-xs">
-                <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
-                  <span className="font-bold text-[var(--text-primary)] font-mono text-[11px]">SYSTEM ALERTS ({notifications.filter(n => !n.read).length})</span>
-                  <button 
-                    onClick={clearNotifications}
-                    className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-                  >
-                    Clear All
-                  </button>
-                </div>
-                <div className="max-h-48 overflow-y-auto space-y-2">
-                  {notifications.length === 0 ? (
-                    <div className="text-[11px] text-[var(--text-secondary)] text-center py-2">No active notifications</div>
-                  ) : (
-                    notifications.map((n) => (
-                      <div 
-                        key={n.id} 
-                        onClick={() => markNotificationRead(n.id)}
-                        className={`p-2 rounded border cursor-pointer transition-colors ${
-                          n.read ? 'bg-[var(--bg-base)] border-[var(--border-subtle)] text-[var(--text-secondary)]' : 'bg-[var(--bg-elevated)] border-[var(--accent-primary)]/40 text-[var(--text-primary)]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between font-bold text-[11px] mb-0.5">
-                          <span className={n.type === 'alert' ? 'text-rose-400' : 'text-[var(--accent-primary)]'}>{n.title}</span>
-                          <span className="text-[9px] font-mono opacity-60">{n.timestamp}</span>
-                        </div>
-                        <p className="text-[10px] leading-snug">{n.message}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          </div>
-          </div>
+        </div>
+      </div>
 
           <button 
             onClick={toggleSidebar}
