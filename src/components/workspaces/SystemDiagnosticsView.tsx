@@ -147,7 +147,7 @@ export const SystemDiagnosticsView: React.FC = () => {
 
           <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--accent-success)] bg-[var(--bg-elevated)] px-2.5 py-1 rounded border border-[var(--border-subtle)]">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>100% Real Live State</span>
+            <span>Live Telemetry</span>
           </div>
         </div>
       </div>

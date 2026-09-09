@@ -145,7 +145,7 @@ export const PerplexitySidebar: React.FC<PerplexitySidebarProps> = ({ onSelectPr
         <div className="flex flex-col items-center space-y-3 w-full">
           <button
             onClick={() => setSecurityModalOpen(true)}
-            title="Local Engine · 100% Offline"
+            title="Security & System Status"
             className="w-8 h-8 rounded-full bg-[#202222] border border-[#2E3133] flex items-center justify-center text-[#858A8E] hover:text-white transition-colors cursor-pointer"
           >
             <ArrowUpRight className="w-3.5 h-3.5 text-[#20B8CD]" />

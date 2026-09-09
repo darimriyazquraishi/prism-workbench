@@ -364,19 +364,6 @@ export const MainWorkspaceView: React.FC = () => {
                       <span className="truncate max-w-[110px]">{activeDocumentContext}</span>
                       <ChevronDown className="w-3 h-3 opacity-50" />
                     </button>
-
-                    <button 
-                      onClick={toggleComputerAccess}
-                      title={isComputerAccessEnabled ? "Local tool execution enabled (--network=none)" : "Local tool execution disabled by policy"}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors border ${
-                        isComputerAccessEnabled 
-                          ? 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)]' 
-                          : 'bg-rose-950/20 border-rose-800/40 text-rose-300'
-                      }`}
-                    >
-                      <Monitor className={`w-4 h-4 ${isComputerAccessEnabled ? 'text-[var(--accent-success)]' : 'text-rose-400'}`} />
-                      <span>Computer {isComputerAccessEnabled ? '' : '(Off)'}</span>
-                    </button>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -405,12 +392,6 @@ export const MainWorkspaceView: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              </div>
-              
-              <div className="mt-8 flex items-center gap-4 text-xs text-[var(--text-secondary)] opacity-80">
-                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[var(--accent-success)]" /> 100% On-Premise Local</span>
-                <span className="w-1 h-1 rounded-full bg-[var(--border-subtle)]"></span>
-                <span>{selectedGeneralModel || 'Local Sovereign Engine'}</span>
               </div>
             </div>
           ) : (
@@ -810,10 +791,6 @@ export const MainWorkspaceView: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-center mt-2 text-[10px] text-[var(--text-secondary)]">
-                    <span>Local Workstation · Zero External Network Traffic</span>
                   </div>
                 </div>
               </div>

@@ -510,9 +510,6 @@ export const DeliverablePreviewModal: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-[11px] font-mono text-zinc-500 hidden sm:inline">
-              100% Local Air-Gapped Engine
-            </span>
             <button
               onClick={() => setActivePreviewArtifact(null)}
               className="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition-colors cursor-pointer"

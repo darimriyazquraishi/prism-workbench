@@ -1,5 +1,5 @@
 import { t as __exportAll } from "./rolldown-runtime_D7D4PA-g.mjs";
-import { a as logFsAudit, n as getActiveWorkspaceRoot } from "./workspaceSecurity_aeVCuJR8.mjs";
+import { a as logFsAudit, n as getActiveWorkspaceRoot } from "./workspaceSecurity_CNHgb3cP.mjs";
 import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";

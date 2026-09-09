@@ -77,8 +77,9 @@ export const AntigravityShell: React.FC = () => {
       {/* 2. Screen Viewport with Left Icon Rail */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar (Unified) */}
-        <div className={`relative flex-shrink-0 flex flex-col transition-[width] duration-200 ease-in-out ${isSidebarOpen ? 'w-[260px]' : 'w-0'} bg-[var(--bg-surface)] border-[var(--border-subtle)] ${isSidebarOpen ? 'border-r' : ''} z-10 h-full group/leftpane`}>
-          <div className="w-[260px] h-full flex flex-col overflow-hidden">
+        <div className="relative flex-shrink-0 h-full z-10 group/leftpane flex">
+          <div className={`h-full flex flex-col transition-[width] duration-200 ease-in-out ${isSidebarOpen ? 'w-[260px] border-r' : 'w-0 border-r-0'} bg-[var(--bg-surface)] border-[var(--border-subtle)] overflow-hidden`}>
+            <div className="w-[260px] h-full flex flex-col overflow-hidden">
           {/* Top: + New Thread / Task */}
           <div className="p-3">
             <button
@@ -269,10 +270,13 @@ export const AntigravityShell: React.FC = () => {
             )}
           </div>
           </div>
+          </div>
 
           <button 
             onClick={toggleSidebar}
-            className="absolute -right-3 top-1/2 -translate-y-1/2 w-3 h-8 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded flex items-center justify-center opacity-0 group-hover/leftpane:opacity-100 transition-opacity z-20 cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[10px]"
+            className={`absolute top-1/2 -translate-y-1/2 w-3 h-8 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded flex items-center justify-center transition-all z-20 cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[10px] ${
+              isSidebarOpen ? '-right-3 opacity-0 group-hover/leftpane:opacity-100' : 'left-0 opacity-80 hover:opacity-100 shadow-md'
+            }`}
             title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
             {isSidebarOpen ? '‹' : '›'}
@@ -285,7 +289,6 @@ export const AntigravityShell: React.FC = () => {
             <div className="flex-1 flex overflow-hidden min-w-0">
               <MainWorkspaceView />
             </div>
-            <WorkbenchVerificationSidebar />
           </div>
           <div className={`flex-1 flex overflow-hidden min-w-0 ${activeScreen === 'models' ? '' : 'hidden'}`}>
             <ModelManagementView />

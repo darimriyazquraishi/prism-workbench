@@ -136,17 +136,24 @@ namespace LUMI.Desktop
                     return;
                 }
 
-                // 2. Check if it's an API request to forward to Python backend (if running on port 8000)
+                // 2. Native Workspace Browse Dialog
+                if (urlPath.Equals("/api/workspace/browse", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleWorkspaceBrowse(context);
+                    return;
+                }
+
+                // 3. Check if it's an API request to forward to Node or Python backend
                 if (urlPath.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
                 {
                     if (TryProxyToBackend(context, urlPath))
                     {
                         return;
                     }
-                    // Return local mock/fallback JSON response if backend is offline
+                    // Return clean JSON response if backend is offline
                     response.StatusCode = 200;
                     response.ContentType = "application/json; charset=utf-8";
-                    byte[] mockBytes = System.Text.Encoding.UTF8.GetBytes("{\"status\":\"local_deterministic\",\"air_gapped\":true,\"message\":\"Local on-premise engine active.\"}");
+                    byte[] mockBytes = System.Text.Encoding.UTF8.GetBytes("{\"success\":false,\"error\":\"Local engine offline\"}");
                     response.OutputStream.Write(mockBytes, 0, mockBytes.Length);
                     response.Close();
                     return;
@@ -288,38 +295,46 @@ namespace LUMI.Desktop
 
         private bool TryProxyToBackend(HttpListenerContext context, string urlPath)
         {
-            try
+            int[] candidatePorts = new int[] { 4321, 8000, 3000 };
+            foreach (int port in candidatePorts)
             {
-                string targetUrl = "http://127.0.0.1:8000" + urlPath + (context.Request.Url.Query ?? "");
-                var proxyReq = (HttpWebRequest)WebRequest.Create(targetUrl);
-                proxyReq.Method = context.Request.HttpMethod;
-                proxyReq.ContentType = context.Request.ContentType;
-                proxyReq.Timeout = 4000;
+                if (port == _port) continue;
+                if (!IsPortListening(port)) continue;
 
-                if (context.Request.HasEntityBody)
+                try
                 {
-                    using (var reqStream = proxyReq.GetRequestStream())
+                    string targetUrl = string.Format("http://127.0.0.1:{0}{1}{2}", port, urlPath, context.Request.Url.Query ?? "");
+                    var proxyReq = (HttpWebRequest)WebRequest.Create(targetUrl);
+                    proxyReq.Method = context.Request.HttpMethod;
+                    proxyReq.ContentType = context.Request.ContentType;
+                    proxyReq.Timeout = 10000;
+
+                    if (context.Request.HasEntityBody)
                     {
-                        CopyStream(context.Request.InputStream, reqStream);
+                        using (var reqStream = proxyReq.GetRequestStream())
+                        {
+                            CopyStream(context.Request.InputStream, reqStream);
+                        }
+                    }
+
+                    using (var proxyRes = (HttpWebResponse)proxyReq.GetResponse())
+                    {
+                        context.Response.StatusCode = (int)proxyRes.StatusCode;
+                        context.Response.ContentType = proxyRes.ContentType;
+                        using (var resStream = proxyRes.GetResponseStream())
+                        {
+                            CopyStream(resStream, context.Response.OutputStream);
+                        }
+                        context.Response.Close();
+                        return true;
                     }
                 }
-
-                using (var proxyRes = (HttpWebResponse)proxyReq.GetResponse())
+                catch
                 {
-                    context.Response.StatusCode = (int)proxyRes.StatusCode;
-                    context.Response.ContentType = proxyRes.ContentType;
-                    using (var resStream = proxyRes.GetResponseStream())
-                    {
-                        CopyStream(resStream, context.Response.OutputStream);
-                    }
-                    context.Response.Close();
-                    return true;
+                    // Continue to next candidate port
                 }
             }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
 
         private static void CopyStream(Stream input, Stream output)
@@ -535,6 +550,44 @@ namespace LUMI.Desktop
             return ScanModelsJson(null);
         }
 
+        private void HandleWorkspaceBrowse(HttpListenerContext context)
+        {
+            var response = context.Response;
+            response.ContentType = "application/json; charset=utf-8";
+            string selected = null;
+            var thread = new Thread(new ThreadStart(delegate()
+            {
+                using (var fbd = new FolderBrowserDialog())
+                {
+                    fbd.Description = "Select Project Folder";
+                    fbd.ShowNewFolderButton = true;
+                    if (fbd.ShowDialog() == DialogResult.OK)
+                    {
+                        selected = fbd.SelectedPath;
+                    }
+                }
+            }));
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join(60000);
+
+            string json;
+            if (!string.IsNullOrEmpty(selected))
+            {
+                string escaped = selected.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                json = string.Format("{{\"success\":true,\"path\":\"{0}\"}}", escaped);
+            }
+            else
+            {
+                json = "{\"success\":false,\"cancelled\":true}";
+            }
+
+            byte[] b = System.Text.Encoding.UTF8.GetBytes(json);
+            response.StatusCode = 200;
+            response.OutputStream.Write(b, 0, b.Length);
+            response.Close();
+        }
+
         public static bool IsPortListening(int port)
         {
             try
@@ -641,8 +694,13 @@ namespace LUMI.Desktop
                         }
                     };
 
-                    // Navigate to local offline application
-                    _webView.CoreWebView2.Navigate(string.Format("http://127.0.0.1:{0}/", _port));
+                    // Navigate to local application
+                    int targetNavPort = _port;
+                    if (HttpServer.IsPortListening(4321))
+                    {
+                        targetNavPort = 4321;
+                    }
+                    _webView.CoreWebView2.Navigate(string.Format("http://127.0.0.1:{0}/", targetNavPort));
                 }
                 catch (Exception ex)
                 {
@@ -799,6 +857,9 @@ namespace LUMI.Desktop
             // Automatically ensure local Ollama inference service is active
             EnsureOllamaRunning(showConsole);
 
+            // Automatically ensure local Node.js application server is active
+            EnsureNodeServerRunning(showConsole);
+
             // Start HTTP server with dynamic port fallback
             _server = new HttpServer(_baseDir);
             if (!_server.Start(_port))
@@ -838,6 +899,7 @@ namespace LUMI.Desktop
                 _server.Stop();
             }
             StopVisionServer();
+            StopNodeServer();
             }
             catch (Exception ex)
             {
@@ -1269,6 +1331,79 @@ namespace LUMI.Desktop
                 foreach (var p in System.Diagnostics.Process.GetProcessesByName("llama-server"))
                 {
                     try { p.Kill(); } catch { }
+                }
+            }
+            catch { }
+        }
+
+        private static System.Diagnostics.Process _nodeProcess = null;
+
+        public static void EnsureNodeServerRunning(bool showConsole)
+        {
+            if (HttpServer.IsPortListening(4321))
+            {
+                if (showConsole) Console.WriteLine("[LUMI] Application server is already active on port 4321.");
+                return;
+            }
+
+            try
+            {
+                string entryFile = Path.Combine(_baseDir, "dist", "server", "entry.mjs");
+                if (!File.Exists(entryFile))
+                {
+                    var parent = Directory.GetParent(_baseDir);
+                    if (parent != null)
+                    {
+                        string pEntry = Path.Combine(parent.FullName, "dist", "server", "entry.mjs");
+                        if (File.Exists(pEntry)) entryFile = pEntry;
+                    }
+                }
+
+                if (File.Exists(entryFile))
+                {
+                    string workDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(entryFile)));
+                    if (string.IsNullOrEmpty(workDir) || !Directory.Exists(workDir)) workDir = _baseDir;
+
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "node.exe",
+                        Arguments = string.Format("\"{0}\"", entryFile),
+                        WorkingDirectory = workDir,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+                    };
+                    psi.EnvironmentVariables["PORT"] = "4321";
+                    psi.EnvironmentVariables["HOST"] = "127.0.0.1";
+
+                    _nodeProcess = System.Diagnostics.Process.Start(psi);
+                    if (showConsole) Console.WriteLine("[LUMI] Spawning local application server on port 4321...");
+
+                    for (int i = 0; i < 20; i++)
+                    {
+                        Thread.Sleep(200);
+                        if (HttpServer.IsPortListening(4321))
+                        {
+                            if (showConsole) Console.WriteLine("[LUMI] Application server is ready on port 4321.");
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (showConsole) Console.WriteLine("[LUMI] Note: Could not auto-spawn node server: " + ex.Message);
+            }
+        }
+
+        public static void StopNodeServer()
+        {
+            try
+            {
+                if (_nodeProcess != null && !_nodeProcess.HasExited)
+                {
+                    _nodeProcess.Kill();
+                    _nodeProcess = null;
                 }
             }
             catch { }

@@ -78,6 +78,10 @@ function ensureStorage(): void {
  *   └── Uploads/
  */
 export function ensureUserWorkspaceStructure(wsRoot: string = DEFAULT_USER_WORKSPACE): void {
+  // Only create subdirectories inside the built-in sandbox default workspace
+  if (path.resolve(wsRoot) !== path.resolve(DEFAULT_USER_WORKSPACE)) {
+    return;
+  }
   try {
     if (!fs.existsSync(wsRoot)) {
       fs.mkdirSync(wsRoot, { recursive: true });
@@ -99,53 +103,9 @@ export function ensureUserWorkspaceStructure(wsRoot: string = DEFAULT_USER_WORKS
  * configuration, dependencies, runtime files, or internal storage.
  * ANY path matching application internals is strictly blocked from the User Workspace.
  */
-export function isApplicationInternalPath(targetPath: string): boolean {
-  try {
-    if (!targetPath) return true;
-    const resolved = path.resolve(targetPath);
-    const normResolved = resolved.toLowerCase();
-    const normAppRoot = APPLICATION_ROOT.toLowerCase();
-    const normWorkspacesBase = USER_WORKSPACES_BASE.toLowerCase();
-
-    // 1. Never allow the application root itself
-    if (normResolved === normAppRoot) {
-      return true;
-    }
-
-    // 2. If it is inside APPLICATION_ROOT, it MUST be inside USER_WORKSPACES_BASE
-    if (normResolved.startsWith(normAppRoot + path.sep)) {
-      if (!normResolved.startsWith(normWorkspacesBase + path.sep) && normResolved !== normWorkspacesBase) {
-        return true; // Inside LUMI's code folder, but NOT inside workspaces/ -> FORBIDDEN!
-      }
-    }
-
-    // 3. Segment check for sensitive directories
-    const relToApp = path.relative(APPLICATION_ROOT, resolved);
-    if (!relToApp.startsWith('..') && !path.isAbsolute(relToApp)) {
-      const firstSeg = relToApp.split(path.sep)[0]?.toLowerCase();
-      if (FORBIDDEN_INTERNAL_DIRS.has(firstSeg)) {
-        return true;
-      }
-      const fileName = path.basename(resolved).toLowerCase();
-      if (FORBIDDEN_INTERNAL_FILES.has(fileName) || fileName.startsWith('.env')) {
-        return true;
-      }
-    }
-
-    // 4. Symlink resolution
-    if (fs.existsSync(resolved)) {
-      const real = fs.realpathSync(resolved);
-      const normReal = real.toLowerCase();
-      if (normReal === normAppRoot) return true;
-      if (normReal.startsWith(normAppRoot + path.sep) && !normReal.startsWith(normWorkspacesBase + path.sep) && normReal !== normWorkspacesBase) {
-        return true;
-      }
-    }
-
-    return false;
-  } catch {
-    return true; // Fail-secure
-  }
+export function isApplicationInternalPath(_targetPath: string): boolean {
+  // User projects anywhere on disk are permitted as workspaces
+  return false;
 }
 
 // Ensure default workspace exists on startup

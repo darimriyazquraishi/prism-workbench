@@ -1,5 +1,5 @@
 import { t as __exportAll } from "./rolldown-runtime_D7D4PA-g.mjs";
-import { s as validatePathWithinWorkspace } from "./workspaceSecurity_aeVCuJR8.mjs";
+import { s as validatePathWithinWorkspace } from "./workspaceSecurity_CNHgb3cP.mjs";
 import path from "path";
 import fs from "fs";
 //#region src/pages/api/workspace/raw.ts

@@ -47,47 +47,27 @@ export const AntigravityStatusBar: React.FC = () => {
           <button 
             onClick={() => setServerHealthModalOpen(true)}
             title="Click for Server Health Metrics"
-            className="flex items-center gap-1.5 font-bold text-[var(--text-primary)] hover:opacity-80 transition-opacity cursor-pointer"
+            className="flex items-center gap-1.5 font-medium text-[var(--text-primary)] hover:opacity-80 transition-opacity cursor-pointer text-xs"
           >
             <span className={`w-1.5 h-1.5 rounded-full ${isServerOnline ? 'bg-[var(--accent-success)]' : 'bg-rose-500'}`}></span>
-            <span>{isServerOnline ? 'LOCAL OLLAMA' : 'OFFLINE'}</span>
+            <span>{isServerOnline ? 'Ready' : 'Offline'}</span>
           </button>
 
-          <div className="h-3 w-[1px] bg-[var(--border-subtle)]"></div>
-
-          <button 
-            onClick={() => setSecurityModalOpen(true)}
-            className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer bg-[var(--bg-base)] px-2 py-0.5 rounded border border-[var(--border-subtle)]"
-            title="Local System & Network Isolation Audit"
-          >
-            <ShieldCheck className="w-3 h-3" />
-            <span className="font-semibold text-[10px]">NETWORK: LOCAL ONLY (0.00 KB EGRESS)</span>
-          </button>
-
-          <div className="h-3 w-[1px] bg-[var(--border-subtle)]"></div>
-
-          <div className="flex items-center gap-1.5 text-[10px]">
-            {isExecuting ? (
-              <span className="flex items-center gap-1 text-[var(--accent-primary)] font-bold">
-                <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-ping"></span>
-                Agents Active...
-              </span>
-            ) : (
-              <span>Engine Ready ({selectedModel || 'No models selected'})</span>
-            )}
-          </div>
+          {isExecuting && (
+            <>
+              <div className="h-3 w-[1px] bg-[var(--border-subtle)]"></div>
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <span className="flex items-center gap-1 text-[var(--accent-primary)] font-bold">
+                  <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-ping"></span>
+                  Agents Active...
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Right: Sandbox info & Encoding */}
-        <div className="flex items-center gap-4 text-[10px]">
-          <button 
-            onClick={() => setNetworkModalOpen(true)}
-            className="flex items-center gap-1.5 cursor-pointer hover:text-[var(--text-primary)] transition-colors"
-            title="View Live Network Audit Logs"
-          >
-            <Terminal className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-            <span>SANDBOX: ISOLATED (--net=none)</span>
-          </button>
+        {/* Right: Encoding & Collapse */}
+        <div className="flex items-center gap-3 text-[10px]">
           <span className="hidden sm:inline">UTF-8</span>
           <button 
             onClick={() => setIsExpanded(false)}

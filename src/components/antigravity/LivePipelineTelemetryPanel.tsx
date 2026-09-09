@@ -32,10 +32,8 @@ export const LivePipelineTelemetryPanel: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-secondary)]">
-            <span>Network:</span>
-            <span className="text-[var(--accent-success)] font-bold flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" /> No egress (Local Only)
-            </span>
+            <span>Status:</span>
+            <span className="text-[var(--accent-success)] font-medium">Ready</span>
           </div>
         </div>
 

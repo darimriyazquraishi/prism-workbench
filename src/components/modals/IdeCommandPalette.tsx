@@ -222,19 +222,37 @@ export const IdeCommandPalette: React.FC<IdeCommandPaletteProps> = ({ isOpen, mo
   };
 
   const handlePickNativeFolder = async () => {
-    if ('showDirectoryPicker' in window) {
-      try {
+    setIsOpeningFolder(true);
+    setFolderError('');
+    try {
+      // 1. Try server-side native system dialog which returns full absolute path on Windows
+      const res = await fetch('/api/workspace/browse', { method: 'POST' }).then(r => r.json()).catch(() => null);
+      if (res && res.success && res.path) {
+        setCustomPath(res.path);
+        await handleOpenFolderSubmit(res.path);
+        return;
+      }
+      if (res && res.cancelled) {
+        setIsOpeningFolder(false);
+        return;
+      }
+
+      // 2. Fallback to browser directory picker if supported
+      if ('showDirectoryPicker' in window) {
         const dirHandle = await (window as any).showDirectoryPicker();
         const suggestedPath = dirHandle.name;
         setCustomPath(suggestedPath);
-        handleOpenFolderSubmit(suggestedPath);
-      } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          console.error(err);
-        }
+        await handleOpenFolderSubmit(suggestedPath);
+      } else {
+        alert('Please enter or paste the folder path into the field.');
       }
-    } else {
-      alert('Native directory picker is not supported in this browser. Please type the folder path below.');
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error(err);
+        setFolderError(err.message || 'Could not choose folder');
+      }
+    } finally {
+      setIsOpeningFolder(false);
     }
   };
 
@@ -361,28 +379,20 @@ export const IdeCommandPalette: React.FC<IdeCommandPaletteProps> = ({ isOpen, mo
           {mode === 'open-folder' && (
             <div className="p-2 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs text-[var(--text-secondary)] font-sans font-medium">Enter Local Folder Path:</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={customPath}
-                    onChange={e => setCustomPath(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleOpenFolderSubmit(customPath);
-                    }}
-                    placeholder="e.g. C:\Users\user\my-project or ./my-test-project"
-                    className="flex-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:border-[var(--text-primary)] focus:outline-none font-mono"
-                  />
-                  <button
-                    onClick={() => handleOpenFolderSubmit(customPath)}
-                    disabled={isOpeningFolder}
-                    className="px-4 py-2 bg-[var(--text-primary)] hover:opacity-90 disabled:opacity-30 text-[var(--bg-base)] text-xs font-semibold rounded-lg font-sans transition-all cursor-pointer shadow"
-                  >
-                    {isOpeningFolder ? 'Opening...' : 'Open'}
-                  </button>
-                </div>
+                <label className="text-xs text-[var(--text-secondary)] font-sans font-medium">Enter Local Folder Path (Press Enter to open):</label>
+                <input
+                  type="text"
+                  value={customPath}
+                  onChange={e => setCustomPath(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleOpenFolderSubmit(customPath);
+                  }}
+                  disabled={isOpeningFolder}
+                  placeholder="e.g. F:\corewithin or C:\Projects\my-project (Press Enter)"
+                  className="w-full bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:border-[var(--text-primary)] focus:outline-none font-mono"
+                />
                 {folderError && (
-                  <p className="text-xs text-[var(--text-primary)] underline font-sans mt-1">{folderError}</p>
+                  <p className="text-xs text-rose-400 font-sans mt-1">{folderError}</p>
                 )}
               </div>
 
@@ -390,7 +400,8 @@ export const IdeCommandPalette: React.FC<IdeCommandPaletteProps> = ({ isOpen, mo
               <div className="pt-1">
                 <button
                   onClick={handlePickNativeFolder}
-                  className="w-full py-2 bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-sans font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  disabled={isOpeningFolder}
+                  className="w-full py-2 bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-sans font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <FolderOpen className="w-4 h-4 text-[var(--text-primary)]" />
                   <span>Choose Folder via System Dialog</span>
@@ -436,7 +447,6 @@ export const IdeCommandPalette: React.FC<IdeCommandPaletteProps> = ({ isOpen, mo
             <span>Navigate <kbd className="px-1 py-0.5 bg-[var(--bg-elevated)] rounded border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-secondary)]">↑↓</kbd></span>
             <span>Select <kbd className="px-1 py-0.5 bg-[var(--bg-elevated)] rounded border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-secondary)]">↵</kbd></span>
           </div>
-          <span className="text-[var(--text-secondary)] font-mono text-[10px]">100% Local Filesystem</span>
         </div>
 
       </div>

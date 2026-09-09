@@ -3032,7 +3032,7 @@ ${workflowContext.visionFindings ? `EXTRACTED VISUAL CONTEXT FROM ATTACHED IMAGE
       addStepToActiveSession({
         id: finalStepId,
         type: 'response',
-        content: `### Task Execution Complete\n\n**Pipeline Status Checklist:**\n- ${uploadsText}\n- ${kbStatusChecklist}\n- ✓ Output Contract Validation: **PASSED (\`${finalArtifact.type.toUpperCase()}\`)**\n- ✓ Real Local Model Execution: **Zero simulation, actual Qwen reasoning completed**\n- ✓ 100% Air-Gapped: **Zero external network egress confirmed**\n\n**Generated Deliverable:**\n- **File:** \`${finalArtifact.name}\` (${(finalArtifact.sizeBytes / 1024).toFixed(1)} KB)\n- **Format:** \`${finalArtifact.type.toUpperCase()}\`\n- **Description:** ${finalArtifact.description}\n\n*Click the **Download Deliverable** button in the workspace or the preview pane to save your file directly.*`,
+        content: `### Task Execution Complete\n\n**Pipeline Status Checklist:**\n- ${uploadsText}\n- ${kbStatusChecklist}\n- ✓ Output Contract Validation: **PASSED (\`${finalArtifact.type.toUpperCase()}\`)**\n- ✓ Model Execution: **Reasoning process complete**\n\n**Generated Deliverable:**\n- **File:** \`${finalArtifact.name}\` (${(finalArtifact.sizeBytes / 1024).toFixed(1)} KB)\n- **Format:** \`${finalArtifact.type.toUpperCase()}\`\n- **Description:** ${finalArtifact.description}\n\n*Click the **Download Deliverable** button in the workspace or the preview pane to save your file directly.*`,
         timestamp: now(),
         citations: kbGuidance.length > 0
           ? kbGuidance.map(g => ({ source: g.title, snippet: g.snippet }))

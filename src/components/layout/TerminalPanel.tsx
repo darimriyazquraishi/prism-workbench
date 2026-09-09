@@ -107,7 +107,7 @@ export const TerminalPanel: React.FC = () => {
       );
     } else if (lower === 'status') {
       newLines.push(
-        { text: 'System Status: 100% OPERATIONAL', color: '#4ec9b0' },
+        { text: 'System Status: OPERATIONAL', color: '#4ec9b0' },
         { text: '  Frontend : Astro v5.2.10 (http://localhost:4321)', color: '#cccccc' },
         { text: '  Backend  : FastAPI v0.115 (http://localhost:8000)', color: '#cccccc' },
         { text: '  Engine   : llama.cpp with CUDA 12 GPU acceleration', color: '#cccccc' }
@@ -445,7 +445,7 @@ export const TerminalPanel: React.FC = () => {
             <div>[server] embedding engine: Qwen3-Embedding-0.6B (Safetensors)</div>
             <div>[server] reranker engine: Qwen3-Reranker-0.6B (Safetensors)</div>
             <div>[cuda] 1 physical GPU device initialized: NVIDIA RTX (VRAM Allocated: 22.8 GB / 24.0 GB)</div>
-            <div className="text-[#4ec9b0]">All inference is strictly on-premise. Zero external network egress.</div>
+            <div className="text-[#4ec9b0]">Inference Engine Initialized.</div>
           </div>
         )}
 

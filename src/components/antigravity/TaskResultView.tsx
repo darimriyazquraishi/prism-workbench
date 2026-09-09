@@ -522,7 +522,7 @@ export const TaskResultView: React.FC<TaskResultViewProps> = ({ step, proposedPl
               <Lock className="w-3.5 h-3.5 text-emerald-400" />
               <span>Sovereignty &amp; Security Status</span>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
-                100% Air-Gapped
+                Sovereign
               </span>
             </div>
             {isSovereigntyOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}

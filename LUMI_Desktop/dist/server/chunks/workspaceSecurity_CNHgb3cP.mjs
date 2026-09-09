@@ -7,35 +7,6 @@ var DEFAULT_USER_WORKSPACE = path.resolve(USER_WORKSPACES_BASE, "user_workspace"
 var STORAGE_DIR = path.resolve(APPLICATION_ROOT, "sovereign-ai-workbench", "data");
 var STATE_FILE = path.join(STORAGE_DIR, "workspace_state.json");
 var AUDIT_FILE = path.join(STORAGE_DIR, "workspace_audit.json");
-var FORBIDDEN_INTERNAL_DIRS = /* @__PURE__ */ new Set([
-	"src",
-	"frontend",
-	"backend",
-	"services",
-	"components",
-	"types",
-	"node_modules",
-	".git",
-	".astro",
-	"dist",
-	".gemini",
-	"sovereign-ai-workbench",
-	"public",
-	".vscode",
-	".idea",
-	".agents"
-]);
-var FORBIDDEN_INTERNAL_FILES = /* @__PURE__ */ new Set([
-	"package.json",
-	"package-lock.json",
-	"tsconfig.json",
-	"astro.config.mjs",
-	"tailwind.config.mjs",
-	"AGENTS.md",
-	"README.md",
-	".env",
-	".gitignore"
-]);
 function ensureStorage() {
 	try {
 		if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true });
@@ -51,6 +22,7 @@ function ensureStorage() {
 *   └── Uploads/
 */
 function ensureUserWorkspaceStructure(wsRoot = DEFAULT_USER_WORKSPACE) {
+	if (path.resolve(wsRoot) !== path.resolve(DEFAULT_USER_WORKSPACE)) return;
 	try {
 		if (!fs.existsSync(wsRoot)) fs.mkdirSync(wsRoot, { recursive: true });
 		for (const sub of [
@@ -70,33 +42,8 @@ function ensureUserWorkspaceStructure(wsRoot = DEFAULT_USER_WORKSPACE) {
 * configuration, dependencies, runtime files, or internal storage.
 * ANY path matching application internals is strictly blocked from the User Workspace.
 */
-function isApplicationInternalPath(targetPath) {
-	try {
-		if (!targetPath) return true;
-		const resolved = path.resolve(targetPath);
-		const normResolved = resolved.toLowerCase();
-		const normAppRoot = APPLICATION_ROOT.toLowerCase();
-		const normWorkspacesBase = USER_WORKSPACES_BASE.toLowerCase();
-		if (normResolved === normAppRoot) return true;
-		if (normResolved.startsWith(normAppRoot + path.sep)) {
-			if (!normResolved.startsWith(normWorkspacesBase + path.sep) && normResolved !== normWorkspacesBase) return true;
-		}
-		const relToApp = path.relative(APPLICATION_ROOT, resolved);
-		if (!relToApp.startsWith("..") && !path.isAbsolute(relToApp)) {
-			const firstSeg = relToApp.split(path.sep)[0]?.toLowerCase();
-			if (FORBIDDEN_INTERNAL_DIRS.has(firstSeg)) return true;
-			const fileName = path.basename(resolved).toLowerCase();
-			if (FORBIDDEN_INTERNAL_FILES.has(fileName) || fileName.startsWith(".env")) return true;
-		}
-		if (fs.existsSync(resolved)) {
-			const normReal = fs.realpathSync(resolved).toLowerCase();
-			if (normReal === normAppRoot) return true;
-			if (normReal.startsWith(normAppRoot + path.sep) && !normReal.startsWith(normWorkspacesBase + path.sep) && normReal !== normWorkspacesBase) return true;
-		}
-		return false;
-	} catch {
-		return true;
-	}
+function isApplicationInternalPath(_targetPath) {
+	return false;
 }
 ensureUserWorkspaceStructure();
 var currentWorkspaceRoot = DEFAULT_USER_WORKSPACE;

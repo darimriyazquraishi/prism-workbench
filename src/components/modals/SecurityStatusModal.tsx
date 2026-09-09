@@ -100,7 +100,7 @@ export const SecurityStatusModal: React.FC = () => {
         <div className="p-2.5 border-t border-[#2d2d2d] bg-[var(--bg-primary)] flex items-center justify-between text-xs font-mono">
           <span className="text-[var(--status-healthy)] font-semibold flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            Security Status: 100% SOVEREIGN
+            Security Status: Active
           </span>
           <button
             onClick={() => setSecurityModalOpen(false)}

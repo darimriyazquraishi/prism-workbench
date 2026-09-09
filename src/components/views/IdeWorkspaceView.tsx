@@ -810,14 +810,6 @@ export const IdeWorkspaceView: React.FC = () => {
             )}
           </div>
 
-          {/* Explorer Bottom Info */}
-          <div className="p-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-tertiary)] flex items-center justify-between bg-[var(--bg-base)]">
-            <span>Air-Gapped Jail</span>
-            <span className="text-[var(--text-secondary)] flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" /> Verified
-            </span>
-          </div>
-
         </div>
 
         {/* PANE 2: CENTER CODE EDITOR & DIFF VIEWER */}
@@ -1176,7 +1168,6 @@ export const IdeWorkspaceView: React.FC = () => {
             </div>
             <div className="text-[10px] text-[var(--text-tertiary)] font-mono mt-1 flex justify-between">
               <span>Press Enter to send</span>
-              <span>100% Local Inference</span>
             </div>
           </div>
 
@@ -1213,11 +1204,6 @@ export const IdeWorkspaceView: React.FC = () => {
           <span>UTF-8</span>
           <span>•</span>
           <span className="text-[var(--text-secondary)]">Mode: {permissionMode.toUpperCase()}</span>
-          <span>•</span>
-          <span className="text-[var(--text-secondary)] flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-primary)] animate-ping"></span>
-            Air-Gapped Real FS
-          </span>
         </div>
       </div>
 

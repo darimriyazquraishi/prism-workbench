@@ -57,7 +57,7 @@ export const WorkbenchVerificationSidebar: React.FC = () => {
           className="fixed top-14 right-4 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-surface)]/90 backdrop-blur border border-[var(--border-subtle)] text-xs font-mono shadow-xl hover:border-blue-500/40 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer group"
         >
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[11px] font-semibold text-emerald-400">Verified Air-Gapped</span>
+          <span className="text-[11px] font-semibold text-emerald-400">Engine Status</span>
           <ChevronLeft className="w-3.5 h-3.5 text-[var(--text-secondary)] group-hover:translate-x-[-2px] transition-transform" />
         </button>
       ) : (
@@ -96,7 +96,7 @@ export const WorkbenchVerificationSidebar: React.FC = () => {
             {/* Air-Gap Guarantee */}
             <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-              <span>100% Local Inference (Zero External Egress)</span>
+              <span>Local Inference Active</span>
             </div>
 
             {/* Service 1: General LLM */}

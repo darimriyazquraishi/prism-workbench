@@ -308,19 +308,15 @@ export const LumiLauncher: React.FC = () => {
                     </div>
                   ) : (
                     selectableModels.map((m) => {
-                      const isActive = activeGgufModel === m.name || activeGgufModel.includes(m.name);
-                      const isLoading = loadingModelPath === m.path;
                       const is14BGeneral = m.name.toLowerCase().includes('14b');
 
                       return (
                         <div
                           key={m.path || m.name}
-                          className={`px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors ${
-                            isActive ? 'bg-neutral-900/90' : 'hover:bg-neutral-900/40'
-                          }`}
+                          className="px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors hover:bg-neutral-900/40"
                         >
                           <div className="flex items-center gap-2.5 min-w-0 pr-3">
-                            <HardDrive className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-cyan-400' : 'text-neutral-500'}`} />
+                            <HardDrive className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
                             <div className="truncate">
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-neutral-200 truncate">{m.name}</span>
@@ -335,27 +331,6 @@ export const LumiLauncher: React.FC = () => {
                               </span>
                             </div>
                           </div>
-
-                          <button
-                            onClick={() => handleSelectModel(m.path, m.name)}
-                            disabled={isLoading}
-                            className={`shrink-0 px-3 py-1 rounded text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                              isActive
-                                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700'
-                            }`}
-                          >
-                            {isLoading ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : isActive ? (
-                              <>
-                                <Check className="w-3 h-3" />
-                                <span>Active</span>
-                              </>
-                            ) : (
-                              <span>Load Model</span>
-                            )}
-                          </button>
                         </div>
                       );
                     })
