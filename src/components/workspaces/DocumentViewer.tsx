@@ -17,7 +17,8 @@ import {
   ExternalLink,
   ChevronRight,
   Shield,
-  Download
+  Download,
+  RefreshCw
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 
@@ -31,6 +32,7 @@ export interface DocumentViewerFile {
   isBinary?: boolean;
   mimeType?: string;
   sha256?: string;
+  version?: number;
 }
 
 export interface DocumentViewerProps {
@@ -53,6 +55,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [viewMode, setViewMode] = useState<'preview' | 'text' | 'table'>('preview');
+  const [pdfVersion, setPdfVersion] = useState<number>(() => Date.now());
+
+  // Automatically update PDF version when file path, size, content, or version prop changes
+  useEffect(() => {
+    setPdfVersion(Date.now());
+  }, [file.path, file.size, file.content, file.version, file.extractedText]);
 
   const ext = (file.extension || file.name.split('.').pop() || '').toLowerCase();
   const rawUrl = `/api/workspace/raw?path=${encodeURIComponent(file.path)}`;
@@ -308,7 +316,15 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 <span className="text-[11px] font-mono text-[var(--text-secondary)]">PDF Reader Active</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-primary)]" />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setPdfVersion(Date.now())}
+                  className="flex items-center gap-1 text-[11px] font-mono hover:text-[var(--text-primary)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
+                  title="Reload PDF document from disk"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Reload</span>
+                </button>
                 <a
                   href={rawUrl}
                   target="_blank"
@@ -325,7 +341,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             {/* Embed Native Browser PDF Plugin */}
             <div className="flex-1 w-full h-full relative">
               <iframe
-                src={`${rawUrl}#toolbar=1&navpanes=0`}
+                key={`${file.path}-${pdfVersion}`}
+                src={`${rawUrl}&_v=${pdfVersion}#toolbar=1&navpanes=0`}
                 className="w-full h-full border-none bg-[var(--bg-base)]"
                 title={file.name}
               />

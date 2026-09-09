@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { resolveModelForCapability } from '../services/modelCapabilityRouter';
-import { callLocalLlm } from '../services/localLlmService';
+import { callLocalLlm, cleanAndParseJson } from '../services/localLlmService';
 
 export interface WorkspaceNode {
   name: string;
@@ -23,6 +23,7 @@ export interface WorkspaceTabItem {
   size?: number;
   isBinary?: boolean;
   extractedText?: string;
+  version?: number;
 }
 
 export interface WorkspaceGitStatus {
@@ -50,6 +51,13 @@ export interface AiChatMessage {
     action: 'modify' | 'create' | 'delete';
     originalContent?: string;
     newContent?: string;
+  };
+  actionBadge?: {
+    label: string;
+    language?: string;
+    code?: string;
+    output?: string;
+    status?: 'success' | 'failed' | 'completed';
   };
 }
 
@@ -225,16 +233,33 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openFileInTab: async (filePath: string) => {
     const { openTabs } = get();
     const existing = openTabs.find(t => t.path === filePath);
-    if (existing) {
-      set({ activeTabId: existing.id });
-      return;
-    }
 
     try {
-      const res = await fetch(`/api/workspace/file?path=${encodeURIComponent(filePath)}`);
+      const res = await fetch(`/api/workspace/file?path=${encodeURIComponent(filePath)}&_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.file) {
+          if (existing) {
+            set(state => ({
+              openTabs: state.openTabs.map(t =>
+                t.path === filePath
+                  ? {
+                      ...t,
+                      name: data.file.name,
+                      extension: data.file.extension,
+                      content: data.file.content ?? '',
+                      savedContent: data.file.content ?? '',
+                      size: data.file.size || Date.now(),
+                      extractedText: data.file.extractedText ?? (data.file.content || ''),
+                      version: Date.now()
+                    }
+                  : t
+              ),
+              activeTabId: existing.id
+            }));
+            return;
+          }
+
           const newTab: WorkspaceTabItem = {
             id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name: data.file.name,
@@ -243,9 +268,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             content: data.file.content ?? '',
             savedContent: data.file.content ?? '',
             isDirty: false,
-            size: data.file.size,
+            size: data.file.size || Date.now(),
             isBinary: data.file.isBinary,
-            extractedText: data.file.extractedText ?? (data.file.content || '')
+            extractedText: data.file.extractedText ?? (data.file.content || ''),
+            version: Date.now()
           };
           set(state => ({
             openTabs: [...state.openTabs, newTab],
@@ -701,18 +727,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         : `General Reasoning Agent (${modelDesc.name})`;
 
       const systemPrompt = isCodingTask
-        ? `You are LUMI's Autonomous Workspace Coding Agent. You inspect existing workspace files, create directories, and write robust code.
+        ? `You are LUMI's Autonomous Workspace Assistant & Coding Agent. You inspect workspace files, create directories, and write robust code.
 Workstation Runtime Environment:
 - OS: Windows
-- Python 3.14 with reportlab, os, sys pre-installed.
-- Node.js runtime available.
+- Python 3.14 with reportlab, os, sys pre-installed
+- Node.js runtime available
 
-STRICT RULES FOR CODE GENERATION:
-1. When asked to edit, modify, or add text/content to an existing PDF or file, provide the complete, updated runnable Python script (using reportlab) that regenerates or updates the file with ALL required contents (both the original text and newly requested text).
-2. NEVER output installation commands like 'pip install' or 'npm install'. All necessary libraries are pre-installed.
-3. Provide ONLY ONE executable code block containing the complete, self-contained, working script.
-4. When writing multiple text strings on a canvas, use appropriate Y coordinates so lines do not collide (e.g. y=750 for line 1, y=720 for line 2).
-5. Never output infinite loops or duplicate lines. Keep explanations brief after the code block.`
+CRITICAL: You MUST respond strictly with a valid JSON object conforming to this schema:
+{
+  "action": "Editing PDF",
+  "summary": "Updated sanGAYan.pdf with the requested text.",
+  "code": "complete runnable Python or JavaScript script",
+  "language": "python"
+}
+
+STRICT RULES:
+1. "action": Concise 2-4 word task title (e.g. "Editing PDF", "Creating Script", "Updating Document").
+2. "summary": Clean, smart 1-2 sentence human explanation of what was done. NEVER put code, markdown fences, or installation commands in the summary.
+3. "code": Complete, standalone runnable script that performs the file operation or edit. When editing a PDF, write both the original text and the new text using non-overlapping Y coordinates.
+4. "language": "python" or "javascript".
+5. Do NOT output any markdown prose outside the JSON.`
         : `You are LUMI's General Reasoning Agent. You analyze project architecture, explain code, debug logic, and plan structural changes across workspace files. Provide insightful, rigorously verified reasoning.`;
 
       let agentUserPrompt = `[Workspace: ${get().workspaceName}]\n[Root: ${get().workspaceRoot}]\n`;
@@ -729,24 +763,35 @@ STRICT RULES FOR CODE GENERATION:
         agentUserPrompt += `\n[Conversation History]:\n`;
         for (const msg of recentHistory) {
           const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
-          const snippet = msg.content.length > 1500 ? msg.content.slice(0, 1500) + '...' : msg.content;
+          // Sanitize past messages of repetitive role tags or enormous blobs
+          const cleanHistory = msg.content
+            .replace(/"?Coding Agent \([^)]+\)"?/gi, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+          const snippet = cleanHistory.length > 1500 ? cleanHistory.slice(0, 1500) + '...' : cleanHistory;
           agentUserPrompt += `${roleLabel}:\n${snippet}\n\n`;
         }
       }
 
       agentUserPrompt += `[User Request]: ${trimmed}`;
 
-      // 4. Query the Local LLM (Ollama / GPU)
+      // 4. Query the Local LLM (Ollama / GPU) with formatJson constraint
       const llmResult = await callLocalLlm({
         model: modelDesc.tag,
         systemPrompt,
         userPrompt: agentUserPrompt,
+        formatJson: isCodingTask,
         temperature: isCodingTask ? 0.1 : 0.2
       });
 
       const responseText = llmResult.content || 'I completed the task analysis.';
 
       // 5. Code modification & Action Execution handling
+      let parsedJson: { action?: string; summary?: string; code?: string; language?: string } | null = null;
+      try {
+        parsedJson = cleanAndParseJson<typeof parsedJson>(responseText);
+      } catch {}
+
       // Extract all code blocks
       const codeBlocks: { lang: string; code: string }[] = [];
       const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/g;
@@ -771,18 +816,19 @@ STRICT RULES FOR CODE GENERATION:
                             codeBlocks[0] ||
                             null;
 
-      const generatedCode = selectedBlock ? selectedBlock.code : null;
+      const generatedCode = parsedJson?.code?.trim() || selectedBlock?.code || null;
+      const scriptLang = (parsedJson?.language || selectedBlock?.lang || 'python').toLowerCase();
 
       let proposedDiff: { path: string; action: 'modify' | 'create' | 'delete'; originalContent?: string; newContent?: string } | null = null;
       let executedScriptSuccess = false;
       let scriptOutput = '';
 
       if (isCodingTask && generatedCode) {
-        const isPythonScript = (selectedBlock?.lang === 'python' || selectedBlock?.lang === 'py') ||
+        const isPythonScript = scriptLang === 'python' || scriptLang === 'py' ||
                                /(?:import\s+[a-zA-Z0-9_.]+|from\s+[a-zA-Z0-9_.]+\s+import)/.test(generatedCode) ||
                                /(?:def\s+[a-zA-Z0-9_]+\s*\(|if\s+__name__\s*==)/.test(generatedCode);
         const isNodeScript = !isPythonScript && (
-          ['javascript', 'js', 'typescript', 'ts'].includes(selectedBlock?.lang || '') ||
+          ['javascript', 'js', 'typescript', 'ts'].includes(scriptLang) ||
           /(?:const\s+.*=\s*require\(|import\s+.*from\s+['"])/.test(generatedCode)
         );
         const isActionExecutionTask = /pdf|image|chart|plot|run|execute|script|generate|make|render|add\s+text|in\s+the\s+same|the\s+same\s+pdf|append|edit|modify/i.test(trimmed) ||
@@ -837,7 +883,7 @@ STRICT RULES FOR CODE GENERATION:
 
             executedToolCalls.push({
               tool: 'execute_script',
-              args: { runtime: isNodeScript ? 'node' : 'python' },
+              args: { runtime: isNodeScript ? 'node' : 'python', target: candidatePath || 'workspace' },
               status: executedScriptSuccess ? 'success' : 'failed',
               output: scriptOutput || execData.stderr || execData.error
             });
@@ -882,14 +928,63 @@ STRICT RULES FOR CODE GENERATION:
         }
       }
 
-      // 6. Append assistant message to chat
-      let finalContent = `**${agentRoleName}**\n\n${responseText}`;
-      if (executedScriptSuccess) {
-        finalContent += `\n\n---\n✓ **Action Completed:** Executed Python script in workspace. Created required files and directories.${scriptOutput ? ` Output: \`${scriptOutput}\`` : ''}`;
-      } else if (proposedDiff) {
-        finalContent += `\n\n---\n⚡ **Diff proposal ready:** Generated ${proposedDiff.action} for \`${proposedDiff.path}\`. Review diff in editor and click **Accept Changes** to save to disk.`;
-      } else if (get().permissionMode === 'autonomous' && candidatePath && generatedCode) {
-        finalContent += `\n\n---\n✓ **Auto-applied change:** Written to \`${candidatePath}\` on physical disk in autonomous mode.`;
+      // 6. Action title & smart human summary
+      let actionTitle = parsedJson?.action || '';
+      if (!actionTitle) {
+        if (candidatePath && /\.pdf$/i.test(candidatePath)) {
+          actionTitle = /(?:create|make|new)\b/i.test(trimmed) ? 'Creating PDF' : 'Editing PDF';
+        } else if (candidatePath) {
+          const base = candidatePath.split('/').pop() || candidatePath;
+          actionTitle = /(?:create|make|new)\b/i.test(trimmed) ? `Creating ${base}` : `Editing ${base}`;
+        } else if (folderMatch) {
+          actionTitle = `Creating Directory ${folderMatch[1]}`;
+        } else {
+          actionTitle = (isCodingTask && generatedCode) ? 'Executing Script' : 'Workspace Action';
+        }
+      }
+
+      let humanSummary = parsedJson?.summary?.trim() || '';
+      if (!humanSummary) {
+        humanSummary = responseText
+          .replace(/```(?:[a-zA-Z0-9_\-]+)?\n[\s\S]*?```/g, '')
+          .replace(/\{[\s\S]*?"code"[\s\S]*?\}/g, '')
+          .replace(/\*\*Coding Agent[^\n]*\*\*/gi, '')
+          .replace(/"?Coding Agent[^"\n]*"?/gi, '')
+          .replace(/### Explanation:?/gi, '')
+          .replace(/---/g, '')
+          .trim();
+      }
+
+      // Clean summary of any leftover markdown code blocks or role prefixes
+      humanSummary = humanSummary
+        .replace(/```[a-zA-Z0-9_\-]*\n[\s\S]*?```/g, '')
+        .replace(/"?Coding Agent \([^)]+\)"?/gi, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+      if (!humanSummary || humanSummary.length < 8) {
+        if (candidatePath) {
+          humanSummary = executedScriptSuccess
+            ? `Successfully updated \`${candidatePath}\`.`
+            : `Completed workspace modifications for \`${candidatePath}\`.`;
+        } else {
+          humanSummary = 'Completed the requested workspace task.';
+        }
+      }
+
+      const actionBadge = (generatedCode || executedScriptSuccess) ? {
+        label: actionTitle,
+        language: scriptLang,
+        code: generatedCode || undefined,
+        output: scriptOutput || undefined,
+        status: (executedScriptSuccess ? 'success' : 'completed') as 'success' | 'completed'
+      } : undefined;
+
+      let finalContent = humanSummary;
+      if (proposedDiff) {
+        finalContent += `\n\n⚡ **Diff proposal ready:** Generated ${proposedDiff.action} for \`${proposedDiff.path}\`. Review diff in editor and click **Accept Changes** to save to disk.`;
+      } else if (get().permissionMode === 'autonomous' && candidatePath && !executedScriptSuccess && generatedCode) {
+        finalContent += `\n\n✓ **Auto-applied change:** Written to \`${candidatePath}\` on physical disk.`;
       }
 
       set(state => ({
@@ -902,7 +997,8 @@ STRICT RULES FOR CODE GENERATION:
             content: finalContent,
             timestamp: new Date().toLocaleTimeString(),
             toolCalls: executedToolCalls.length > 0 ? executedToolCalls : undefined,
-            diffProposal: proposedDiff || undefined
+            diffProposal: proposedDiff || undefined,
+            actionBadge
           }
         ]
       }));
