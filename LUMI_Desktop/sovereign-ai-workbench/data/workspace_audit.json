@@ -1,5 +1,229 @@
 [
   {
+    "id": "audit-1788979706935-5whe",
+    "timestamp": "2026-09-09T18:48:26.935Z",
+    "action": "DELETE",
+    "path": "F:/corewithin/_task_exec_1788979691905.py",
+    "status": "allowed",
+    "details": "Deleted file"
+  },
+  {
+    "id": "audit-1788979691916-hj16",
+    "timestamp": "2026-09-09T18:48:11.916Z",
+    "action": "COMMAND",
+    "path": "python _task_exec_1788979691905.py",
+    "status": "allowed",
+    "details": "Executed in user workspace"
+  },
+  {
+    "id": "audit-1788979691911-x0j7",
+    "timestamp": "2026-09-09T18:48:11.911Z",
+    "action": "CREATE",
+    "path": "F:/corewithin/_task_exec_1788979691905.py",
+    "status": "allowed",
+    "details": "Created file _task_exec_1788979691905.py"
+  },
+  {
+    "id": "audit-1788975925522-9fqt",
+    "timestamp": "2026-09-09T17:45:25.522Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975873844.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975913109-x84q",
+    "timestamp": "2026-09-09T17:45:13.109Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975873844.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975323448-djgd",
+    "timestamp": "2026-09-09T17:35:23.448Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975307102.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975323103-hgg7",
+    "timestamp": "2026-09-09T17:35:23.103Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975307102.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975322090-w4k5",
+    "timestamp": "2026-09-09T17:35:22.090Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975307102.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975317029-gmt4",
+    "timestamp": "2026-09-09T17:35:17.029Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975307102.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975256419-m2uu",
+    "timestamp": "2026-09-09T17:34:16.419Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975239831.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975256233-pm9k",
+    "timestamp": "2026-09-09T17:34:16.233Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975239831.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975255964-24jz",
+    "timestamp": "2026-09-09T17:34:15.964Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975239831.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788975253502-ifhy",
+    "timestamp": "2026-09-09T17:34:13.502Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788975239831.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967701375-1igq",
+    "timestamp": "2026-09-09T15:28:21.375Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967701173-uaw8",
+    "timestamp": "2026-09-09T15:28:21.173Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967700923-1kqc",
+    "timestamp": "2026-09-09T15:28:20.923Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967699605-tvhe",
+    "timestamp": "2026-09-09T15:28:19.605Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967697169-685o",
+    "timestamp": "2026-09-09T15:28:17.169Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967697001-peok",
+    "timestamp": "2026-09-09T15:28:17.001Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967696878-a6hu",
+    "timestamp": "2026-09-09T15:28:16.878Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967696329-e6kx",
+    "timestamp": "2026-09-09T15:28:16.329Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967693551-ys8p",
+    "timestamp": "2026-09-09T15:28:13.551Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_sdxl-lightning_1788967643855.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967683581-jev2",
+    "timestamp": "2026-09-09T15:28:03.581Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_flux1-schnell_1788967634347.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967637423-mvyz",
+    "timestamp": "2026-09-09T15:27:17.423Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_flux1-schnell_1788967634347.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967636873-l2e9",
+    "timestamp": "2026-09-09T15:27:16.873Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_flux1-schnell_1788967634347.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967634453-bnab",
+    "timestamp": "2026-09-09T15:27:14.453Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_flux1-schnell_1788967634347.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967613102-1awh",
+    "timestamp": "2026-09-09T15:26:53.102Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_flux1-schnell_1788967604341.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
+    "id": "audit-1788967608185-3hxi",
+    "timestamp": "2026-09-09T15:26:48.185Z",
+    "action": "READ",
+    "path": "F:/corewithin/workspace/generated_images/img_flux1-schnell_1788967604341.png",
+    "status": "error",
+    "details": "File not found"
+  },
+  {
     "id": "audit-1788965439008-9tga",
     "timestamp": "2026-09-09T14:50:39.008Z",
     "action": "DELETE",

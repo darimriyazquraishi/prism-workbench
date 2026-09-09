@@ -43,6 +43,44 @@ var GET = async ({ url }) => {
 			status: 400,
 			headers: { "Content-Type": "application/json" }
 		});
+		const norm = target.replace(/\\/g, "/").replace(/^\/+/, "");
+		const filename = path.basename(norm);
+		if (norm.includes("generated_images/")) {
+			const cwd = process.cwd();
+			const candPaths = [
+				path.resolve(cwd, norm),
+				path.resolve(cwd, "workspace", "generated_images", filename),
+				path.resolve(cwd, "LUMI_Desktop", norm),
+				path.resolve(cwd, "LUMI_Desktop", "workspace", "generated_images", filename),
+				path.resolve(path.dirname(cwd), norm),
+				path.resolve(path.dirname(cwd), "workspace", "generated_images", filename),
+				path.resolve(path.dirname(cwd), "LUMI_Desktop", norm),
+				path.resolve(path.dirname(cwd), "LUMI_Desktop", "workspace", "generated_images", filename)
+			];
+			for (const cand of candPaths) if (fs.existsSync(cand) && !fs.statSync(cand).isDirectory()) {
+				const stat = fs.statSync(cand);
+				const ext = path.extname(cand).toLowerCase().replace(".", "");
+				return new Response(JSON.stringify({
+					success: true,
+					content: null,
+					extractedText: null,
+					file: {
+						name: filename,
+						path: norm,
+						fullPath: cand.replace(/\\/g, "/"),
+						size: stat.size,
+						extension: ext,
+						isBinary: true,
+						content: null,
+						extractedText: null,
+						modifiedAt: stat.mtime.toISOString()
+					}
+				}), {
+					status: 200,
+					headers: { "Content-Type": "application/json" }
+				});
+			}
+		}
 		const validation = validatePathWithinWorkspace(target);
 		if (!validation.valid || !validation.resolvedPath) return new Response(JSON.stringify({
 			success: false,

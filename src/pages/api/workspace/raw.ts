@@ -28,7 +28,42 @@ export const GET: APIRoute = async ({ url }) => {
     return new Response('Path required', { status: 400 });
   }
 
-  // 1. Strict Server-Side Workspace Security Boundary Enforcement
+  // 1. Direct support for LUMI-generated images across workspace locations
+  const normPath = targetPath.replace(/\\/g, '/').replace(/^\/+/, '');
+  const filename = path.basename(normPath);
+  if (normPath.includes('generated_images/') || normPath.includes('workspace/')) {
+    const cwd = process.cwd();
+    const candPaths = [
+      path.resolve(cwd, normPath),
+      path.resolve(cwd, 'workspace', 'generated_images', filename),
+      path.resolve(cwd, 'LUMI_Desktop', normPath),
+      path.resolve(cwd, 'LUMI_Desktop', 'workspace', 'generated_images', filename),
+      path.resolve(path.dirname(cwd), normPath),
+      path.resolve(path.dirname(cwd), 'workspace', 'generated_images', filename),
+      path.resolve(path.dirname(cwd), 'LUMI_Desktop', normPath),
+      path.resolve(path.dirname(cwd), 'LUMI_Desktop', 'workspace', 'generated_images', filename),
+      path.resolve(cwd, 'workspaces', 'user_workspace', normPath),
+      path.resolve(path.dirname(cwd), 'workspaces', 'user_workspace', normPath)
+    ];
+    for (const cand of candPaths) {
+      if (fs.existsSync(cand) && !fs.statSync(cand).isDirectory()) {
+        const ext = path.extname(cand).toLowerCase().replace('.', '');
+        const contentType = MIME_MAP[ext] || 'image/png';
+        const fileBuffer = fs.readFileSync(cand);
+        return new Response(fileBuffer, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Content-Disposition': `inline; filename="${path.basename(cand)}"`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'X-Content-Type-Options': 'nosniff'
+          }
+        });
+      }
+    }
+  }
+
+  // 2. Strict Server-Side Workspace Security Boundary Enforcement
   const validation = validatePathWithinWorkspace(targetPath);
   if (!validation.valid || !validation.resolvedPath) {
     return new Response(validation.error || 'Access denied: requested resource is outside the user workspace.', {

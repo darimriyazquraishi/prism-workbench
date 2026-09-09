@@ -40,7 +40,12 @@ import {
   Sliders,
   ChevronUp,
   Upload,
-  ArrowLeft
+  ArrowLeft,
+  History,
+  MessageSquare,
+  Square,
+  Pencil,
+  RotateCcw
 } from 'lucide-react';
 import { useWorkspaceStore, type WorkspaceNode } from '../../store/useWorkspaceStore';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
@@ -64,6 +69,8 @@ export const IdeWorkspaceView: React.FC = () => {
     terminalHistory,
     isExecutingCommand,
     permissionMode,
+    chatSessions,
+    activeChatSessionId,
     aiMessages,
     isAiGenerating,
     activeDiffProposal,
@@ -89,15 +96,53 @@ export const IdeWorkspaceView: React.FC = () => {
     setSelectedImageModel,
     generateWorkspaceImage,
     sendWorkspaceAiPrompt,
+    stopAiGeneration,
+    editUserMessageAndRegenerate,
+    regenerateAiResponse,
     approveDiffProposal,
-    rejectDiffProposal
+    rejectDiffProposal,
+    createNewChatSession,
+    selectChatSession,
+    deleteChatSession
   } = useWorkspaceStore();
+
+  const [isChatHistoryOpen, setIsChatHistoryOpen] = useState(false);
+  const activeChatSession = chatSessions.find(s => s.id === activeChatSessionId);
 
   // Local state for UI
   const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'changes'>('files');
   const [searchFilter, setSearchFilter] = useState('');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [paletteMode, setPaletteMode] = useState<'files' | 'commands' | 'open-folder'>('files');
+
+  // Edit message & action states
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState('');
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  const handleCopyMessage = (msgId: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMessageId(msgId);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
+
+  const handleStartEditing = (msgId: string, currentContent: string) => {
+    setEditingMessageId(msgId);
+    setEditingMessageText(currentContent);
+  };
+
+  const handleCancelEditing = () => {
+    setEditingMessageId(null);
+    setEditingMessageText('');
+  };
+
+  const handleSaveAndRegenerate = async (msgId: string) => {
+    if (!editingMessageText.trim()) return;
+    const textToSubmit = editingMessageText.trim();
+    setEditingMessageId(null);
+    setEditingMessageText('');
+    await editUserMessageAndRegenerate(msgId, textToSubmit);
+  };
   
   // Modals & prompts
   const [newPromptModal, setNewPromptModal] = useState<{ isOpen: boolean; type: 'file' | 'folder' | 'rename' | 'delete'; targetPath: string; defaultVal: string }>({
@@ -1121,16 +1166,112 @@ export const IdeWorkspaceView: React.FC = () => {
         >
           
           {/* AI Panel Header */}
-          <div className="p-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[var(--text-primary)]" />
-              <span className="text-xs font-semibold text-[var(--text-primary)]">LUMI Workspace AI</span>
+          <div className="p-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Sparkles className="w-4 h-4 text-[var(--text-primary)] shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-[var(--text-primary)] truncate" title={activeChatSession?.title || 'LUMI Workspace AI'}>
+                    {activeChatSession?.title || 'LUMI Workspace AI'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-[var(--text-tertiary)] font-mono block truncate">
+                  {activeChatSession?.createdAt ? `Started ${activeChatSession.createdAt}` : 'Active Chat'}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* + New Chat Button */}
+              <button
+                type="button"
+                onClick={() => createNewChatSession(true)}
+                className="px-2 py-1 rounded text-[11px] font-medium bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] cursor-pointer transition-colors flex items-center gap-1 shadow-sm"
+                title="Start a new chat session"
+              >
+                <Plus className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                <span className="hidden sm:inline">New Chat</span>
+              </button>
+
+              {/* Chat History Dropdown Toggle */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsChatHistoryOpen(prev => !prev)}
+                  className={`px-2 py-1 rounded text-[11px] font-medium border cursor-pointer transition-colors flex items-center gap-1 ${
+                    isChatHistoryOpen
+                      ? 'bg-[var(--text-primary)] text-[var(--bg-base)] border-[var(--text-primary)] font-semibold'
+                      : 'bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-subtle)]'
+                  }`}
+                  title="View past chat sessions"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>Chats ({chatSessions.length})</span>
+                </button>
+
+                {/* History Dropdown Menu */}
+                {isChatHistoryOpen && (
+                  <div className="absolute right-0 mt-1.5 w-72 max-h-80 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
+                    <div className="px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-[var(--text-primary)]">Chat History</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          createNewChatSession(true);
+                          setIsChatHistoryOpen(false);
+                        }}
+                        className="text-[10px] text-blue-400 hover:text-blue-300 font-medium cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>New Chat</span>
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
+                      {chatSessions.map((session) => (
+                        <div
+                          key={session.id}
+                          onClick={() => {
+                            selectChatSession(session.id);
+                            setIsChatHistoryOpen(false);
+                          }}
+                          className={`group px-2.5 py-2 rounded-lg text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                            session.id === activeChatSessionId
+                              ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] font-semibold border border-[var(--border-subtle)]'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+                            <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                            <div className="truncate text-left">
+                              <div className="truncate text-[11px] font-medium">{session.title || 'Untitled Chat'}</div>
+                              <div className="text-[9px] text-[var(--text-tertiary)] font-mono">{session.createdAt} · {session.messages.length} msgs</div>
+                            </div>
+                          </div>
+                          {chatSessions.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteChatSession(session.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-950/50 text-[var(--text-secondary)] hover:text-rose-400 transition-all cursor-pointer"
+                              title="Delete chat"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Create Image Toggle */}
               <button
                 type="button"
                 onClick={() => setIsCreateImageMode(prev => !prev)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium border cursor-pointer transition-colors flex items-center gap-1 ${
+                className={`px-2 py-1 rounded text-[11px] font-medium border cursor-pointer transition-colors flex items-center gap-1 ${
                   isCreateImageMode
                     ? 'bg-[var(--text-primary)] text-[var(--bg-base)] border-[var(--text-primary)] font-semibold'
                     : 'bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-subtle)]'
@@ -1138,9 +1279,9 @@ export const IdeWorkspaceView: React.FC = () => {
                 title="Toggle Create Image mode"
               >
                 <Sparkles className="w-3 h-3" />
-                <span>Create Image</span>
+                <span>Image</span>
               </button>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] uppercase">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] uppercase">
                 {permissionMode}
               </span>
             </div>
@@ -1309,18 +1450,126 @@ export const IdeWorkspaceView: React.FC = () => {
                     </div>
                   )}
 
-                  {msg.role === 'assistant' ? renderAssistantMessageBody(msg.content) : msg.content}
+                  {msg.role === 'assistant' ? renderAssistantMessageBody(msg.content) : (
+                    editingMessageId === msg.id ? (
+                      <div className="w-full space-y-2 text-left">
+                        <textarea
+                          value={editingMessageText}
+                          onChange={(e) => setEditingMessageText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                              e.preventDefault();
+                              handleSaveAndRegenerate(msg.id);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              handleCancelEditing();
+                            }
+                          }}
+                          rows={3}
+                          autoFocus
+                          className="w-full bg-[var(--bg-base)] text-[var(--text-primary)] border border-[var(--border-subtle)] focus:border-[var(--text-primary)] rounded-lg p-2 text-xs focus:outline-none resize-y font-sans leading-relaxed"
+                        />
+                        <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-tertiary)]">
+                          <span>Ctrl+Enter to send • Esc to cancel</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={handleCancelEditing}
+                              disabled={isAiGenerating}
+                              className="px-2 py-0.5 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveAndRegenerate(msg.id)}
+                              disabled={!editingMessageText.trim() || isAiGenerating}
+                              className="px-2.5 py-0.5 bg-[var(--text-primary)] hover:opacity-90 disabled:opacity-40 text-[var(--bg-base)] font-semibold rounded transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>Save & Regenerate</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>{msg.content}</div>
+                    )
+                  )}
                 </div>
-                <div className="text-[10px] font-mono text-[var(--text-tertiary)] px-1">
-                  {msg.timestamp}
+
+                {/* Message Action Bar & Timestamp */}
+                <div className={`flex items-center gap-2 px-1 text-[10px] font-mono text-[var(--text-tertiary)] ${
+                  msg.role === 'user' ? 'justify-end' : 'justify-between'
+                }`}>
+                  {msg.role === 'assistant' && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMessage(msg.id, msg.content)}
+                        title="Copy response"
+                        className="p-0.5 hover:text-[var(--text-primary)] cursor-pointer rounded flex items-center gap-1 text-[10px]"
+                      >
+                        {copiedMessageId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedMessageId === msg.id ? 'Copied' : 'Copy'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => regenerateAiResponse(msg.id)}
+                        disabled={isAiGenerating}
+                        title="Regenerate this response"
+                        className="p-0.5 hover:text-[var(--text-primary)] disabled:opacity-40 cursor-pointer rounded flex items-center gap-1 text-[10px]"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Regenerate</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span>{msg.timestamp}</span>
+                    {msg.role === 'user' && editingMessageId !== msg.id && (
+                      <div className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(msg.id, msg.content)}
+                          title="Copy message"
+                          className="p-0.5 hover:text-[var(--text-primary)] cursor-pointer rounded"
+                        >
+                          {copiedMessageId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditing(msg.id, msg.content)}
+                          disabled={isAiGenerating}
+                          title="Edit message & regenerate"
+                          className="p-0.5 hover:text-[var(--text-primary)] disabled:opacity-40 cursor-pointer rounded flex items-center gap-0.5"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span className="text-[10px]">Edit</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
 
             {isAiGenerating && (
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] p-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-xl max-w-[80%] animate-pulse">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-[var(--text-primary)]" />
-                <span>Executing filesystem action...</span>
+              <div className="flex items-center justify-between gap-3 p-2 px-3 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-xl max-w-[90%] select-none shadow-sm">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-xs animate-pulse">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-[var(--text-primary)]" />
+                  <span>{isCreateImageMode ? 'Generating image with local model...' : 'LUMI is thinking & generating...'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={stopAiGeneration}
+                  className="px-2.5 py-0.5 text-xs bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 rounded flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                  title="Stop generation immediately"
+                >
+                  <Square className="w-2.5 h-2.5 fill-current" />
+                  <span className="font-semibold">Stop</span>
+                </button>
               </div>
             )}
             <div ref={aiChatEndRef} />
@@ -1340,30 +1589,14 @@ export const IdeWorkspaceView: React.FC = () => {
               <Sparkles className="w-3 h-3" />
               <span>Create Image</span>
             </button>
-            <button
-              onClick={() => {
-                if (activeTab) {
-                  sendWorkspaceAiPrompt(`Read and explain ${activeTab.path}`);
-                } else {
-                  sendWorkspaceAiPrompt('Summarize project workspace architecture');
-                }
-              }}
-              className="px-2 py-0.5 rounded bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] whitespace-nowrap cursor-pointer transition-colors"
-            >
-              Explain File
-            </button>
-            <button
-              onClick={() => sendWorkspaceAiPrompt('Create a file called src/test.js with a helloWorld function')}
-              className="px-2 py-0.5 rounded bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] whitespace-nowrap cursor-pointer transition-colors"
-            >
-              + Create File
-            </button>
-            <button
-              onClick={() => sendWorkspaceAiPrompt('Add a verification comment header to the active file')}
-              className="px-2 py-0.5 rounded bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] whitespace-nowrap cursor-pointer transition-colors"
-            >
-              Edit File
-            </button>
+            {activeTab && (
+              <button
+                onClick={() => sendWorkspaceAiPrompt(`Read and explain ${activeTab.path}`)}
+                className="px-2 py-0.5 rounded bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] whitespace-nowrap cursor-pointer transition-colors"
+              >
+                Explain {activeTab.name}
+              </button>
+            )}
           </div>
 
           {/* AI Prompt Input Bar */}
@@ -1382,8 +1615,9 @@ export const IdeWorkspaceView: React.FC = () => {
                     onChange={(e) => setSelectedImageModel(e.target.value)}
                     className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)] font-mono outline-none cursor-pointer hover:border-[var(--text-secondary)]"
                   >
+                    <option value="z-image-turbo">Z-Image Turbo (DiT BF16 + Qwen 3 4B)</option>
+                    <option value="sdxl-lightning">SDXL-Lightning (Safetensors - Fast GPU)</option>
                     <option value="flux1-schnell">FLUX.1 [schnell] (GGUF)</option>
-                    <option value="sdxl-lightning">SDXL-Lightning (Safetensors)</option>
                   </select>
                   <button
                     type="button"
@@ -1418,32 +1652,44 @@ export const IdeWorkspaceView: React.FC = () => {
                 rows={2}
                 placeholder={
                   isCreateImageMode
-                    ? `Describe the image to generate with ${selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning'}...`
+                    ? `Describe the image to generate with ${selectedImageModel === 'z-image-turbo' ? 'Z-Image Turbo' : (selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning')}...`
                     : "Ask LUMI to read, create, edit, or test files..."
                 }
                 className="w-full bg-transparent border-none outline-none text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] resize-none font-sans"
               />
-              <button
-                onClick={() => {
-                  if (aiPromptInput.trim() && !isAiGenerating) {
-                    if (isCreateImageMode) {
-                      generateWorkspaceImage(aiPromptInput, selectedImageModel);
-                      setAiPromptInput('');
-                    } else {
-                      sendWorkspaceAiPrompt(aiPromptInput);
-                      setAiPromptInput('');
+              {isAiGenerating ? (
+                <button
+                  type="button"
+                  onClick={stopAiGeneration}
+                  className="p-1.5 px-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 rounded-lg transition-all ml-1 shrink-0 flex items-center gap-1 text-xs font-semibold cursor-pointer animate-pulse shadow-sm"
+                  title="Stop generation immediately"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                  <span>Stop</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (aiPromptInput.trim() && !isAiGenerating) {
+                      if (isCreateImageMode) {
+                        generateWorkspaceImage(aiPromptInput, selectedImageModel);
+                        setAiPromptInput('');
+                      } else {
+                        sendWorkspaceAiPrompt(aiPromptInput);
+                        setAiPromptInput('');
+                      }
                     }
-                  }
-                }}
-                disabled={!aiPromptInput.trim() || isAiGenerating}
-                className="p-1.5 bg-[var(--text-primary)] hover:opacity-90 disabled:opacity-30 text-[var(--bg-base)] rounded-lg transition-all ml-1 shrink-0 cursor-pointer"
-                title={isCreateImageMode ? "Generate Image" : "Send Prompt"}
-              >
-                {isCreateImageMode ? <Sparkles className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
-              </button>
+                  }}
+                  disabled={!aiPromptInput.trim() || isAiGenerating}
+                  className="p-1.5 bg-[var(--text-primary)] hover:opacity-90 disabled:opacity-30 text-[var(--bg-base)] rounded-lg transition-all ml-1 shrink-0 cursor-pointer"
+                  title={isCreateImageMode ? "Generate Image" : "Send Prompt"}
+                >
+                  {isCreateImageMode ? <Sparkles className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                </button>
+              )}
             </div>
             <div className="text-[10px] text-[var(--text-tertiary)] font-mono mt-1 flex justify-between">
-              <span>{isCreateImageMode ? `Using ${selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning'}` : 'Press Enter to send'}</span>
+              <span>{isCreateImageMode ? `Using ${selectedImageModel === 'z-image-turbo' ? 'Z-Image Turbo' : (selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning')}` : 'Press Enter to send'}</span>
             </div>
           </div>
 

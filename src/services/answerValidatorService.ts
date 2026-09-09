@@ -34,7 +34,8 @@ export async function validateAnswerWithModel(
   sourceContext: string,
   generatedAnswer: string,
   validatorModel: string = defaultPipelineConfig.validatorModel,
-  threshold: number = defaultPipelineConfig.confidenceThreshold
+  threshold: number = defaultPipelineConfig.confidenceThreshold,
+  signal?: AbortSignal
 ): Promise<ValidationResult> {
   const prompt = `USER REQUEST:
 ${userQuery}
@@ -53,7 +54,8 @@ TASK: Evaluate the GENERATED ANSWER. Check if it directly answers the USER REQUE
       systemPrompt: VALIDATOR_SYSTEM_PROMPT,
       userPrompt: prompt,
       formatJson: true,
-      temperature: 0.1
+      temperature: 0.1,
+      signal
     });
 
     const parsed = await parseOrRepairJson<ValidationResult>(
@@ -114,7 +116,8 @@ export async function executeValidationAndRoutingPipeline(
   overrideConfig: Partial<PipelineConfig> = {},
   requestId?: string,
   onToken?: (token: string, accumulated: string, isThinking?: boolean) => void,
-  conversationHistory?: ConversationTurn[]
+  conversationHistory?: ConversationTurn[],
+  signal?: AbortSignal
 ): Promise<PipelineExecutionResult> {
   const cfg: PipelineConfig = { ...defaultPipelineConfig, ...overrideConfig };
   const logId = `val-log-${Date.now()}`;
@@ -129,7 +132,8 @@ export async function executeValidationAndRoutingPipeline(
         : DEFAULT_FACTUAL_SYSTEM_PROMPT,
       userPrompt: `Context:\n${sourceContext}\n\nUser Question:\n${userQuery}`,
       conversationHistory,
-      onToken
+      onToken,
+      signal
     });
     const mockValidation: ValidationResult = {
       grounded: true,
@@ -180,7 +184,8 @@ export async function executeValidationAndRoutingPipeline(
     userPrompt: initialPrompt,
     conversationHistory,
     temperature: 0.2,
-    onToken
+    onToken,
+    signal
   });
   const initialModelDuration = Math.round(performance.now() - startInitialModel);
   const initialAnswer = initialRes.content;
@@ -258,7 +263,8 @@ export async function executeValidationAndRoutingPipeline(
       sourceContext,
       initialAnswer,
       cfg.validatorModel,
-      cfg.confidenceThreshold
+      cfg.confidenceThreshold,
+      signal
     );
   } catch (err: any) {
     console.warn('Evaluation #1 model call or JSON parsing failed. Treating as failed evaluation 1.', err);
@@ -390,7 +396,8 @@ Re-evaluate and refine the answer using the feedback above. Ground all claims st
       model: cfg.initialModel,
       systemPrompt: 'You are a precise, grounded assistant performing re-evaluation. Revise the answer using validator feedback to ensure 100% adherence to source evidence.',
       userPrompt: reevalPrompt,
-      temperature: 0.2
+      temperature: 0.2,
+      signal
     });
     reevalAnswer = reevalGenRes.content;
   } catch (err: any) {
@@ -406,7 +413,8 @@ Re-evaluate and refine the answer using the feedback above. Ground all claims st
       sourceContext,
       reevalAnswer,
       cfg.validatorModel,
-      cfg.confidenceThreshold
+      cfg.confidenceThreshold,
+      signal
     );
   } catch (err: any) {
     console.warn('Evaluation #2 model call or JSON parsing failed. Treating as failed evaluation 2.', err);

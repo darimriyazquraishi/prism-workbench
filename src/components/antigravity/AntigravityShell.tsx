@@ -26,11 +26,13 @@ import {
   FolderTree
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 
 export type ActiveScreenView = 'workspace' | 'models' | 'workflow' | 'ide';
 
 export const AntigravityShell: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<ActiveScreenView>('workspace');
+  const previousScreenRef = useRef<ActiveScreenView>(activeScreen);
   const sidebarFileInputRef = useRef<HTMLInputElement>(null);
   const { 
     runIndustrialDemo, 
@@ -46,21 +48,45 @@ export const AntigravityShell: React.FC = () => {
     loadKnowledgeBaseFromDisk
   } = useAntigravityStore();
 
+  const {
+    chatSessions,
+    activeChatSessionId,
+    selectChatSession,
+    deleteChatSession,
+    createNewChatSession
+  } = useWorkspaceStore();
+
   useEffect(() => {
     loadKnowledgeBaseFromDisk();
   }, [loadKnowledgeBaseFromDisk]);
+
+  // When switching into IDE Explorer from another view, automatically start a new chat (unless the active chat is already blank)
+  useEffect(() => {
+    if (activeScreen === 'ide' && previousScreenRef.current !== 'ide') {
+      createNewChatSession();
+    }
+    previousScreenRef.current = activeScreen;
+  }, [activeScreen, createNewChatSession]);
+
+  const handleNewChat = () => {
+    if (activeScreen === 'ide') {
+      createNewChatSession(true);
+    } else {
+      setActiveScreen('workspace');
+      createNewSession();
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        setActiveScreen('workspace');
-        createNewSession();
+        handleNewChat();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createNewSession]);
+  }, [activeScreen, createNewSession, createNewChatSession]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden select-none font-sans">
@@ -76,10 +102,7 @@ export const AntigravityShell: React.FC = () => {
           {/* Top: + New Thread / Task */}
           <div className="p-3">
             <button
-              onClick={() => {
-                setActiveScreen('workspace');
-                createNewSession();
-              }}
+              onClick={handleNewChat}
               title="Create New Chat (Ctrl + N)"
               className="w-full flex items-center justify-between px-3 py-2 bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-full text-sm font-medium transition-colors cursor-pointer text-[var(--text-primary)] shadow-sm group"
             >
@@ -128,7 +151,10 @@ export const AntigravityShell: React.FC = () => {
                 <span>Knowledge Base</span>
               </button>
               <button
-                onClick={() => setActiveScreen('ide')}
+                onClick={() => {
+                  setActiveScreen('ide');
+                  createNewChatSession();
+                }}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm font-medium ${
                   activeScreen === 'ide'
                     ? 'text-[var(--text-primary)] bg-[var(--bg-elevated)]'
@@ -147,52 +173,96 @@ export const AntigravityShell: React.FC = () => {
               </button>
             </div>
 
-            {/* Recent Sessions List - ALWAYS VISIBLE ACROSS ALL VIEWS */}
+            {/* Recent Sessions List - Displays IDE chats when on IDE, or Studio chats when on Workspace */}
             <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1.5">
               <div className="px-3 pb-1 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider flex items-center justify-between">
-                <span>Recent Chats</span>
-                <span className="text-[9px] font-mono text-[var(--text-tertiary)]">{sessions.length}</span>
+                <span>{activeScreen === 'ide' ? 'IDE Recent Chats' : 'Recent Chats'}</span>
+                <span className="text-[9px] font-mono text-[var(--text-tertiary)]">
+                  {activeScreen === 'ide' ? chatSessions.length : sessions.length}
+                </span>
               </div>
               <div className="space-y-0.5 max-h-[360px] overflow-y-auto pr-1">
-                {sessions.length === 0 ? (
-                  <div className="px-3 py-3 text-[11px] text-[var(--text-tertiary)] italic border border-dashed border-[var(--border-subtle)] rounded-lg text-center">
-                    No active chats. Click + New Chat to begin.
-                  </div>
-                ) : (
-                  sessions.map((sess) => (
-                    <div
-                      key={sess.id}
-                      onClick={() => {
-                        setActiveScreen('workspace');
-                        selectSession(sess.id);
-                      }}
-                      className={`group px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors flex items-center justify-between ${
-                        sess.id === activeSessionId && activeScreen === 'workspace'
-                          ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] font-semibold border border-[var(--border-subtle)]'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
-                        <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
-                        <span className="truncate text-xs">{sess.title || 'Untitled Chat'}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className="text-[9px] font-mono text-[var(--text-tertiary)] group-hover:hidden">
-                          {sess.steps.length} msgs
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteSession(sess.id);
-                          }}
-                          title="Delete chat from history"
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-950/50 text-[var(--text-secondary)] hover:text-rose-400 transition-all cursor-pointer flex items-center justify-center"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                {activeScreen === 'ide' ? (
+                  chatSessions.length === 0 ? (
+                    <div className="px-3 py-3 text-[11px] text-[var(--text-tertiary)] italic border border-dashed border-[var(--border-subtle)] rounded-lg text-center">
+                      No IDE chats yet. Click + New Chat to begin.
                     </div>
-                  ))
+                  ) : (
+                    chatSessions.map((sess) => (
+                      <div
+                        key={sess.id}
+                        onClick={() => selectChatSession(sess.id)}
+                        className={`group px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                          sess.id === activeChatSessionId
+                            ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] font-semibold border border-[var(--border-subtle)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+                          <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+                          <span className="truncate text-xs">{sess.title || 'New Chat'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-[9px] font-mono text-[var(--text-tertiary)] group-hover:hidden">
+                            {sess.messages.length} msgs
+                          </span>
+                          {chatSessions.length > 1 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteChatSession(sess.id);
+                              }}
+                              title="Delete chat from history"
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-950/50 text-[var(--text-secondary)] hover:text-rose-400 transition-all cursor-pointer flex items-center justify-center"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )
+                ) : (
+                  sessions.length === 0 ? (
+                    <div className="px-3 py-3 text-[11px] text-[var(--text-tertiary)] italic border border-dashed border-[var(--border-subtle)] rounded-lg text-center">
+                      No active chats. Click + New Chat to begin.
+                    </div>
+                  ) : (
+                    sessions.map((sess) => (
+                      <div
+                        key={sess.id}
+                        onClick={() => {
+                          setActiveScreen('workspace');
+                          selectSession(sess.id);
+                        }}
+                        className={`group px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                          sess.id === activeSessionId && activeScreen === 'workspace'
+                            ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] font-semibold border border-[var(--border-subtle)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+                          <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+                          <span className="truncate text-xs">{sess.title || 'Untitled Chat'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-[9px] font-mono text-[var(--text-tertiary)] group-hover:hidden">
+                            {sess.steps.length} msgs
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteSession(sess.id);
+                            }}
+                            title="Delete chat from history"
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-950/50 text-[var(--text-secondary)] hover:text-rose-400 transition-all cursor-pointer flex items-center justify-center"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )
                 )}
               </div>
             </div>

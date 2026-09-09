@@ -25,7 +25,8 @@ import {
   Zap,
   RotateCw,
   Pencil,
-  Copy
+  Copy,
+  Square
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 import { PlanApprovalCard } from '../agent/PlanApprovalCard';
@@ -104,6 +105,7 @@ export const MainWorkspaceView: React.FC = () => {
     toggleComputerAccess,
     setNetworkModalOpen,
     isExecuting,
+    stopExecution,
     selectedModel,
     selectedGeneralModel,
     isThinkHarderMode,
@@ -327,8 +329,9 @@ export const MainWorkspaceView: React.FC = () => {
                         onChange={(e) => setSelectedImageModel(e.target.value)}
                         className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)] font-mono outline-none cursor-pointer hover:border-[var(--text-secondary)]"
                       >
+                        <option value="z-image-turbo">Z-Image Turbo (DiT BF16 + Qwen 3 4B)</option>
+                        <option value="sdxl-lightning">SDXL-Lightning (Safetensors - Fast GPU)</option>
                         <option value="flux1-schnell">FLUX.1 [schnell] (GGUF)</option>
-                        <option value="sdxl-lightning">SDXL-Lightning (Safetensors)</option>
                       </select>
                       <button
                         type="button"
@@ -351,7 +354,7 @@ export const MainWorkspaceView: React.FC = () => {
                   }}
                   placeholder={
                     isCreateImageMode
-                      ? `Describe the image to generate with ${selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning'}...`
+                      ? `Describe the image to generate with ${selectedImageModel === 'z-image-turbo' ? 'Z-Image Turbo' : (selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning')}...`
                       : "Type / for commands, or ask your local AI to analyze documents..."
                   }
                   className="w-full bg-transparent border-none text-[15px] text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-tertiary)] resize-none h-14 p-1"
@@ -434,24 +437,35 @@ export const MainWorkspaceView: React.FC = () => {
                     >
                       <Mic className="w-4 h-4" />
                     </button>
-                    <button 
-                      onClick={() => {
-                        if (promptText.trim()) {
-                          clearAttachments();
-                          if (isCreateImageMode) {
-                            generateImageTask(promptText.trim(), selectedImageModel);
-                          } else {
-                            proposePlanForTask(promptText.trim());
+                    {isExecuting ? (
+                      <button
+                        type="button"
+                        onClick={stopExecution}
+                        className="p-2 rounded-full bg-rose-600 hover:bg-rose-500 text-white cursor-pointer transition-all shadow-md flex items-center justify-center animate-pulse"
+                        title="Stop Generation"
+                      >
+                        <Square className="w-4 h-4 fill-white" />
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                          if (promptText.trim()) {
+                            clearAttachments();
+                            if (isCreateImageMode) {
+                              generateImageTask(promptText.trim(), selectedImageModel);
+                            } else {
+                              proposePlanForTask(promptText.trim());
+                            }
+                            setPromptText('');
+                            setShowSlashMenu(false);
                           }
-                          setPromptText('');
-                          setShowSlashMenu(false);
-                        }
-                      }} 
-                      className="p-2 rounded-full bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 cursor-pointer transition-opacity"
-                      title={isCreateImageMode ? "Generate Image" : "Submit Task Query"}
-                    >
-                      {isCreateImageMode ? <Sparkles className="w-4 h-4" /> : <Search className="w-4 h-4" />}
-                    </button>
+                        }} 
+                        className="p-2 rounded-full bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 cursor-pointer transition-opacity"
+                        title={isCreateImageMode ? "Generate Image" : "Submit Task Query"}
+                      >
+                        {isCreateImageMode ? <Sparkles className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -691,9 +705,22 @@ export const MainWorkspaceView: React.FC = () => {
                               <span className="font-semibold text-[var(--text-primary)]">LUMI</span>
                               <span className="text-[10px] font-mono text-[var(--text-tertiary)]">{step.timestamp}</span>
                             </div>
-                            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                              Local Air-Gapped
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {isCurrentStreaming && (
+                                <button
+                                  type="button"
+                                  onClick={stopExecution}
+                                  className="px-2 py-0.5 rounded bg-rose-600/90 hover:bg-rose-600 text-white text-[10px] font-medium flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
+                                  title="Stop generation immediately"
+                                >
+                                  <Square className="w-2.5 h-2.5 fill-white" />
+                                  <span>Stop</span>
+                                </button>
+                              )}
+                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                Local Air-Gapped
+                              </span>
+                            </div>
                           </div>
                           <div className="text-[13px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap select-text font-sans">
                             {formatCleanText(step.content)}
@@ -830,14 +857,25 @@ export const MainWorkspaceView: React.FC = () => {
                 })}
 
                 {isExecuting && !sessionSteps.some(s => s.type === 'response') && (
-                  <div className="max-w-3xl mx-auto w-full flex items-center gap-3 p-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl animate-pulse font-mono text-xs text-[var(--text-secondary)]">
-                    <Sparkles className="w-4 h-4 text-[var(--accent-primary)] animate-spin" />
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[var(--text-primary)]">
-                        {selectedModel ? selectedModel : (selectedGeneralModel || 'Local Sovereign Engine')}
-                      </span>
-                      <span>generating response...</span>
+                  <div className="max-w-3xl mx-auto w-full flex items-center justify-between p-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl font-mono text-xs text-[var(--text-secondary)] shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <Sparkles className="w-4 h-4 text-[var(--accent-primary)] animate-spin" />
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-[var(--text-primary)]">
+                          {selectedModel ? selectedModel : (selectedGeneralModel || 'Local Sovereign Engine')}
+                        </span>
+                        <span className="animate-pulse">generating response...</span>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={stopExecution}
+                      className="px-2.5 py-1 bg-rose-600/90 hover:bg-rose-600 text-white rounded-md text-[11px] font-sans font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                      title="Stop Generation"
+                    >
+                      <Square className="w-3 h-3 fill-white" />
+                      <span>Stop</span>
+                    </button>
                   </div>
                 )}
 
@@ -885,8 +923,9 @@ export const MainWorkspaceView: React.FC = () => {
                             onChange={(e) => setSelectedImageModel(e.target.value)}
                             className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)] font-mono outline-none cursor-pointer hover:border-[var(--text-secondary)]"
                           >
+                            <option value="z-image-turbo">Z-Image Turbo (DiT BF16 + Qwen 3 4B)</option>
+                            <option value="sdxl-lightning">SDXL-Lightning (Safetensors - Fast GPU)</option>
                             <option value="flux1-schnell">FLUX.1 [schnell] (GGUF)</option>
-                            <option value="sdxl-lightning">SDXL-Lightning (Safetensors)</option>
                           </select>
                           <button
                             type="button"
@@ -905,7 +944,7 @@ export const MainWorkspaceView: React.FC = () => {
                       onChange={(e) => setFollowUpText(e.target.value)}
                       placeholder={
                         isCreateImageMode
-                          ? `Describe the image to generate with ${selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning'}...`
+                          ? `Describe the image to generate with ${selectedImageModel === 'z-image-turbo' ? 'Z-Image Turbo' : (selectedImageModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning')}...`
                           : "Ask a follow-up or provide next instructions..."
                       }
                       className="w-full bg-transparent border-none text-[14px] text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-tertiary)] resize-none h-12 p-2"
@@ -971,22 +1010,34 @@ export const MainWorkspaceView: React.FC = () => {
                         >
                           <Mic className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => {
-                            if (followUpText.trim()) {
-                              if (isCreateImageMode) {
-                                generateImageTask(followUpText.trim(), selectedImageModel);
-                              } else {
-                                proposePlanForTask(followUpText.trim());
+                        {isExecuting ? (
+                          <button
+                            type="button"
+                            onClick={stopExecution}
+                            className="p-1.5 px-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white cursor-pointer transition-all shadow-md flex items-center gap-1 text-xs font-semibold animate-pulse"
+                            title="Stop Generation"
+                          >
+                            <Square className="w-3.5 h-3.5 fill-white" />
+                            <span>Stop</span>
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => {
+                              if (followUpText.trim()) {
+                                if (isCreateImageMode) {
+                                  generateImageTask(followUpText.trim(), selectedImageModel);
+                                } else {
+                                  proposePlanForTask(followUpText.trim());
+                                }
+                                setFollowUpText('');
                               }
-                              setFollowUpText('');
-                            }
-                          }}
-                          className="p-1.5 rounded-full bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 cursor-pointer transition-opacity"
-                          title={isCreateImageMode ? "Generate Image" : "Send Query"}
-                        >
-                          {isCreateImageMode ? <Sparkles className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                        </button>
+                            }}
+                            className="p-1.5 rounded-full bg-[var(--text-primary)] text-[var(--bg-base)] hover:opacity-90 cursor-pointer transition-opacity"
+                            title={isCreateImageMode ? "Generate Image" : "Send Query"}
+                          >
+                            {isCreateImageMode ? <Sparkles className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -213,18 +213,22 @@ export async function queryLocalChatbotLLM(
   contextText: string = '',
   requestId?: string,
   onToken?: (token: string, accumulated: string, isThinking?: boolean) => void,
-  conversationHistory?: import('../services/localLlmService').ConversationTurn[]
+  conversationHistory?: import('../services/localLlmService').ConversationTurn[],
+  signal?: AbortSignal
 ): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   try {
     const pipelineRes = await executeValidationAndRoutingPipeline(promptText, contextText, {
       initialModel: model || defaultPipelineConfig.initialModel
-    }, requestId, onToken, conversationHistory);
+    }, requestId, onToken, conversationHistory, signal);
     return {
       text: pipelineRes.finalAnswer,
       auditLog: pipelineRes.auditLog,
       groundedStatus: pipelineRes.groundedStatus
     };
   } catch (err: any) {
+    if (signal?.aborted || err.name === 'AbortError') {
+      throw err;
+    }
     if (requestId) {
       useTelemetryStore.getState().failCurrentExecution(requestId, err.message, 'Validation Pipeline');
     }
@@ -425,7 +429,8 @@ export async function generateChatbotResponse(
   contextText: string = '',
   requestId?: string,
   onToken?: (token: string, accumulated: string, isThinking?: boolean) => void,
-  conversationHistory?: import('../services/localLlmService').ConversationTurn[]
+  conversationHistory?: import('../services/localLlmService').ConversationTurn[],
+  signal?: AbortSignal
 ): Promise<{ text: string; auditLog?: ValidationAuditLog; groundedStatus: 'grounded' | 'routed' | 'insufficient' }> {
   let rawP = promptText.trim();
   let p = rawP.toLowerCase();
@@ -442,79 +447,7 @@ export async function generateChatbotResponse(
 
   // When external document context is provided, bypass small-talk/math shortcuts to guarantee grounded answer
   if (contextText && contextText.trim()) {
-    return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId, onToken, conversationHistory);
-  }
-
-  const cleanP = p.replace(/^[^\w\s]+|[^\w\s]+$/g, '').trim();
-
-  // Greetings & Small talk
-  if (/^(hi|hello|hey|good morning|good afternoon|good evening|greetings|howdy|sup)\b/i.test(cleanP) && cleanP.length < 30) {
-    return { text: "Hello! I am your local Lumi assistant. How can I help you today?", groundedStatus: 'grounded' };
-  }
-
-  if (/^(how are you|who are you|what can you do|thanks|thank you|bye)\b/i.test(p) && p.length < 40) {
-    if (p.includes('who are you') || p.includes('what can you do')) {
-      return { text: "I am Lumi, an on-premise engineering & agentic intelligence assistant running locally on your workstation. I can answer technical questions, explain standards, perform calculations, or coordinate specialized agents to analyze inspection reports, query SOP manuals, and build PPTX/DOCX/XLSX deliverables.", groundedStatus: 'grounded' };
-    }
-    if (p.includes('how are you')) {
-      return { text: "I'm running smoothly on your local workstation engine, ready to assist!", groundedStatus: 'grounded' };
-    }
-    if (p.includes('thanks') || p.includes('thank you')) {
-      return { text: "You're welcome! Let me know if you need anything else.", groundedStatus: 'grounded' };
-    }
-    return { text: "Goodbye! Have a great day.", groundedStatus: 'grounded' };
-  }
-
-  // Math & Geometry Formulas
-  if ((p.includes('area of') || p.includes('formula for')) && p.includes('circle')) {
-    return { text: "The formula for the area of a circle is **$A = \\pi r^2$**, where **$A$** is the area and **$r$** is the radius of the circle (or $A = \\frac{\\pi d^2}{4}$ using diameter $d$).", groundedStatus: 'grounded' };
-  }
-
-  if (p.includes('circumference') && p.includes('circle')) {
-    return { text: "The formula for the circumference of a circle is **$C = 2\\pi r$** (or **$C = \\pi d$**), where **$r$** is the radius and **$d$** is the diameter.", groundedStatus: 'grounded' };
-  }
-
-  if (p.includes('volume') && p.includes('sphere')) {
-    return { text: "The formula for the volume of a sphere is **$V = \\frac{4}{3}\\pi r^3$**, where **$r$** is the radius.", groundedStatus: 'grounded' };
-  }
-
-  if (p.includes('volume') && p.includes('cylinder')) {
-    return { text: "The formula for the volume of a cylinder is **$V = \\pi r^2 h$**, where **$r$** is the base radius and **$h$** is the height.", groundedStatus: 'grounded' };
-  }
-
-  if (p.includes('quadratic formula')) {
-    return { text: "The quadratic formula for finding roots of $ax^2 + bx + c = 0$ is **$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$**.", groundedStatus: 'grounded' };
-  }
-
-  if (p.includes('pythagorean')) {
-    return { text: "The Pythagorean Theorem for a right triangle states: **$a^2 + b^2 = c^2$**, where $c$ is the hypotenuse.", groundedStatus: 'grounded' };
-  }
-
-  // Math Calculations
-  const mathMatch = p.match(/^calculate\s+(.+)$/i) || p.match(/^(what is|what's)\s+([\d\s\+\-\*\/\(\)\.]+)\??$/i);
-  if (mathMatch) {
-    try {
-      const expr = mathMatch[mathMatch.length - 1].replace(/[^0-9\+\-\*\/\(\)\.]/g, '');
-      if (expr) {
-        const result = Function(`'use strict'; return (${expr})`)();
-        return { text: `The result of \`${expr}\` is **${result}**.`, groundedStatus: 'grounded' };
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  // Science & Engineering Direct Q&A (Domain knowledge definitions, but NO aggressive generic traps)
-  if (p.includes('newton') && (p.includes('second law') || p.includes('2nd law') || p.includes('law'))) {
-    return { text: "Newton's Second Law of Motion states that force equals mass times acceleration: **$F = m \\cdot a$**.", groundedStatus: 'grounded' };
-  }
-
-  if (p.includes('api 570') && p.includes('definition')) {
-    return { text: "API 570 is the Piping Inspection Code covering in-service inspection, rating, repair, and alteration of metallic and fiberglass-reinforced plastic (FRP) piping systems.", groundedStatus: 'grounded' };
-  }
-
-  if (p.includes('cdu') && p.includes('definition')) {
-    return { text: "CDU stands for Crude Distillation Unit, the primary refining unit in a petroleum refinery that separates crude oil into fractions based on boiling point ranges.", groundedStatus: 'grounded' };
+    return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId, onToken, conversationHistory, signal);
   }
 
   if (!contextText) {
@@ -527,8 +460,8 @@ export async function generateChatbotResponse(
     }
   }
 
-  // Fallback Reasoning Engine: Call the actual validation and routing pipeline
-  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId, onToken, conversationHistory);
+  // Reason with the actual local LLM pipeline
+  return await queryLocalChatbotLLM(rawP, activeModel, previousUserPrompts, contextText, requestId, onToken, conversationHistory, signal);
 }
 
 export interface PreviewFile {
@@ -697,6 +630,8 @@ interface AntigravityStore {
   approveProposedPlan: (plan: ProposedExecutionPlan) => Promise<void>;
   rejectProposedPlan: (userFeedback?: string) => void;
   runIndustrialDemo: (demoType: 'inspection' | 'pump_mtbf' | 'pid_vision' | 'sop_search') => Promise<void>;
+  stopExecution: () => void;
+  activeAbortController: AbortController | null;
 
   // Network Egress Audit Log Actions
   setNetworkModalOpen: (val: boolean) => void;
@@ -1025,7 +960,7 @@ const initialSessionId = 'session-001';
 const initialSessions: AntigravitySession[] = [
   {
     id: 'session-001',
-    title: 'Active Workbench Session',
+    title: 'New Chat',
     createdAt: new Date().toISOString(),
     mode: 'agent',
     model: 'Qwen3-8B-Instruct',
@@ -1048,6 +983,14 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       localStorage.setItem('lumi_launched', 'true');
     }
     set({ isLauncherOpen: open });
+  },
+  activeAbortController: null,
+  stopExecution: () => {
+    const ctrl = get().activeAbortController;
+    if (ctrl) {
+      try { ctrl.abort(); } catch {}
+    }
+    set({ isExecuting: false, activeAbortController: null });
   },
   selectedGeneralModel: '',
   setSelectedGeneralModel: (model: string) => {
@@ -1276,7 +1219,7 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   activeSessionId: initialSessionId,
   activeMode: 'agent',
   selectedModel: '',
-  selectedImageModel: 'flux1-schnell',
+  selectedImageModel: 'sdxl-lightning',
   setSelectedImageModel: (model: string) => set({ selectedImageModel: model }),
   availableModels: [],
   arsenalModels: [],
@@ -1854,13 +1797,14 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
   },
 
   generateImageTask: async (prompt: string, modelId?: string) => {
-    const activeModel = modelId || get().selectedImageModel || 'flux1-schnell';
+    const activeModel = modelId || get().selectedImageModel || 'sdxl-lightning';
     const trimmed = prompt.trim();
     if (!trimmed) return;
 
     const { addStepToActiveSession, setActiveTaskStarted, addArtifact, updateStepInActiveSession } = get();
     setActiveTaskStarted(true);
-    set({ isExecuting: true });
+    const abortCtrl = new AbortController();
+    set({ isExecuting: true, activeAbortController: abortCtrl });
 
     const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -1873,7 +1817,9 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
     });
 
     const respStepId = `step-${Date.now()}-resp`;
-    const modelDisplayName = activeModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning';
+    const modelDisplayName = activeModel === 'z-image-turbo'
+      ? 'Z-Image Turbo'
+      : (activeModel === 'flux1-schnell' ? 'FLUX.1 [schnell]' : 'SDXL-Lightning');
     addStepToActiveSession({
       id: respStepId,
       type: 'response',
@@ -1885,7 +1831,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       const res = await fetch('/api/workspace/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: trimmed, modelId: activeModel })
+        body: JSON.stringify({ prompt: trimmed, modelId: activeModel }),
+        signal: abortCtrl.signal
       });
 
       const data = await res.json();
@@ -1915,12 +1862,19 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         });
       }
     } catch (err: any) {
-      updateStepInActiveSession(respStepId, {
-        content: `❌ Image generation failed: ${err.message}`,
-        status: 'error'
-      });
+      if (abortCtrl.signal.aborted || err.name === 'AbortError') {
+        updateStepInActiveSession(respStepId, {
+          content: '🛑 Image generation stopped by user.',
+          status: 'error'
+        });
+      } else {
+        updateStepInActiveSession(respStepId, {
+          content: `❌ Image generation failed: ${err.message}`,
+          status: 'error'
+        });
+      }
     } finally {
-      set({ isExecuting: false });
+      set({ isExecuting: false, activeAbortController: null });
     }
   },
 
@@ -1994,7 +1948,8 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
         timestamp: now()
       });
 
-      set({ isExecuting: true });
+      const abortCtrl = new AbortController();
+      set({ isExecuting: true, activeAbortController: abortCtrl });
 
       // Add response step immediately so the user sees assistant response container with pulsing cursor
       const respStepId = `step-${Date.now()}-resp`;
@@ -2009,63 +1964,79 @@ export const useAntigravityStore = create<AntigravityStore>((set, get) => ({
       const modelStart = performance.now();
       let hasReceivedContentToken = false;
 
-      const chatRes = await generateChatbotResponse(
-        prompt,
-        previousUserPrompts,
-        activeModel,
-        resolvedDocContext,
-        requestId,
-        (token, accumulated, isThinking) => {
-          if (isThinking && !hasReceivedContentToken) {
-            const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
-            get().updateStepInActiveSession(respStepId, {
-              content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
-            });
-          } else {
-            hasReceivedContentToken = true;
-            get().updateStepInActiveSession(respStepId, { content: accumulated });
-          }
-        },
-        conversationHistory
-      );
-      const modelDurationMs = Math.round(performance.now() - modelStart);
-      const totalDurationMs = Math.round(performance.now() - totalStart);
+      try {
+        const chatRes = await generateChatbotResponse(
+          prompt,
+          previousUserPrompts,
+          activeModel,
+          resolvedDocContext,
+          requestId,
+          (token, accumulated, isThinking) => {
+            if (isThinking && !hasReceivedContentToken) {
+              const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
+              get().updateStepInActiveSession(respStepId, {
+                content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
+              });
+            } else {
+              hasReceivedContentToken = true;
+              get().updateStepInActiveSession(respStepId, { content: accumulated });
+            }
+          },
+          conversationHistory,
+          abortCtrl.signal
+        );
+        const modelDurationMs = Math.round(performance.now() - modelStart);
+        const totalDurationMs = Math.round(performance.now() - totalStart);
 
-      console.log(`[PIPELINE LATENCY DIAGNOSTIC] Request ID: ${requestId}
+        console.log(`[PIPELINE LATENCY DIAGNOSTIC] Request ID: ${requestId}
   Prompt: "${prompt.slice(0, 50)}"
   Intent Router: ${routerDurationMs} ms (Intent: DIRECT_QA)
   Document Context: ${sourcesUsed.length > 0 ? `Loaded ${sourcesUsed.join(', ')}` : 'None'}
   Model Generation & Validation: ${modelDurationMs} ms
   Total Execution Latency: ${totalDurationMs} ms`);
 
-      if (chatRes.auditLog) {
-        get().addValidationAuditLog(chatRes.auditLog);
+        if (chatRes.auditLog) {
+          get().addValidationAuditLog(chatRes.auditLog);
+        }
+
+        // Finalize the step with completed text & status
+        let finalContent = chatRes.text;
+        if (sourcesUsed.length > 0 && !finalContent.includes('**Sources used:**') && !finalContent.includes('Sources used:')) {
+          finalContent = `${finalContent.trim()}\n\n---\n**Sources used:**\n${sourcesUsed.map(s => `• ${s}`).join('\n')}`;
+        }
+
+        get().updateStepInActiveSession(respStepId, {
+          content: finalContent,
+          groundedStatus: sourcesUsed.length > 0 ? 'grounded' : chatRes.groundedStatus
+        });
+
+        useTelemetryStore.getState().completeCurrentExecution(requestId);
+
+        addNetworkLog({
+          timestamp: now(),
+          source: '127.0.0.1:4321',
+          destination: '127.0.0.1:11434',
+          protocol: 'HTTP',
+          bytesSent: 140 + prompt.length,
+          bytesReceived: (finalContent || '').length * 2,
+          isExternal: false,
+          modelOrTool: `${activeModel} (Local Direct Q&A)`
+        });
+      } catch (err: any) {
+        if (abortCtrl.signal.aborted || err.name === 'AbortError') {
+          get().updateStepInActiveSession(respStepId, {
+            content: '🛑 Generation stopped by user.',
+            status: 'error'
+          });
+        } else {
+          get().updateStepInActiveSession(respStepId, {
+            content: `⚠️ **Execution Error**: ${err.message}`,
+            status: 'error'
+          });
+        }
+      } finally {
+        set({ isExecuting: false, activeAbortController: null });
       }
-
-      // Finalize the step with completed text & status
-      let finalContent = chatRes.text;
-      if (sourcesUsed.length > 0 && !finalContent.includes('**Sources used:**') && !finalContent.includes('Sources used:')) {
-        finalContent = `${finalContent.trim()}\n\n---\n**Sources used:**\n${sourcesUsed.map(s => `• ${s}`).join('\n')}`;
-      }
-
-      get().updateStepInActiveSession(respStepId, {
-        content: finalContent,
-        groundedStatus: sourcesUsed.length > 0 ? 'grounded' : chatRes.groundedStatus
-      });
-
-      set({ isExecuting: false });
-      useTelemetryStore.getState().completeCurrentExecution(requestId);
-
-      addNetworkLog({
-        timestamp: now(),
-        source: '127.0.0.1:4321',
-        destination: '127.0.0.1:11434',
-        protocol: 'HTTP',
-        bytesSent: 140 + prompt.length,
-        bytesReceived: (finalContent || '').length * 2,
-        isExternal: false,
-        modelOrTool: `${activeModel} (Local Direct Q&A)`
-      });
       return;
     }
 
@@ -2377,9 +2348,11 @@ Passing to local specialist models to assemble the execution plan.`;
       }
     ];
 
+    const abortCtrl = new AbortController();
     set(state => ({
       sessions: state.sessions.map(s => s.id === activeSess.id ? { ...s, steps: updatedSteps } : s),
-      isExecuting: true
+      isExecuting: true,
+      activeAbortController: abortCtrl
     }));
 
     const requestId = `req-${Date.now()}`;
@@ -2388,37 +2361,53 @@ Passing to local specialist models to assemble the execution plan.`;
     let hasReceivedContentToken = false;
     const previousPrompts = conversationHistory.filter(c => c.role === 'user').map(c => c.content);
 
-    const chatRes = await generateChatbotResponse(
-      userPrompt,
-      previousPrompts,
-      activeModel,
-      '',
-      requestId,
-      (token, accumulated, isThinking) => {
-        if (isThinking && !hasReceivedContentToken) {
-          const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
-          get().updateStepInActiveSession(respStepId, {
-            content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
-          });
-        } else {
-          hasReceivedContentToken = true;
-          get().updateStepInActiveSession(respStepId, { content: accumulated });
-        }
-      },
-      conversationHistory
-    );
+    try {
+      const chatRes = await generateChatbotResponse(
+        userPrompt,
+        previousPrompts,
+        activeModel,
+        '',
+        requestId,
+        (token, accumulated, isThinking) => {
+          if (isThinking && !hasReceivedContentToken) {
+            const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
+            get().updateStepInActiveSession(respStepId, {
+              content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
+            });
+          } else {
+            hasReceivedContentToken = true;
+            get().updateStepInActiveSession(respStepId, { content: accumulated });
+          }
+        },
+        conversationHistory,
+        abortCtrl.signal
+      );
 
-    if (chatRes.auditLog) {
-      get().addValidationAuditLog(chatRes.auditLog);
+      if (chatRes.auditLog) {
+        get().addValidationAuditLog(chatRes.auditLog);
+      }
+
+      get().updateStepInActiveSession(respStepId, {
+        content: chatRes.text,
+        groundedStatus: chatRes.groundedStatus
+      });
+
+      useTelemetryStore.getState().completeCurrentExecution(requestId);
+    } catch (err: any) {
+      if (abortCtrl.signal.aborted || err.name === 'AbortError') {
+        get().updateStepInActiveSession(respStepId, {
+          content: '🛑 Generation stopped by user.',
+          status: 'error'
+        });
+      } else {
+        get().updateStepInActiveSession(respStepId, {
+          content: `⚠️ **Execution Error**: ${err.message}`,
+          status: 'error'
+        });
+      }
+    } finally {
+      set({ isExecuting: false, activeAbortController: null });
     }
-
-    get().updateStepInActiveSession(respStepId, {
-      content: chatRes.text,
-      groundedStatus: chatRes.groundedStatus
-    });
-
-    set({ isExecuting: false });
-    useTelemetryStore.getState().completeCurrentExecution(requestId);
   },
 
   editUserMessageAndRegenerate: async (stepId: string, newContent: string) => {
@@ -2462,9 +2451,11 @@ Passing to local specialist models to assemble the execution plan.`;
       }
     ];
 
+    const abortCtrl = new AbortController();
     set(state => ({
       sessions: state.sessions.map(s => s.id === activeSess.id ? { ...s, steps: updatedSteps } : s),
-      isExecuting: true
+      isExecuting: true,
+      activeAbortController: abortCtrl
     }));
 
     const requestId = `req-${Date.now()}`;
@@ -2473,37 +2464,53 @@ Passing to local specialist models to assemble the execution plan.`;
     let hasReceivedContentToken = false;
     const previousPrompts = conversationHistory.filter(c => c.role === 'user').map(c => c.content);
 
-    const chatRes = await generateChatbotResponse(
-      newContent,
-      previousPrompts,
-      activeModel,
-      '',
-      requestId,
-      (token, accumulated, isThinking) => {
-        if (isThinking && !hasReceivedContentToken) {
-          const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
-          get().updateStepInActiveSession(respStepId, {
-            content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
-          });
-        } else {
-          hasReceivedContentToken = true;
-          get().updateStepInActiveSession(respStepId, { content: accumulated });
-        }
-      },
-      conversationHistory
-    );
+    try {
+      const chatRes = await generateChatbotResponse(
+        newContent,
+        previousPrompts,
+        activeModel,
+        '',
+        requestId,
+        (token, accumulated, isThinking) => {
+          if (isThinking && !hasReceivedContentToken) {
+            const preview = accumulated.split('\n').filter(Boolean).slice(-2).join(' ');
+            get().updateStepInActiveSession(respStepId, {
+              content: `💭 *Thinking...*\n${preview ? `> ${preview}` : ''}`
+            });
+          } else {
+            hasReceivedContentToken = true;
+            get().updateStepInActiveSession(respStepId, { content: accumulated });
+          }
+        },
+        conversationHistory,
+        abortCtrl.signal
+      );
 
-    if (chatRes.auditLog) {
-      get().addValidationAuditLog(chatRes.auditLog);
+      if (chatRes.auditLog) {
+        get().addValidationAuditLog(chatRes.auditLog);
+      }
+
+      get().updateStepInActiveSession(respStepId, {
+        content: chatRes.text,
+        groundedStatus: chatRes.groundedStatus
+      });
+
+      useTelemetryStore.getState().completeCurrentExecution(requestId);
+    } catch (err: any) {
+      if (abortCtrl.signal.aborted || err.name === 'AbortError') {
+        get().updateStepInActiveSession(respStepId, {
+          content: '🛑 Generation stopped by user.',
+          status: 'error'
+        });
+      } else {
+        get().updateStepInActiveSession(respStepId, {
+          content: `⚠️ **Execution Error**: ${err.message}`,
+          status: 'error'
+        });
+      }
+    } finally {
+      set({ isExecuting: false, activeAbortController: null });
     }
-
-    get().updateStepInActiveSession(respStepId, {
-      content: chatRes.text,
-      groundedStatus: chatRes.groundedStatus
-    });
-
-    set({ isExecuting: false });
-    useTelemetryStore.getState().completeCurrentExecution(requestId);
   },
 
   approveProposedPlan: async (approvedPlan) => {

@@ -8,16 +8,21 @@ if (-not (Test-Path $DestinationPath)) {
     New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
 }
 
-# 1. Executables
-Copy-Item "F:\corewithin\LUMI.exe" -Destination $DestinationPath
+# 1. Executables & Standalone Portable Runtimes
+Copy-Item "F:\corewithin\LUMI.exe" -Destination $DestinationPath -Force
+if (Test-Path "F:\corewithin\node.exe") {
+    Copy-Item "F:\corewithin\node.exe" -Destination $DestinationPath -Force
+} elseif (Test-Path "C:\Program Files\nodejs\node.exe") {
+    Copy-Item "C:\Program Files\nodejs\node.exe" -Destination $DestinationPath -Force
+}
 if (Test-Path "F:\corewithin\launcher\app.ico") {
-    Copy-Item "F:\corewithin\launcher\app.ico" -Destination $DestinationPath
+    Copy-Item "F:\corewithin\launcher\app.ico" -Destination $DestinationPath -Force
 }
 
 # 2. Native WebView2 Runtime DLLs
-Copy-Item "F:\corewithin\Microsoft.Web.WebView2.WinForms.dll" -Destination $DestinationPath
-Copy-Item "F:\corewithin\Microsoft.Web.WebView2.Core.dll" -Destination $DestinationPath
-Copy-Item "F:\corewithin\WebView2Loader.dll" -Destination $DestinationPath
+Copy-Item "F:\corewithin\Microsoft.Web.WebView2.WinForms.dll" -Destination $DestinationPath -Force
+Copy-Item "F:\corewithin\Microsoft.Web.WebView2.Core.dll" -Destination $DestinationPath -Force
+Copy-Item "F:\corewithin\WebView2Loader.dll" -Destination $DestinationPath -Force
 
 # 3. Built Frontend Web Application (dist)
 if (Test-Path "$DestinationPath\dist") {
@@ -38,15 +43,22 @@ if (Test-Path "F:\corewithin\dist\client\index.html") {
 # 4. Demo Notes & Datasets (demo)
 Copy-Item "F:\corewithin\demo" -Destination $DestinationPath -Recurse -Force
 
-# 5. Local Models Directory (models)
-if (Test-Path "F:\corewithin\models") {
-    if (-not (Test-Path "$DestinationPath\models")) {
-        try {
-            New-Item -ItemType Junction -Path "$DestinationPath\models" -Target "F:\corewithin\models" -Force | Out-Null
-        } catch {
-            New-Item -ItemType Directory -Path "$DestinationPath\models" -Force | Out-Null
-        }
-    }
+# 5. Local Models Directory (clean structure, ready for user downloads)
+$targetModels = "$DestinationPath\models"
+if (-not (Test-Path $targetModels)) {
+    New-Item -ItemType Directory -Path $targetModels -Force | Out-Null
+}
+$modelSubdirs = @("sdxl-lightning", "flux1-schnell", "unet", "text_encoders", "vae", "z-image-turbo", "qwen3-vl-8b", "qwen2.5-coder-7b", "qwen3-14b", "qwen3-embedding-0.6b", "qwen3-reranker-0.6b")
+foreach ($sub in $modelSubdirs) {
+    $subPath = "$targetModels\$sub"
+    if (-not (Test-Path $subPath)) { New-Item -ItemType Directory -Path $subPath -Force | Out-Null }
+    if (-not (Test-Path "$subPath\.gitkeep")) { New-Item -ItemType File -Path "$subPath\.gitkeep" -Force | Out-Null }
+}
+if (Test-Path "F:\corewithin\models\HOW_TO_ADD_MODELS.txt") {
+    Copy-Item "F:\corewithin\models\HOW_TO_ADD_MODELS.txt" -Destination $targetModels -Force
+}
+if (Test-Path "F:\corewithin\models\Download_Recommended_Models.bat") {
+    Copy-Item "F:\corewithin\models\Download_Recommended_Models.bat" -Destination $targetModels -Force
 }
 
 # 6. Local Inference Server Directory (llama_server)
@@ -63,10 +75,10 @@ Copy-Item "F:\corewithin\public" -Destination $DestinationPath -Recurse -Force
 
 # 8. Tools and Scripts for Local Neural Models & Image Generation
 if (Test-Path "F:\corewithin\tools") {
-    Copy-Item "F:\corewithin\tools" -Destination $DestinationPath -Recurse -Force
+    Copy-Item "F:\corewithin\tools" -Destination $DestinationPath -Recurse -Force -ErrorAction SilentlyContinue
 }
 if (Test-Path "F:\corewithin\scripts") {
-    Copy-Item "F:\corewithin\scripts" -Destination $DestinationPath -Recurse -Force
+    Copy-Item "F:\corewithin\scripts" -Destination $DestinationPath -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # 8. Add Quick Launch Readme

@@ -26,6 +26,7 @@ export interface LocalLlmOptions {
   thinkHarder?: boolean;
   timeoutMs?: number;
   onToken?: (token: string, accumulated: string, isThinking?: boolean) => void;
+  signal?: AbortSignal;
 }
 
 export interface LocalLlmResult {
@@ -286,7 +287,7 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
           temperature: options.thinkHarder ? 0.15 : (options.temperature ?? 0.2),
           stream: Boolean(options.onToken)
         }),
-        signal: AbortSignal.timeout(options.timeoutMs ?? (options.thinkHarder ? 360000 : 240000))
+        signal: options.signal || AbortSignal.timeout(options.timeoutMs ?? (options.thinkHarder ? 360000 : 240000))
       });
 
       if (visionRes.ok) {
@@ -448,6 +449,10 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
 
   try {
     const controller = new AbortController();
+    if (options.signal) {
+      if (options.signal.aborted) controller.abort();
+      else options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
 
     let currentTimeout = setTimeout(() => {
       controller.abort();
@@ -533,6 +538,9 @@ export async function callLocalLlm(options: LocalLlmOptions): Promise<LocalLlmRe
     }
   } catch (err: any) {
     if (err.name === 'AbortError') {
+      if (options.signal?.aborted) {
+        throw err;
+      }
       const stage = isStreamActive ? 'during token generation' : 'while loading model or processing prompt';
       const timeoutSec = Math.round((isStreamActive ? chunkInactivityMs : initialTimeoutMs) / 1000);
       throw new Error(

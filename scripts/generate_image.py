@@ -25,12 +25,30 @@ MODELS_CONFIG = {
         "name": "SDXL-Lightning 4-Step (Safetensors)",
         "path": os.path.join("models", "sdxl-lightning", "sdxl_lightning_4step.safetensors"),
         "default_steps": 4,
-        "default_cfg": 1.5,
+        "default_cfg": 1.0,
         "type": "safetensors"
     }
 }
 
+def configure_gpu_cuda_environment():
+    """Ensure CUDA runtime DLLs (cublas, cudart, etc.) from llama_server and tools/sd are in PATH."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(base_dir, ".."))
+    search_dirs = [
+        os.path.join(project_root, "llama_server"),
+        os.path.join(project_root, "LUMI_Desktop", "llama_server"),
+        os.path.join(project_root, "tools", "sd"),
+        os.path.join(project_root, "LUMI_Desktop", "tools", "sd"),
+        os.path.abspath("llama_server"),
+        os.path.abspath(os.path.join("tools", "sd"))
+    ]
+    current_path = os.environ.get("PATH", "")
+    new_dirs = [d for d in search_dirs if os.path.isdir(d) and d not in current_path]
+    if new_dirs:
+        os.environ["PATH"] = ";".join(new_dirs) + ";" + current_path
+
 def find_sd_executable():
+    configure_gpu_cuda_environment()
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(base_dir, ".."))
     candidate_paths = [
@@ -114,17 +132,17 @@ def main():
     parser = argparse.ArgumentParser(description="LUMI Local Image Generation Engine")
     parser.add_argument("--prompt", type=str, required=True, help="Image prompt")
     parser.add_argument("--negative-prompt", type=str, default="", help="Negative prompt")
-    parser.add_argument("--model-id", type=str, default="flux1-schnell", choices=list(MODELS_CONFIG.keys()), help="Model ID")
+    parser.add_argument("--model-id", type=str, default="sdxl-lightning", choices=list(MODELS_CONFIG.keys()), help="Model ID")
     parser.add_argument("--output", type=str, default="", help="Output image path")
-    parser.add_argument("--width", type=int, default=512, help="Image width")
-    parser.add_argument("--height", type=int, default=512, help="Image height")
+    parser.add_argument("--width", type=int, default=1024, help="Image width")
+    parser.add_argument("--height", type=int, default=1024, help="Image height")
     parser.add_argument("--steps", type=int, default=0, help="Sampling steps")
     parser.add_argument("--cfg-scale", type=float, default=0.0, help="CFG scale")
     parser.add_argument("--seed", type=int, default=-1, help="Seed")
 
     args = parser.parse_args()
 
-    model_info = MODELS_CONFIG.get(args.model_id, MODELS_CONFIG["flux1-schnell"])
+    model_info = MODELS_CONFIG.get(args.model_id, MODELS_CONFIG["sdxl-lightning"])
     model_rel = model_info["path"]
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(base_dir, ".."))
@@ -142,8 +160,11 @@ def main():
         model_path = os.path.abspath(model_rel)
     model_name = model_info["name"]
 
-    steps = args.steps if args.steps > 0 else model_info["default_steps"]
-    cfg_scale = args.cfg_scale if args.cfg_scale > 0.0 else model_info["default_cfg"]
+    is_sdxl = args.model_id == "sdxl-lightning"
+    width = 1024 if is_sdxl else (args.width if args.width > 0 else 1024)
+    height = 1024 if is_sdxl else (args.height if args.height > 0 else 1024)
+    steps = 4 if is_sdxl else (args.steps if args.steps > 0 else model_info["default_steps"])
+    cfg_scale = 1.0 if is_sdxl else (args.cfg_scale if args.cfg_scale > 0.0 else model_info["default_cfg"])
 
     if not args.output:
         timestamp = int(time.time() * 1000)
@@ -165,10 +186,13 @@ def main():
             "-m", model_path,
             "-p", args.prompt,
             "-o", os.path.abspath(output_path),
-            "-W", str(args.width),
-            "-H", str(args.height),
+            "-W", str(width),
+            "-H", str(height),
             "--steps", str(steps),
-            "--cfg-scale", str(cfg_scale)
+            "--cfg-scale", str(cfg_scale),
+            "--sampling-method", "euler",
+            "--vae-tiling",
+            "--force-sdxl-vae-conv-scale"
         ]
         if args.negative_prompt:
             cmd.extend(["-n", args.negative_prompt])
@@ -177,7 +201,7 @@ def main():
 
         try:
             print(f"[LUMI IMG] Running neural diffusion with {sd_bin}...", file=sys.stderr)
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180, cwd=os.path.dirname(sd_bin), env=os.environ.copy())
             if res.returncode != 0 or not os.path.isfile(output_path):
                 print(f"[LUMI IMG] sd.exe exited with code {res.returncode}, falling back to PIL synthesis: {res.stderr}", file=sys.stderr)
                 generate_with_pillow_fallback(args.prompt, model_name, output_path, args.width, args.height)
@@ -203,8 +227,8 @@ def main():
         "model_name": model_name,
         "model_file": os.path.basename(model_path),
         "prompt": args.prompt,
-        "width": args.width,
-        "height": args.height,
+        "width": width,
+        "height": height,
         "steps": steps,
         "duration_ms": duration_ms,
         "size_bytes": size_bytes,

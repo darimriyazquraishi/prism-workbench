@@ -157,34 +157,44 @@ namespace LUMI.Desktop
                 // 2c. Native Workspace Raw File Serving
                 if (urlPath.Equals("/api/workspace/raw", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (TryProxyToBackend(context, urlPath))
-                    {
-                        return;
-                    }
                     string target = context.Request.QueryString["path"];
                     if (!string.IsNullOrEmpty(target))
                     {
                         string rel = target.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-                        string cand = Path.Combine(_baseDir, rel);
-                        if (File.Exists(cand))
+                        string filename = Path.GetFileName(rel);
+                        var cands = new List<string>
                         {
-                            ServeFile(response, cand);
-                            return;
-                        }
+                            Path.Combine(_baseDir, rel),
+                            Path.Combine(_baseDir, "workspace", "generated_images", filename),
+                            Path.Combine(_baseDir, "LUMI_Desktop", rel),
+                            Path.Combine(_baseDir, "LUMI_Desktop", "workspace", "generated_images", filename)
+                        };
                         try
                         {
                             var parent = Directory.GetParent(_baseDir);
                             if (parent != null)
                             {
-                                string parentCand = Path.Combine(parent.FullName, rel);
-                                if (File.Exists(parentCand))
-                                {
-                                    ServeFile(response, parentCand);
-                                    return;
-                                }
+                                cands.Add(Path.Combine(parent.FullName, rel));
+                                cands.Add(Path.Combine(parent.FullName, "workspace", "generated_images", filename));
+                                cands.Add(Path.Combine(parent.FullName, "LUMI_Desktop", rel));
+                                cands.Add(Path.Combine(parent.FullName, "LUMI_Desktop", "workspace", "generated_images", filename));
                             }
                         }
                         catch { }
+
+                        foreach (string cand in cands)
+                        {
+                            if (File.Exists(cand))
+                            {
+                                ServeFile(response, cand);
+                                return;
+                            }
+                        }
+                    }
+
+                    if (TryProxyToBackend(context, urlPath))
+                    {
+                        return;
                     }
                 }
 
@@ -353,7 +363,7 @@ namespace LUMI.Desktop
                     var proxyReq = (HttpWebRequest)WebRequest.Create(targetUrl);
                     proxyReq.Method = context.Request.HttpMethod;
                     proxyReq.ContentType = context.Request.ContentType;
-                    proxyReq.Timeout = 10000;
+                    proxyReq.Timeout = 300000;
 
                     if (context.Request.HasEntityBody)
                     {
@@ -642,7 +652,7 @@ namespace LUMI.Desktop
 
             if (request.HttpMethod.Equals("GET", StringComparison.OrdinalIgnoreCase))
             {
-                string modelsJson = "{\"success\":true,\"models\":[{\"id\":\"flux1-schnell\",\"name\":\"FLUX.1 [schnell]\",\"format\":\"GGUF (Q4_K_S)\",\"file\":\"flux1-schnell-Q4_K_S.gguf\",\"path\":\"models/flux1-schnell/flux1-schnell-Q4_K_S.gguf\",\"sizeGb\":6.78,\"installed\":true},{\"id\":\"sdxl-lightning\",\"name\":\"SDXL-Lightning\",\"format\":\"4-Step Safetensors\",\"file\":\"sdxl_lightning_4step.safetensors\",\"path\":\"models/sdxl-lightning/sdxl_lightning_4step.safetensors\",\"sizeGb\":6.94,\"installed\":true}]}";
+                string modelsJson = "{\"success\":true,\"models\":[{\"id\":\"z-image-turbo\",\"name\":\"Z-Image Turbo (DiT BF16 + Qwen 3 4B)\",\"format\":\"DiT Safetensors (Modular)\",\"file\":\"z_image_turbo_bf16.safetensors\",\"path\":\"models/unet/z_image_turbo_bf16.safetensors\",\"sizeGb\":14.2,\"installed\":true},{\"id\":\"sdxl-lightning\",\"name\":\"SDXL-Lightning\",\"format\":\"4-Step Safetensors\",\"file\":\"sdxl_lightning_4step.safetensors\",\"path\":\"models/sdxl-lightning/sdxl_lightning_4step.safetensors\",\"sizeGb\":6.94,\"installed\":true},{\"id\":\"flux1-schnell\",\"name\":\"FLUX.1 [schnell]\",\"format\":\"GGUF (Q4_K_S)\",\"file\":\"flux1-schnell-Q4_K_S.gguf\",\"path\":\"models/flux1-schnell/flux1-schnell-Q4_K_S.gguf\",\"sizeGb\":6.78,\"installed\":true}]}";
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(modelsJson);
                 response.StatusCode = 200;
                 response.OutputStream.Write(bytes, 0, bytes.Length);
@@ -655,7 +665,10 @@ namespace LUMI.Desktop
                 string body = ReadRequestBody(request);
                 string prompt = ExtractJsonField(body, "prompt");
                 string modelId = ExtractJsonField(body, "modelId");
-                if (string.IsNullOrEmpty(modelId)) modelId = "flux1-schnell";
+                if (string.IsNullOrEmpty(modelId) || (!modelId.Equals("z-image-turbo", StringComparison.OrdinalIgnoreCase) && !modelId.Equals("flux1-schnell", StringComparison.OrdinalIgnoreCase) && !modelId.Equals("sdxl-lightning", StringComparison.OrdinalIgnoreCase)))
+                {
+                    modelId = "z-image-turbo";
+                }
 
                 if (string.IsNullOrEmpty(prompt))
                 {
@@ -666,6 +679,193 @@ namespace LUMI.Desktop
                     return;
                 }
 
+                // 1. Direct native C++ diffusion via tools/sd/sd-cli.exe (zero Python dependency)
+                string sdBin = Path.Combine(_baseDir, "tools", "sd", "sd-cli.exe");
+                if (!File.Exists(sdBin))
+                {
+                    try
+                    {
+                        var parent = Directory.GetParent(_baseDir);
+                        if (parent != null)
+                        {
+                            string altSd = Path.Combine(parent.FullName, "tools", "sd", "sd-cli.exe");
+                            if (File.Exists(altSd)) sdBin = altSd;
+                        }
+                    }
+                    catch { }
+                }
+
+                string modelsDir = Program.LocateModelsDirectory();
+                string resolvedModelPath = null;
+                string zDiffPath = null;
+                string zLlmPath = null;
+                string zVaePath = null;
+
+                string[] driveRoots = new string[] { "F:\\", "C:\\", "D:\\", "E:\\" };
+                foreach (var d in driveRoots)
+                {
+                    string comfyUnet = Path.Combine(d, "ComfyUIMain", "models", "unet", "z_image_turbo_bf16.safetensors");
+                    if (File.Exists(comfyUnet)) { zDiffPath = comfyUnet; break; }
+                    string comfyDiff = Path.Combine(d, "ComfyUIMain", "models", "diffusion_models", "z_image_turbo_bf16.safetensors");
+                    if (File.Exists(comfyDiff)) { zDiffPath = comfyDiff; break; }
+                }
+                foreach (var d in driveRoots)
+                {
+                    string comfyLlm = Path.Combine(d, "ComfyUIMain", "models", "text_encoders", "qwen_3_4b.safetensors");
+                    if (File.Exists(comfyLlm)) { zLlmPath = comfyLlm; break; }
+                    string comfyLLM2 = Path.Combine(d, "ComfyUIMain", "models", "LLM", "qwen_3_4b.safetensors");
+                    if (File.Exists(comfyLLM2)) { zLlmPath = comfyLLM2; break; }
+                }
+                foreach (var d in driveRoots)
+                {
+                    string comfyVae = Path.Combine(d, "ComfyUIMain", "models", "vae", "ae.safetensors");
+                    if (File.Exists(comfyVae)) { zVaePath = comfyVae; break; }
+                }
+
+                if (Directory.Exists(modelsDir))
+                {
+                    if (string.IsNullOrEmpty(zDiffPath))
+                    {
+                        foreach (var f in Directory.GetFiles(modelsDir, "*z_image_turbo*.safetensors", SearchOption.AllDirectories)) { zDiffPath = f; break; }
+                    }
+                    if (string.IsNullOrEmpty(zLlmPath))
+                    {
+                        foreach (var f in Directory.GetFiles(modelsDir, "*qwen_3_4b*.safetensors", SearchOption.AllDirectories)) { zLlmPath = f; break; }
+                    }
+                    if (string.IsNullOrEmpty(zVaePath))
+                    {
+                        foreach (var f in Directory.GetFiles(modelsDir, "*ae*.safetensors", SearchOption.AllDirectories)) { zVaePath = f; break; }
+                    }
+
+                    string sdxlPath = null;
+                    string fluxPath = null;
+
+                    foreach (var f in Directory.GetFiles(modelsDir, "*sdxl_lightning*.safetensors", SearchOption.AllDirectories))
+                    {
+                        sdxlPath = f;
+                        break;
+                    }
+                    if (string.IsNullOrEmpty(sdxlPath))
+                    {
+                        foreach (var f in Directory.GetFiles(modelsDir, "*lightning*.safetensors", SearchOption.AllDirectories))
+                        {
+                            sdxlPath = f;
+                            break;
+                        }
+                    }
+
+                    foreach (var f in Directory.GetFiles(modelsDir, "*flux1-schnell*.gguf", SearchOption.AllDirectories))
+                    {
+                        fluxPath = f;
+                        break;
+                    }
+
+                    bool hasZ = !string.IsNullOrEmpty(zDiffPath) && !string.IsNullOrEmpty(zLlmPath) && !string.IsNullOrEmpty(zVaePath);
+                    if (modelId.Equals("z-image-turbo", StringComparison.OrdinalIgnoreCase) && hasZ)
+                    {
+                        resolvedModelPath = zDiffPath;
+                    }
+                    else if (modelId.Equals("sdxl-lightning", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrEmpty(sdxlPath)) resolvedModelPath = sdxlPath;
+                        else if (hasZ) { resolvedModelPath = zDiffPath; modelId = "z-image-turbo"; }
+                        else if (!string.IsNullOrEmpty(fluxPath)) { resolvedModelPath = fluxPath; modelId = "flux1-schnell"; }
+                    }
+                    else
+                    {
+                        if (!string.IsNullOrEmpty(fluxPath)) resolvedModelPath = fluxPath;
+                        else if (hasZ) { resolvedModelPath = zDiffPath; modelId = "z-image-turbo"; }
+                        else if (!string.IsNullOrEmpty(sdxlPath)) { resolvedModelPath = sdxlPath; modelId = "sdxl-lightning"; }
+                    }
+                }
+
+                long timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                string outputDir = Path.Combine(_baseDir, "workspace", "generated_images");
+                try { Directory.CreateDirectory(outputDir); } catch { }
+                string outFilename = string.Format("img_{0}_{1}.png", modelId, timestamp);
+                string fullOutputPath = Path.Combine(outputDir, outFilename);
+                string relOutputPath = string.Format("workspace/generated_images/{0}", outFilename);
+
+                bool isZ = modelId.Equals("z-image-turbo", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(zDiffPath) && !string.IsNullOrEmpty(zLlmPath) && !string.IsNullOrEmpty(zVaePath);
+
+                if (File.Exists(sdBin) && ((isZ && File.Exists(zDiffPath)) || (!string.IsNullOrEmpty(resolvedModelPath) && File.Exists(resolvedModelPath))))
+                {
+                    try
+                    {
+                        string sdDir = Path.GetDirectoryName(sdBin);
+                        string llamaDir = Path.Combine(Path.GetDirectoryName(sdDir), "llama_server");
+                        string existingPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+
+                        int randomSeed = new Random().Next(1, int.MaxValue);
+                        string sdArgs;
+                        if (isZ)
+                        {
+                            sdArgs = string.Format("--diffusion-model \"{0}\" --llm \"{1}\" --vae \"{2}\" -p \"{3}\" -o \"{4}\" -W 1024 -H 1024 --steps 8 --cfg-scale 1.0 --sampling-method euler -s {5}",
+                                zDiffPath,
+                                prompt.Replace("\"", "\\\""),
+                                fullOutputPath,
+                                randomSeed);
+                        }
+                        else
+                        {
+                            sdArgs = string.Format("-m \"{0}\" -p \"{1}\" -o \"{2}\" -W 1024 -H 1024 --steps 4 --cfg-scale 1.0 --sampling-method euler --vae-tiling --force-sdxl-vae-conv-scale -s {3}",
+                                resolvedModelPath,
+                                prompt.Replace("\"", "\\\""),
+                                fullOutputPath,
+                                randomSeed);
+                        }
+
+                        var sdPsi = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = sdBin,
+                            Arguments = sdArgs,
+                            WorkingDirectory = sdDir,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        };
+                        sdPsi.EnvironmentVariables["PATH"] = string.Format("{0};{1};{2}", sdDir, llamaDir, existingPath);
+
+                        using (var sdProc = System.Diagnostics.Process.Start(sdPsi))
+                        {
+                            sdProc.WaitForExit(180000);
+                        }
+
+                        if (File.Exists(fullOutputPath))
+                        {
+                            try
+                            {
+                                var parent = Directory.GetParent(_baseDir);
+                                if (parent != null)
+                                {
+                                    string p1 = Path.Combine(parent.FullName, "workspace", "generated_images", outFilename);
+                                    if (!File.Exists(p1)) { Directory.CreateDirectory(Path.GetDirectoryName(p1)); File.Copy(fullOutputPath, p1, true); }
+                                    string p2 = Path.Combine(parent.FullName, "LUMI_Desktop", "workspace", "generated_images", outFilename);
+                                    if (!File.Exists(p2)) { Directory.CreateDirectory(Path.GetDirectoryName(p2)); File.Copy(fullOutputPath, p2, true); }
+                                }
+                                string d1 = Path.Combine(_baseDir, "LUMI_Desktop", "workspace", "generated_images", outFilename);
+                                if (!File.Exists(d1) && Directory.Exists(Path.Combine(_baseDir, "LUMI_Desktop"))) { Directory.CreateDirectory(Path.GetDirectoryName(d1)); File.Copy(fullOutputPath, d1, true); }
+                            }
+                            catch { }
+
+                            long sz = new FileInfo(fullOutputPath).Length;
+                            string rawUrl = string.Format("/api/workspace/raw?path={0}", Uri.EscapeDataString(relOutputPath));
+                            string mName = isZ ? "Z-Image Turbo (DiT BF16 + Qwen 3 4B)" : (modelId.Equals("sdxl-lightning", StringComparison.OrdinalIgnoreCase) ? "SDXL-Lightning (Safetensors)" : "FLUX.1 [schnell]");
+                            string wrappedJson = string.Format("{{\"success\":true,\"image\":{{\"filename\":\"{0}\",\"path\":\"{1}\",\"rawUrl\":\"{2}\",\"prompt\":\"{3}\",\"modelId\":\"{4}\",\"modelName\":\"{5}\",\"width\":1024,\"height\":1024,\"durationMs\":18000,\"sizeBytes\":{6}}}}}",
+                                outFilename, relOutputPath, rawUrl, prompt.Replace("\"", "\\\""), modelId, mName, sz);
+
+                            byte[] outBytes = System.Text.Encoding.UTF8.GetBytes(wrappedJson);
+                            response.StatusCode = 200;
+                            response.OutputStream.Write(outBytes, 0, outBytes.Length);
+                            response.Close();
+                            return;
+                        }
+                    }
+                    catch { }
+                }
+
+                // 2. Fallback: Python generate_image.py if available
                 string scriptPath = Path.Combine(_baseDir, "scripts", "generate_image.py");
                 string workDir = _baseDir;
                 if (!File.Exists(scriptPath))
@@ -699,6 +899,8 @@ namespace LUMI.Desktop
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
+
+                string expectedModelFile = modelId.Equals("sdxl-lightning", StringComparison.OrdinalIgnoreCase) ? "sdxl_lightning_4step.safetensors" : "flux1-schnell-Q4_K_S.gguf";
 
                 try
                 {
@@ -734,8 +936,11 @@ namespace LUMI.Desktop
                         }
                         else
                         {
+                            string errMessage = string.IsNullOrEmpty(resolvedModelPath)
+                                ? string.Format("Model weights not found. Please download {0} into the models/ directory.", expectedModelFile)
+                                : (stderr ?? "Failed to generate image");
                             string errJson = string.Format("{{\"success\":false,\"error\":\"{0}\"}}",
-                                (stderr ?? "Failed to generate image").Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " "));
+                                errMessage.Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " "));
                             byte[] errBytes = System.Text.Encoding.UTF8.GetBytes(errJson);
                             response.StatusCode = 500;
                             response.OutputStream.Write(errBytes, 0, errBytes.Length);
@@ -746,7 +951,10 @@ namespace LUMI.Desktop
                 }
                 catch (Exception ex)
                 {
-                    string errJson = string.Format("{{\"success\":false,\"error\":\"{0}\"}}", ex.Message.Replace("\"", "\\\""));
+                    string errMessage = string.IsNullOrEmpty(resolvedModelPath)
+                        ? string.Format("Model weights not found. Please download {0} into the models/ directory.", expectedModelFile)
+                        : ex.Message;
+                    string errJson = string.Format("{{\"success\":false,\"error\":\"{0}\"}}", errMessage.Replace("\"", "\\\""));
                     byte[] errBytes = System.Text.Encoding.UTF8.GetBytes(errJson);
                     response.StatusCode = 500;
                     response.OutputStream.Write(errBytes, 0, errBytes.Length);
@@ -1535,9 +1743,25 @@ namespace LUMI.Desktop
                     string workDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(entryFile)));
                     if (string.IsNullOrEmpty(workDir) || !Directory.Exists(workDir)) workDir = _baseDir;
 
+                    string nodeBinary = "node.exe";
+                    string localNode = Path.Combine(_baseDir, "node.exe");
+                    if (File.Exists(localNode))
+                    {
+                        nodeBinary = localNode;
+                    }
+                    else
+                    {
+                        var parent = Directory.GetParent(_baseDir);
+                        if (parent != null)
+                        {
+                            string pNode = Path.Combine(parent.FullName, "node.exe");
+                            if (File.Exists(pNode)) nodeBinary = pNode;
+                        }
+                    }
+
                     var psi = new System.Diagnostics.ProcessStartInfo
                     {
-                        FileName = "node.exe",
+                        FileName = nodeBinary,
                         Arguments = string.Format("\"{0}\"", entryFile),
                         WorkingDirectory = workDir,
                         UseShellExecute = false,

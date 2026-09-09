@@ -37,9 +37,12 @@ llama/
 # Compiled Binaries (loose root binaries ignored; LUMI_Desktop distribution included)
 /*.dll
 /*.exe
+launcher/*.exe
 *.so
 *.dylib
 lib/
+node.exe
+**/node.exe
 llama_server/*.exe
 LUMI_Desktop/llama_server/*.exe
 llama_server/*.dll
@@ -47,6 +50,7 @@ LUMI_Desktop/llama_server/*.dll
 /tools/
 /LUMI_Desktop/tools/
 /workspace/
+/LUMI_Desktop/workspace/
 /sanGHEHan/
 
 # Caches and runtime
@@ -57,6 +61,7 @@ __pycache__/
 *.pyd
 
 # logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

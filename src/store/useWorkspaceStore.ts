@@ -73,6 +73,92 @@ export interface AiChatMessage {
     sizeBytes: number;
   };
 }
+ 
+export interface IdeChatSession {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: AiChatMessage[];
+}
+
+function getInitialChatSessions(): { sessions: IdeChatSession[]; activeId: string; messages: AiChatMessage[] } {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = localStorage.getItem('lumi_ide_chat_sessions');
+      if (raw) {
+        const parsed: IdeChatSession[] = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Remove any legacy canned greetings from persisted sessions
+          const cleaned = parsed.map(s => ({
+            ...s,
+            messages: (s.messages || []).filter(m => m.id !== 'msg-init' && !m.content.includes('I am LUMI, your Project Workspace AI Assistant'))
+          }));
+          const activeId = localStorage.getItem('lumi_ide_active_chat_id') || cleaned[0].id;
+          const activeSession = cleaned.find(s => s.id === activeId) || cleaned[0];
+          return {
+            sessions: cleaned,
+            activeId: activeSession.id,
+            messages: activeSession.messages || []
+          };
+        }
+      }
+    }
+  } catch {}
+
+  const initialId = `ide-chat-${Date.now()}`;
+  const initialSession: IdeChatSession = {
+    id: initialId,
+    title: 'New Chat',
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    updatedAt: new Date().toISOString(),
+    messages: []
+  };
+
+  return {
+    sessions: [initialSession],
+    activeId: initialId,
+    messages: []
+  };
+}
+
+function syncSessionsList(sessions: IdeChatSession[], activeId: string, messages: AiChatMessage[]): IdeChatSession[] {
+  const list = [...sessions];
+  const idx = list.findIndex(s => s.id === activeId);
+
+  const firstUser = messages.find(m => m.role === 'user');
+  let title = 'New Chat';
+  if (firstUser) {
+    const clean = firstUser.content.replace(/^🎨\s*Create Image:\s*"?/, '').replace(/"$/, '').trim();
+    title = clean.slice(0, 36) + (clean.length > 36 ? '...' : '');
+  }
+
+  if (idx >= 0) {
+    list[idx] = {
+      ...list[idx],
+      title: list[idx].title === 'New Chat' || list[idx].title === 'Untitled Chat' ? title : list[idx].title,
+      updatedAt: new Date().toISOString(),
+      messages
+    };
+  } else {
+    list.unshift({
+      id: activeId,
+      title,
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      updatedAt: new Date().toISOString(),
+      messages
+    });
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('lumi_ide_chat_sessions', JSON.stringify(list));
+      localStorage.setItem('lumi_ide_active_chat_id', activeId);
+    }
+  } catch {}
+
+  return list;
+}
 
 export interface WorkspaceState {
   // 1. Workspace Identity
@@ -96,6 +182,8 @@ export interface WorkspaceState {
 
   // 4. AI & Permissions
   permissionMode: 'safe' | 'assisted' | 'autonomous';
+  chatSessions: IdeChatSession[];
+  activeChatSessionId: string;
   aiMessages: AiChatMessage[];
   isAiGenerating: boolean;
   activeDiffProposal: {
@@ -125,10 +213,17 @@ export interface WorkspaceState {
   checkGitStatus: () => Promise<void>;
   selectedImageModel: string;
   setSelectedImageModel: (modelId: string) => void;
+  activeAbortController: AbortController | null;
+  stopAiGeneration: () => void;
   generateWorkspaceImage: (prompt: string, modelId?: string, skipUserMsg?: boolean) => Promise<void>;
-  sendWorkspaceAiPrompt: (prompt: string) => Promise<void>;
+  sendWorkspaceAiPrompt: (prompt: string, skipUserMsg?: boolean) => Promise<void>;
+  editUserMessageAndRegenerate: (messageId: string, newContent: string) => Promise<void>;
+  regenerateAiResponse: (aiMessageId: string) => Promise<void>;
   approveDiffProposal: () => Promise<void>;
   rejectDiffProposal: () => void;
+  createNewChatSession: (force?: boolean) => string;
+  selectChatSession: (sessionId: string) => void;
+  deleteChatSession: (sessionId: string) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -137,7 +232,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   recentWorkspaces: [],
   isLoadingTree: false,
   treeData: [],
-  expandedPaths: new Set(['src']),
+  expandedPaths: new Set<string>(),
   searchQuery: '',
 
   openTabs: [],
@@ -148,18 +243,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   terminalHistory: ['LUMI Workspace Terminal Ready. Type commands and press Enter.'],
   isExecutingCommand: false,
 
-  selectedImageModel: 'flux1-schnell',
+  selectedImageModel: 'sdxl-lightning',
   setSelectedImageModel: (modelId: string) => set({ selectedImageModel: modelId }),
+  activeAbortController: null,
 
   permissionMode: 'assisted',
-  aiMessages: [
-    {
-      id: 'msg-init',
-      role: 'assistant',
-      content: 'I am LUMI, your Project Workspace AI Assistant. Open any project folder to allow me to inspect, search, create, and modify your code directly with full air-gapped security.',
-      timestamp: new Date().toLocaleTimeString()
-    }
-  ],
+  ...(() => {
+    const init = getInitialChatSessions();
+    return {
+      chatSessions: init.sessions,
+      activeChatSessionId: init.activeId,
+      aiMessages: init.messages
+    };
+  })(),
   isAiGenerating: false,
   activeDiffProposal: null,
 
@@ -549,10 +645,38 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch {}
   },
 
+  stopAiGeneration: () => {
+    const ctrl = get().activeAbortController;
+    if (ctrl) {
+      try {
+        ctrl.abort();
+      } catch {}
+    }
+    set(state => {
+      const msgs = [...state.aiMessages];
+      if (msgs.length > 0 && state.isAiGenerating) {
+        msgs.push({
+          id: `asst-${Date.now()}`,
+          role: 'assistant',
+          content: '🛑 *Generation stopped by user.*',
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }
+      return {
+        isAiGenerating: false,
+        activeAbortController: null,
+        aiMessages: msgs,
+        chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+      };
+    });
+  },
+
   generateWorkspaceImage: async (prompt: string, modelId?: string, skipUserMsg?: boolean) => {
-    const activeModel = modelId || get().selectedImageModel || 'flux1-schnell';
+    const activeModel = modelId || get().selectedImageModel || 'sdxl-lightning';
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) return;
+
+    const controller = new AbortController();
 
     if (!skipUserMsg) {
       const userMsg: AiChatMessage = {
@@ -561,12 +685,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         content: `🎨 Create Image: "${trimmedPrompt}"`,
         timestamp: new Date().toLocaleTimeString()
       };
-      set(state => ({
-        aiMessages: [...state.aiMessages, userMsg],
-        isAiGenerating: true
-      }));
+      set(state => {
+        const msgs = [...state.aiMessages, userMsg];
+        return {
+          aiMessages: msgs,
+          chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs),
+          isAiGenerating: true,
+          activeAbortController: controller
+        };
+      });
     } else {
-      set({ isAiGenerating: true });
+      set({ isAiGenerating: true, activeAbortController: controller });
     }
 
     try {
@@ -576,7 +705,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         body: JSON.stringify({
           prompt: trimmedPrompt,
           modelId: activeModel
-        })
+        }),
+        signal: controller.signal
       });
 
       const data = await res.json();
@@ -592,10 +722,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           imageCard: data.image
         };
 
-        set(state => ({
-          isAiGenerating: false,
-          aiMessages: [...state.aiMessages, assistantMsg]
-        }));
+        set(state => {
+          const msgs = [...state.aiMessages, assistantMsg];
+          return {
+            isAiGenerating: false,
+            activeAbortController: null,
+            aiMessages: msgs,
+            chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+          };
+        });
       } else {
         const errorMsg: AiChatMessage = {
           id: `asst-${Date.now()}`,
@@ -603,42 +738,64 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           content: `❌ Image generation error: ${data.error || 'Failed to generate image'}`,
           timestamp: new Date().toLocaleTimeString()
         };
-        set(state => ({
-          isAiGenerating: false,
-          aiMessages: [...state.aiMessages, errorMsg]
-        }));
+        set(state => {
+          const msgs = [...state.aiMessages, errorMsg];
+          return {
+            isAiGenerating: false,
+            activeAbortController: null,
+            aiMessages: msgs,
+            chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+          };
+        });
       }
     } catch (err: any) {
-      set(state => ({
-        isAiGenerating: false,
-        aiMessages: [
+      const isAborted = controller.signal.aborted || err.name === 'AbortError' || err.message?.includes('aborted');
+      set(state => {
+        const msgs = [
           ...state.aiMessages,
           {
             id: `asst-${Date.now()}`,
             role: 'assistant',
-            content: `❌ Image generation failed: ${err.message}`,
+            content: isAborted ? '🛑 *Image generation stopped by user.*' : `❌ Image generation failed: ${err.message}`,
             timestamp: new Date().toLocaleTimeString()
           }
-        ]
-      }));
+        ];
+        return {
+          isAiGenerating: false,
+          activeAbortController: null,
+          aiMessages: msgs,
+          chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+        };
+      });
     }
   },
 
-  sendWorkspaceAiPrompt: async (prompt: string) => {
+  sendWorkspaceAiPrompt: async (prompt: string, skipUserMsg?: boolean) => {
     const trimmed = prompt.trim();
     if (!trimmed) return;
 
-    const userMsg: AiChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: trimmed,
-      timestamp: new Date().toLocaleTimeString()
-    };
+    const controller = new AbortController();
 
-    set(state => ({
-      aiMessages: [...state.aiMessages, userMsg],
-      isAiGenerating: true
-    }));
+    if (!skipUserMsg) {
+      const userMsg: AiChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: trimmed,
+        timestamp: new Date().toLocaleTimeString()
+      };
+
+      set(state => {
+        const msgs = [...state.aiMessages, userMsg];
+        return {
+          aiMessages: msgs,
+          isAiGenerating: true,
+          activeAbortController: controller,
+          chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+        };
+      });
+    } else {
+      set({ isAiGenerating: true, activeAbortController: controller });
+    }
 
     // Auto-detect if prompt is an image generation request
     const imageMatch = trimmed.match(/^(?:\/image\s+|(?:create|generate|make|draw|render)\s+(?:an?\s+)?image\s*(?:of\s+|about\s+|for\s+)?)(.+)$/i);
@@ -661,9 +818,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         })
       });
       const secData = await secRes.json().catch(() => ({}));
-      set(state => ({
-        isAiGenerating: false,
-        aiMessages: [
+      set(state => {
+        const msgs = [
           ...state.aiMessages,
           {
             id: `asst-${Date.now()}`,
@@ -672,8 +828,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             timestamp: new Date().toLocaleTimeString(),
             toolCalls: [{ tool: 'read_file', args: { path: '../../some-file.txt' }, status: 'failed', error: secData.error }]
           }
-        ]
-      }));
+        ];
+        return {
+          isAiGenerating: false,
+          aiMessages: msgs,
+          chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+        };
+      });
       return;
     }
 
@@ -773,10 +934,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       // Handle Delete explicitly if requested
       if (isDeleteTask && candidatePath) {
         if (get().permissionMode !== 'autonomous') {
-          set(state => ({
-            isAiGenerating: false,
-            activeDiffProposal: { path: candidatePath!, action: 'delete' },
-            aiMessages: [
+          set(state => {
+            const msgs = [
               ...state.aiMessages,
               {
                 id: `asst-${Date.now()}`,
@@ -785,8 +944,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 timestamp: new Date().toLocaleTimeString(),
                 diffProposal: { path: candidatePath!, action: 'delete' }
               }
-            ]
-          }));
+            ];
+            return {
+              isAiGenerating: false,
+              activeDiffProposal: { path: candidatePath!, action: 'delete' },
+              aiMessages: msgs,
+              chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+            };
+          });
           return;
         }
 
@@ -803,9 +968,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const delData = await delRes.json().catch(() => ({}));
         await get().refreshTree();
 
-        set(state => ({
-          isAiGenerating: false,
-          aiMessages: [
+        set(state => {
+          const msgs = [
             ...state.aiMessages,
             {
               id: `asst-${Date.now()}`,
@@ -816,8 +980,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               timestamp: new Date().toLocaleTimeString(),
               toolCalls: [{ tool: 'delete_file', args: { path: candidatePath }, status: delData.success ? 'success' : 'failed' }]
             }
-          ]
-        }));
+          ];
+          return {
+            isAiGenerating: false,
+            aiMessages: msgs,
+            chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+          };
+        });
         return;
       }
 
@@ -885,7 +1054,8 @@ STRICT RULES:
         systemPrompt,
         userPrompt: agentUserPrompt,
         formatJson: isCodingTask,
-        temperature: isCodingTask ? 0.1 : 0.2
+        temperature: isCodingTask ? 0.1 : 0.2,
+        signal: controller.signal
       });
 
       const responseText = llmResult.content || 'I completed the task analysis.';
@@ -1091,9 +1261,8 @@ STRICT RULES:
         finalContent += `\n\n✓ **Auto-applied change:** Written to \`${candidatePath}\` on physical disk.`;
       }
 
-      set(state => ({
-        isAiGenerating: false,
-        aiMessages: [
+      set(state => {
+        const msgs = [
           ...state.aiMessages,
           {
             id: `asst-${Date.now()}`,
@@ -1104,21 +1273,92 @@ STRICT RULES:
             diffProposal: proposedDiff || undefined,
             actionBadge
           }
-        ]
-      }));
+        ];
+        return {
+          isAiGenerating: false,
+          activeAbortController: null,
+          aiMessages: msgs,
+          chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+        };
+      });
     } catch (err: any) {
-      set(state => ({
-        isAiGenerating: false,
-        aiMessages: [
+      const isAborted = controller.signal.aborted || err.name === 'AbortError' || err.message?.includes('aborted');
+      set(state => {
+        const msgs = [
           ...state.aiMessages,
           {
             id: `asst-${Date.now()}`,
             role: 'assistant',
-            content: `Error executing workspace request: ${err.message}`,
+            content: isAborted ? '🛑 *Generation stopped by user.*' : `Error executing workspace request: ${err.message}`,
             timestamp: new Date().toLocaleTimeString()
           }
-        ]
-      }));
+        ];
+        return {
+          isAiGenerating: false,
+          activeAbortController: null,
+          aiMessages: msgs,
+          chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+        };
+      });
+    }
+  },
+
+  editUserMessageAndRegenerate: async (messageId: string, newContent: string) => {
+    const trimmed = newContent.trim();
+    if (!trimmed) return;
+
+    get().stopAiGeneration();
+
+    const messages = get().aiMessages;
+    const targetIdx = messages.findIndex(m => m.id === messageId);
+    if (targetIdx === -1) return;
+
+    const updatedUserMsg: AiChatMessage = {
+      ...messages[targetIdx],
+      content: trimmed,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    const prunedMessages = [...messages.slice(0, targetIdx), updatedUserMsg];
+    set(state => ({
+      aiMessages: prunedMessages,
+      chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, prunedMessages)
+    }));
+
+    await get().sendWorkspaceAiPrompt(trimmed, true);
+  },
+
+  regenerateAiResponse: async (aiMessageId: string) => {
+    get().stopAiGeneration();
+
+    const messages = get().aiMessages;
+    const asstIdx = messages.findIndex(m => m.id === aiMessageId);
+    if (asstIdx === -1) return;
+
+    let precedingUserMsg: AiChatMessage | null = null;
+    let userIdx = -1;
+    for (let i = asstIdx - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        precedingUserMsg = messages[i];
+        userIdx = i;
+        break;
+      }
+    }
+
+    if (!precedingUserMsg) return;
+
+    const prunedMessages = messages.slice(0, userIdx + 1);
+    set(state => ({
+      aiMessages: prunedMessages,
+      chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, prunedMessages)
+    }));
+
+    if (precedingUserMsg.content.startsWith('🎨 Create Image:')) {
+      const match = precedingUserMsg.content.match(/🎨 Create Image:\s*"?([^"]*)"?/);
+      const prompt = match ? match[1] : precedingUserMsg.content.replace('🎨 Create Image:', '').trim();
+      await get().generateWorkspaceImage(prompt, undefined, true);
+    } else {
+      await get().sendWorkspaceAiPrompt(precedingUserMsg.content, true);
     }
   },
 
@@ -1156,9 +1396,8 @@ STRICT RULES:
     await get().refreshTree();
     await get().checkGitStatus();
 
-    set(state => ({
-      activeDiffProposal: null,
-      aiMessages: [
+    set(state => {
+      const msgs = [
         ...state.aiMessages,
         {
           id: `asst-${Date.now()}`,
@@ -1166,14 +1405,18 @@ STRICT RULES:
           content: `✓ **Approved & Applied Changes:** Successfully executed \`${action}\` on \`${targetPath}\` and written to physical disk.`,
           timestamp: new Date().toLocaleTimeString()
         }
-      ]
-    }));
+      ];
+      return {
+        activeDiffProposal: null,
+        aiMessages: msgs,
+        chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+      };
+    });
   },
 
   rejectDiffProposal: () => {
-    set(state => ({
-      activeDiffProposal: null,
-      aiMessages: [
+    set(state => {
+      const msgs = [
         ...state.aiMessages,
         {
           id: `asst-${Date.now()}`,
@@ -1181,7 +1424,110 @@ STRICT RULES:
           content: `Declined proposed changes. No modifications were written to disk.`,
           timestamp: new Date().toLocaleTimeString()
         }
-      ]
-    }));
+      ];
+      return {
+        activeDiffProposal: null,
+        aiMessages: msgs,
+        chatSessions: syncSessionsList(state.chatSessions, state.activeChatSessionId, msgs)
+      };
+    });
+  },
+
+  createNewChatSession: (force?: boolean) => {
+    const { chatSessions, activeChatSessionId, aiMessages } = get();
+    // If not forced, check if the active session is already empty/new (no user messages)
+    if (!force) {
+      const activeSession = chatSessions.find(s => s.id === activeChatSessionId);
+      const currentMsgs = activeSession?.messages || aiMessages;
+      const hasUserMsg = currentMsgs.some(m => m.role === 'user');
+      if (!hasUserMsg && activeSession) {
+        // Return existing blank session
+        return activeSession.id;
+      }
+    }
+
+    const newId = `ide-chat-${Date.now()}`;
+    const newSession: IdeChatSession = {
+      id: newId,
+      title: 'New Chat',
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      updatedAt: new Date().toISOString(),
+      messages: []
+    };
+
+    const updatedSessions = [newSession, ...chatSessions];
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('lumi_ide_chat_sessions', JSON.stringify(updatedSessions));
+        localStorage.setItem('lumi_ide_active_chat_id', newId);
+      }
+    } catch {}
+
+    set({
+      chatSessions: updatedSessions,
+      activeChatSessionId: newId,
+      aiMessages: [],
+      activeDiffProposal: null
+    });
+
+    return newId;
+  },
+
+  selectChatSession: (sessionId: string) => {
+    const { chatSessions } = get();
+    const target = chatSessions.find(s => s.id === sessionId);
+    if (!target) return;
+
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('lumi_ide_active_chat_id', target.id);
+      }
+    } catch {}
+
+    set({
+      activeChatSessionId: target.id,
+      aiMessages: target.messages || [],
+      activeDiffProposal: null
+    });
+  },
+
+  deleteChatSession: (sessionId: string) => {
+    const { chatSessions, activeChatSessionId } = get();
+    const filtered = chatSessions.filter(s => s.id !== sessionId);
+
+    let nextSessions = filtered;
+    let nextActiveId = activeChatSessionId;
+    let nextMessages = get().aiMessages;
+
+    if (filtered.length === 0) {
+      const freshId = `ide-chat-${Date.now()}`;
+      const freshSession: IdeChatSession = {
+        id: freshId,
+        title: 'New Chat',
+        createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        updatedAt: new Date().toISOString(),
+        messages: []
+      };
+      nextSessions = [freshSession];
+      nextActiveId = freshId;
+      nextMessages = [];
+    } else if (activeChatSessionId === sessionId) {
+      nextActiveId = filtered[0].id;
+      nextMessages = filtered[0].messages || [];
+    }
+
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('lumi_ide_chat_sessions', JSON.stringify(nextSessions));
+        localStorage.setItem('lumi_ide_active_chat_id', nextActiveId);
+      }
+    } catch {}
+
+    set({
+      chatSessions: nextSessions,
+      activeChatSessionId: nextActiveId,
+      aiMessages: nextMessages,
+      activeDiffProposal: null
+    });
   }
 }));
