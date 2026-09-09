@@ -125,14 +125,65 @@ function renderHighlightedCode(code: string): React.ReactNode {
   const lines = code.split('\n');
   const tokenRegex = /(#.*$|\/\/.*$|f?"""[\s\S]*?"""|f?'''[\s\S]*?'''|f?"(?:\\.|[^"\\])*"|f?'(?:\\.|[^'\\])*'|\b(?:def|class|return|if|elif|else|for|while|in|import|from|as|try|except|finally|raise|with|lambda|pass|break|continue|yield|function|const|let|var|async|await|new|typeof|interface|type|public|private|static|export|default|null|true|false|True|False|None)\b|\b\d+(?:\.\d+)?\b|\b(?:print|len|range|int|float|str|bool|dict|list|set|tuple|input|super|isinstance|enumerate|zip|map|filter|sum|min|max|abs|round|open|console|log|error|warn)\b|[a-zA-Z_]\w*(?=\s*\())/g;
 
+  let inDocstring: string | null = null;
+
   return lines.map((line, lineIdx) => {
+    const lineNum = (
+      <span className="table-cell select-none pr-4 text-right text-[#484f58] font-mono text-[11px] w-8 border-r border-[#21262d]">
+        {lineIdx + 1}
+      </span>
+    );
+
+    // If currently inside a multiline docstring
+    if (inDocstring) {
+      const closeIdx = line.indexOf(inDocstring);
+      if (closeIdx !== -1) {
+        const endPos = closeIdx + 3;
+        const docstringPart = line.slice(0, endPos);
+        const rest = line.slice(endPos);
+        inDocstring = null;
+        return (
+          <div key={lineIdx} className="table-row hover:bg-[#161b22]/50 transition-colors">
+            {lineNum}
+            <span className="table-cell pl-3 whitespace-pre">
+              <span className="text-[#7ee787] italic">{docstringPart}</span>
+              {rest}
+            </span>
+          </div>
+        );
+      } else {
+        return (
+          <div key={lineIdx} className="table-row hover:bg-[#161b22]/50 transition-colors">
+            {lineNum}
+            <span className="table-cell pl-3 text-[#7ee787] italic whitespace-pre">{line}</span>
+          </div>
+        );
+      }
+    }
+
     const trimmed = line.trim();
+
+    // Check if line begins a multiline docstring
+    const docMatch = trimmed.match(/^(?:f)?("""|''')/);
+    if (docMatch) {
+      const delimiter = docMatch[1];
+      const firstDelimIdx = line.indexOf(delimiter);
+      const secondDelimIdx = line.indexOf(delimiter, firstDelimIdx + 3);
+      if (secondDelimIdx === -1) {
+        inDocstring = delimiter;
+        return (
+          <div key={lineIdx} className="table-row hover:bg-[#161b22]/50 transition-colors">
+            {lineNum}
+            <span className="table-cell pl-3 text-[#7ee787] italic whitespace-pre">{line}</span>
+          </div>
+        );
+      }
+    }
+
     if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
       return (
         <div key={lineIdx} className="table-row hover:bg-[#161b22]/50 transition-colors">
-          <span className="table-cell select-none pr-4 text-right text-[#484f58] font-mono text-[11px] w-8 border-r border-[#21262d] mr-3">
-            {lineIdx + 1}
-          </span>
+          {lineNum}
           <span className="table-cell pl-3 text-[#8b949e] italic whitespace-pre">{line}</span>
         </div>
       );
@@ -142,6 +193,7 @@ function renderHighlightedCode(code: string): React.ReactNode {
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
+    tokenRegex.lastIndex = 0;
     while ((match = tokenRegex.exec(line)) !== null) {
       if (match.index > lastIndex) {
         elements.push(line.slice(lastIndex, match.index));
@@ -150,6 +202,8 @@ function renderHighlightedCode(code: string): React.ReactNode {
       const matchText = match[0];
       if (matchText.startsWith('#') || matchText.startsWith('//')) {
         elements.push(<span key={match.index} className="text-[#8b949e] italic">{matchText}</span>);
+      } else if (matchText.startsWith('"""') || matchText.startsWith("'''")) {
+        elements.push(<span key={match.index} className="text-[#7ee787] italic">{matchText}</span>);
       } else if (matchText.startsWith('"') || matchText.startsWith("'") || matchText.startsWith('f"') || matchText.startsWith("f'")) {
         elements.push(<span key={match.index} className="text-[#a5d6ff]">{matchText}</span>);
       } else if (/^\d/.test(matchText)) {
@@ -171,9 +225,7 @@ function renderHighlightedCode(code: string): React.ReactNode {
 
     return (
       <div key={lineIdx} className="table-row hover:bg-[#161b22]/50 transition-colors">
-        <span className="table-cell select-none pr-4 text-right text-[#484f58] font-mono text-[11px] w-8 border-r border-[#21262d] mr-3">
-          {lineIdx + 1}
-        </span>
+        {lineNum}
         <span className="table-cell pl-3 whitespace-pre">{elements.length > 0 ? elements : line}</span>
       </div>
     );
@@ -187,13 +239,13 @@ function renderInlineTokens(tokens?: Token[]): React.ReactNode {
     switch (token.type) {
       case 'strong':
         return (
-          <strong key={index} className="font-semibold text-[var(--text-primary)]">
+          <strong key={index} className="font-bold text-inherit">
             {renderInlineTokens(token.tokens)}
           </strong>
         );
       case 'em':
         return (
-          <em key={index} className="italic text-[var(--text-primary)]">
+          <em key={index} className="italic text-inherit">
             {renderInlineTokens(token.tokens)}
           </em>
         );
@@ -232,6 +284,11 @@ function renderInlineTokens(tokens?: Token[]): React.ReactNode {
         );
       case 'escape':
         return token.text;
+      case 'html':
+        if (token.raw && (token.raw.trim().toLowerCase() === '<br>' || token.raw.trim().toLowerCase() === '<br/>' || token.raw.trim().toLowerCase() === '<br />')) {
+          return <br key={index} />;
+        }
+        return (token as any).text || (token as any).raw || null;
       default:
         return (token as any).text || (token as any).raw || null;
     }
@@ -271,8 +328,8 @@ function renderBlockToken(token: Token, index: number): React.ReactNode {
     case 'list': {
       const ListTag = token.ordered ? 'ol' : 'ul';
       const listClass = token.ordered
-        ? 'my-2.5 pl-5 space-y-1.5 list-decimal marker:text-cyan-400 marker:font-mono text-[13px] text-[var(--text-primary)] leading-relaxed'
-        : 'my-2.5 pl-5 space-y-1.5 list-disc marker:text-cyan-400/80 text-[13px] text-[var(--text-primary)] leading-relaxed';
+        ? 'my-2 pl-5 space-y-1.5 list-decimal marker:text-cyan-400 marker:font-mono text-[13px] text-[var(--text-primary)] leading-relaxed'
+        : 'my-2 pl-5 space-y-1.5 list-disc marker:text-cyan-400/80 text-[13px] text-[var(--text-primary)] leading-relaxed';
 
       return (
         <ListTag key={index} className={listClass} start={token.start || undefined}>
@@ -285,6 +342,13 @@ function renderBlockToken(token: Token, index: number): React.ReactNode {
                       <React.Fragment key={subIdx}>
                         {subToken.tokens ? renderInlineTokens(subToken.tokens) : subToken.text}
                       </React.Fragment>
+                    );
+                  }
+                  if (subToken.type === 'paragraph') {
+                    return (
+                      <div key={subIdx} className="inline-block my-0.5">
+                        {subToken.tokens ? renderInlineTokens(subToken.tokens) : subToken.text}
+                      </div>
                     );
                   }
                   return renderBlockToken(subToken, subIdx);

@@ -66,15 +66,17 @@ function formatCleanText(content?: string): string {
     }
   }
 
-  // Strip excessive markdown wrapping quotes if present
+  // Unwrap internal JSON envelope if the AI model wrapped its text in a json block
   if (text.startsWith('```json')) {
-    text = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    const stripped = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     try {
-      const inner = JSON.parse(text);
+      const inner = JSON.parse(stripped);
       if (typeof inner === 'string') text = inner;
       else if (inner.answer) text = inner.answer;
       else if (inner.response) text = inner.response;
       else if (inner.summary) text = inner.summary;
+      else if (inner.message) text = inner.message;
+      else if (inner.final_answer) text = inner.final_answer;
     } catch {}
   }
 
