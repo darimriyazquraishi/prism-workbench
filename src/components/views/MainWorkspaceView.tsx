@@ -32,6 +32,7 @@ import { useAntigravityStore } from '../../store/useAntigravityStore';
 import { PlanApprovalCard } from '../agent/PlanApprovalCard';
 import { LivePipelineTelemetryPanel } from '../antigravity/LivePipelineTelemetryPanel';
 import { TaskResultView } from '../antigravity/TaskResultView';
+import { MarkdownRenderer } from '../common/MarkdownRenderer';
 
 function formatCleanText(content?: string): string {
   if (!content) return '';
@@ -573,8 +574,8 @@ export const MainWorkspaceView: React.FC = () => {
                             </div>
                             <span className="font-mono text-[10px] text-blue-400">{step.timestamp}</span>
                           </div>
-                          <div className="text-xs text-[var(--text-primary)] whitespace-pre-line leading-relaxed font-sans">
-                            {formatCleanText(step.content)}
+                          <div className="text-xs text-[var(--text-primary)] leading-relaxed font-sans">
+                            <MarkdownRenderer content={formatCleanText(step.content)} />
                           </div>
                         </div>
                       </div>
@@ -722,11 +723,11 @@ export const MainWorkspaceView: React.FC = () => {
                               </span>
                             </div>
                           </div>
-                          <div className="text-[13px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap select-text font-sans">
-                            {formatCleanText(step.content)}
-                            {isCurrentStreaming && (
-                              <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse align-middle rounded-sm" />
-                            )}
+                          <div className="min-w-0">
+                            <MarkdownRenderer
+                              content={formatCleanText(step.content)}
+                              isStreaming={isCurrentStreaming}
+                            />
                           </div>
 
                           {/* Image Card Preview */}

@@ -12,6 +12,7 @@ import {
   Layers
 } from 'lucide-react';
 import { useAntigravityStore } from '../../store/useAntigravityStore';
+import { MarkdownRenderer } from '../common/MarkdownRenderer';
 
 interface TrajectoryStreamProps {
   onRunDemo: (type: 'inspection' | 'pump_mtbf' | 'pid_vision' | 'sop_search') => void;
@@ -242,8 +243,8 @@ export const TrajectoryStream: React.FC<TrajectoryStreamProps> = ({ onRunDemo })
               </div>
 
               {/* Response Markdown */}
-              <div className="text-xs leading-relaxed whitespace-pre-wrap text-[var(--text-primary)] font-sans">
-                {step.content}
+              <div className="text-xs leading-relaxed text-[var(--text-primary)] font-sans">
+                <MarkdownRenderer content={step.content} />
               </div>
 
               {/* Citations */}

@@ -51,6 +51,7 @@ import { useWorkspaceStore, type WorkspaceNode } from '../../store/useWorkspaceS
 import { useAntigravityStore } from '../../store/useAntigravityStore';
 import { IdeCommandPalette } from '../modals/IdeCommandPalette';
 import { DocumentViewer } from '../workspaces/DocumentViewer';
+import { MarkdownRenderer } from '../common/MarkdownRenderer';
 
 export const IdeWorkspaceView: React.FC = () => {
   const { allArtifacts, setActivePreviewArtifact } = useAntigravityStore();
@@ -190,44 +191,7 @@ export const IdeWorkspaceView: React.FC = () => {
   };
 
   const renderAssistantMessageBody = (content: string) => {
-    if (!content.includes('```')) {
-      return <span>{content}</span>;
-    }
-
-    const parts = content.split(/(```[a-zA-Z0-9_\-]*\n[\s\S]*?```)/g);
-    return (
-      <div className="space-y-2">
-        {parts.map((part, idx) => {
-          const match = part.match(/^```([a-zA-Z0-9_\-]*)\n([\s\S]*?)```$/);
-          if (match) {
-            const lang = match[1] || 'code';
-            const code = match[2].trim();
-            return (
-              <details
-                key={idx}
-                className="my-1.5 border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-surface)] overflow-hidden"
-              >
-                <summary className="px-2.5 py-1.5 text-xs font-semibold cursor-pointer hover:bg-[var(--bg-elevated)] text-[var(--text-primary)] flex items-center justify-between select-none">
-                  <div className="flex items-center gap-1.5">
-                    <Code2 className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                    <span>{lang ? `${lang.toUpperCase()} Script` : 'Script'}</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-[var(--text-tertiary)]">Click to view code</span>
-                </summary>
-                <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-base)] p-2">
-                  <pre className="text-[11px] font-mono overflow-x-auto text-[var(--text-secondary)] whitespace-pre select-text max-h-60 leading-normal">
-                    <code>{code}</code>
-                  </pre>
-                </div>
-              </details>
-            );
-          }
-          const text = part.trim();
-          if (!text) return null;
-          return <span key={idx}>{text}</span>;
-        })}
-      </div>
-    );
+    return <MarkdownRenderer content={content} />;
   };
 
   useEffect(() => {
