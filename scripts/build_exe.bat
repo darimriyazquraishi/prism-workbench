@@ -32,14 +32,10 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-echo [3/3] Creating PrismWorkbench.exe alias...
-copy /Y LUMI.exe PrismWorkbench.exe >nul
-
 echo.
 echo ======================================================================
 echo   SUCCESS: Executable created successfully!
 echo   Location: %CD%\LUMI.exe
-echo   Alias:    %CD%\PrismWorkbench.exe
 echo.
 echo   All files and folders remain available alongside LUMI.exe.
 echo   Double-click LUMI.exe to launch the desktop application.
