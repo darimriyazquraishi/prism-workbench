@@ -55,6 +55,7 @@ export interface AiChatMessage {
   actionBadge?: {
     label: string;
     language?: string;
+    path?: string;
     code?: string;
     output?: string;
     status?: 'success' | 'failed' | 'completed';
@@ -990,6 +991,79 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         return;
       }
 
+function deriveSmartFilename(promptText: string, lang: string, action?: string): string {
+  const extMap: Record<string, string> = {
+    python: 'py',
+    py: 'py',
+    javascript: 'js',
+    js: 'js',
+    typescript: 'ts',
+    ts: 'ts',
+    html: 'html',
+    css: 'css',
+    json: 'json',
+    csharp: 'cs',
+    cs: 'cs',
+    cpp: 'cpp',
+    c: 'c',
+    rust: 'rs',
+    rs: 'rs',
+    go: 'go',
+    sql: 'sql',
+    sh: 'sh',
+    bash: 'sh',
+    markdown: 'md',
+    md: 'md'
+  };
+  const ext = extMap[lang.toLowerCase()] || (lang ? lang.toLowerCase() : 'py');
+
+  const lowerPrompt = promptText.toLowerCase();
+  let baseName = '';
+
+  if (lowerPrompt.includes('recorder') || lowerPrompt.includes('recording') || lowerPrompt.includes('mic') || lowerPrompt.includes('audio') || lowerPrompt.includes('voice')) {
+    baseName = lowerPrompt.includes('gui') ? 'audio_recorder_gui' : 'audio_recorder';
+  } else if (lowerPrompt.includes('snake') && (lowerPrompt.includes('game') || lowerPrompt.includes('play'))) {
+    baseName = 'snake_game';
+  } else if (lowerPrompt.includes('game')) {
+    baseName = 'game_app';
+  } else if (lowerPrompt.includes('calculator')) {
+    baseName = lowerPrompt.includes('gui') ? 'calculator_gui' : 'calculator';
+  } else if (lowerPrompt.includes('todo') || lowerPrompt.includes('task')) {
+    baseName = 'todo_app';
+  } else if (lowerPrompt.includes('weather')) {
+    baseName = 'weather_app';
+  } else if (lowerPrompt.includes('scrape') || lowerPrompt.includes('crawler') || lowerPrompt.includes('spider')) {
+    baseName = 'web_scraper';
+  } else if (lowerPrompt.includes('pdf')) {
+    baseName = 'pdf_processor';
+  } else if (lowerPrompt.includes('chat') || lowerPrompt.includes('bot')) {
+    baseName = 'chatbot';
+  } else if (lowerPrompt.includes('plot') || lowerPrompt.includes('chart') || lowerPrompt.includes('graph')) {
+    baseName = 'plot_generator';
+  } else if (lowerPrompt.includes('server') || lowerPrompt.includes('api') || lowerPrompt.includes('backend')) {
+    baseName = 'server';
+  } else {
+    // Extract remaining descriptive keywords from prompt
+    const clean = lowerPrompt
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\b(write|create|make|build|generate|code|program|script|app|application|with|gui|using|that|should|contain|when|tapped|on|button|start|stop|the|a|an|in|for|to|and|of|from|is|are|it|at|please|help|me)\b/g, ' ')
+      .trim();
+    const words = clean.split(/\s+/).filter(w => w.length > 2).slice(0, 3);
+    if (words.length > 0) {
+      baseName = words.join('_');
+    } else if (action) {
+      baseName = action.toLowerCase().replace(/[^\w]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    }
+  }
+
+  if (!baseName || baseName === 'script' || baseName.length < 3) {
+    baseName = ext === 'py' ? 'main' : (ext === 'html' ? 'index' : 'app');
+  }
+
+  baseName = baseName.replace(/^_+|_+$/g, '');
+  return `${baseName}.${ext}`;
+}
+
       // Resolve Agent & Model
       const modelDesc = isCodingTask
         ? resolveModelForCapability('code')
@@ -1008,18 +1082,20 @@ Workstation Runtime Environment:
 
 CRITICAL: You MUST respond strictly with a valid JSON object conforming to this schema:
 {
-  "action": "Editing PDF",
-  "summary": "Updated sanGAYan.pdf with the requested text.",
+  "action": "Creating Script",
+  "filename": "audio_recorder_gui.py",
+  "summary": "Created a Python script with a GUI containing a start and stop button for recording audio.",
   "code": "complete runnable Python or JavaScript script",
   "language": "python"
 }
 
 STRICT RULES:
-1. "action": Concise 2-4 word task title (e.g. "Editing PDF", "Creating Script", "Updating Document").
-2. "summary": Clean, smart 1-2 sentence human explanation of what was done. NEVER put code, markdown fences, or installation commands in the summary.
-3. "code": Complete, standalone runnable script that performs the file operation or edit. When editing a PDF, write both the original text and the new text using non-overlapping Y coordinates.
-4. "language": "python" or "javascript".
-5. Do NOT output any markdown prose outside the JSON.`
+1. "action": Concise 2-4 word task title (e.g. "Creating Script", "Editing File", "Updating Document").
+2. "filename": Clear, descriptive filename with proper extension (e.g. "audio_recorder_gui.py", "app.py", "index.html", "script.js") where this file should be saved in the user's workspace folder.
+3. "summary": Clean, smart 1-2 sentence human explanation of what was done. NEVER put code, markdown fences, or installation commands in the summary.
+4. "code": Complete, standalone runnable script or file content. When editing a PDF, write both the original text and the new text using non-overlapping Y coordinates.
+5. "language": "python", "javascript", "typescript", "html", "css", etc.
+6. Do NOT output any markdown prose outside the JSON.`
         : `You are LUMI's General Reasoning Agent. You analyze project architecture, explain code, debug logic, and plan structural changes across workspace files. Provide insightful, rigorously verified reasoning.`;
 
       let agentUserPrompt = `[Workspace: ${get().workspaceName}]\n[Root: ${get().workspaceRoot}]\n`;
@@ -1061,7 +1137,7 @@ STRICT RULES:
       const responseText = llmResult.content || 'I completed the task analysis.';
 
       // 5. Code modification & Action Execution handling
-      let parsedJson: { action?: string; summary?: string; code?: string; language?: string } | null = null;
+      let parsedJson: { action?: string; filename?: string; summary?: string; code?: string; language?: string } | null = null;
       try {
         parsedJson = cleanAndParseJson<typeof parsedJson>(responseText);
       } catch {}
@@ -1093,42 +1169,46 @@ STRICT RULES:
       const generatedCode = parsedJson?.code?.trim() || selectedBlock?.code || null;
       const scriptLang = (parsedJson?.language || selectedBlock?.lang || 'python').toLowerCase();
 
+      // Determine the target file path in the workspace
+      let targetPath = candidatePath;
+
+      if (!targetPath && parsedJson?.filename && typeof parsedJson.filename === 'string') {
+        const cleanFn = parsedJson.filename.trim().replace(/[\\/]/g, '_').replace(/^\.+/, '');
+        if (cleanFn && /\.[a-zA-Z0-9]+$/.test(cleanFn)) {
+          targetPath = cleanFn;
+        }
+      }
+
+      if (!targetPath && isCodingTask && generatedCode) {
+        targetPath = deriveSmartFilename(trimmed, scriptLang, parsedJson?.action);
+      }
+
       let proposedDiff: { path: string; action: 'modify' | 'create' | 'delete'; originalContent?: string; newContent?: string } | null = null;
       let executedScriptSuccess = false;
       let scriptOutput = '';
 
-      if (isCodingTask && generatedCode) {
-        const isPythonScript = scriptLang === 'python' || scriptLang === 'py' ||
-                               /(?:import\s+[a-zA-Z0-9_.]+|from\s+[a-zA-Z0-9_.]+\s+import)/.test(generatedCode) ||
-                               /(?:def\s+[a-zA-Z0-9_]+\s*\(|if\s+__name__\s*==)/.test(generatedCode);
-        const isNodeScript = !isPythonScript && (
-          ['javascript', 'js', 'typescript', 'ts'].includes(scriptLang) ||
-          /(?:const\s+.*=\s*require\(|import\s+.*from\s+['"])/.test(generatedCode)
-        );
-        const isActionExecutionTask = /pdf|image|chart|plot|run|execute|script|generate|make|render|add\s+text|in\s+the\s+same|the\s+same\s+pdf|append|edit|modify/i.test(trimmed) ||
-                                      (candidatePath && /\.pdf$/i.test(candidatePath));
+      if (isCodingTask && generatedCode && targetPath) {
+        const isPdfModificationTask = candidatePath && /\.pdf$/i.test(candidatePath);
 
-        // A) If LLM generated an executable script to satisfy the user's action task, execute it directly
-        if ((isPythonScript || isNodeScript) && isActionExecutionTask) {
+        if (isPdfModificationTask) {
+          // A) If editing an existing PDF, execute script to update the PDF
           try {
-            const ext = isNodeScript ? 'js' : 'py';
-            const tempScriptName = `_task_exec_${Date.now()}.${ext}`;
+            const runnerName = `_modify_pdf_${Date.now()}.py`;
             await fetch('/api/workspace/tools', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 tool: 'create_file',
-                args: { path: tempScriptName, content: generatedCode },
+                args: { path: runnerName, content: generatedCode },
                 permissionMode: 'autonomous',
                 approved: true
               })
             });
 
-            const execCmd = isNodeScript ? `node ${tempScriptName}` : `python ${tempScriptName}`;
             const execRes = await fetch('/api/workspace/terminal', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ command: execCmd })
+              body: JSON.stringify({ command: `python ${runnerName}` })
             });
             const execData = await execRes.json().catch(() => ({}));
 
@@ -1137,18 +1217,14 @@ STRICT RULES:
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 tool: 'delete_file',
-                args: { path: tempScriptName },
+                args: { path: runnerName },
                 permissionMode: 'autonomous',
                 approved: true
               })
             });
 
             await get().refreshTree();
-
-            // If a candidate file was targeted, reopen it so viewer updates
-            if (candidatePath) {
-              await get().openFileInTab(candidatePath);
-            }
+            await get().openFileInTab(candidatePath);
 
             if (execData.success || (execData.stdout && !execData.stderr)) {
               executedScriptSuccess = true;
@@ -1157,23 +1233,25 @@ STRICT RULES:
 
             executedToolCalls.push({
               tool: 'execute_script',
-              args: { runtime: isNodeScript ? 'node' : 'python', target: candidatePath || 'workspace' },
+              args: { runtime: 'python', target: candidatePath },
               status: executedScriptSuccess ? 'success' : 'failed',
               output: scriptOutput || execData.stderr || execData.error
             });
           } catch (err: any) {
-            console.error('Failed to execute task script:', err);
+            console.error('Failed to execute PDF modification:', err);
           }
-        } else if (candidatePath) {
-          // B) If user specified a file path or asked to edit current file
-          const targetPath = candidatePath;
-          const action = inspectedFile ? ('modify' as const) : ('create' as const);
+        } else {
+          // B) Standard Code & Script Generation:
+          // ALWAYS save the generated code/script to the user's workspace folder on disk!
+          const isExistingFile = (inspectedFile && inspectedFile.path === targetPath) ||
+                                 get().openTabs.some(t => t.path === targetPath);
+          const action = isExistingFile ? ('modify' as const) : ('create' as const);
 
-          if (get().permissionMode === 'assisted' && action === 'modify') {
+          if (get().permissionMode === 'assisted' && action === 'modify' && inspectedFile) {
             proposedDiff = {
               path: targetPath,
               action,
-              originalContent: inspectedFile ? inspectedFile.content : '',
+              originalContent: inspectedFile.content,
               newContent: generatedCode
             };
             set({ activeDiffProposal: proposedDiff });
@@ -1190,8 +1268,11 @@ STRICT RULES:
               })
             });
             const writeData = await writeRes.json().catch(() => ({}));
+
+            // Refresh tree and open tab immediately so user sees the file in the workspace
             await get().refreshTree();
             await get().openFileInTab(targetPath);
+
             executedToolCalls.push({
               tool: toolName,
               args: { path: targetPath },
@@ -1205,15 +1286,15 @@ STRICT RULES:
       // 6. Action title & smart human summary
       let actionTitle = parsedJson?.action || '';
       if (!actionTitle) {
-        if (candidatePath && /\.pdf$/i.test(candidatePath)) {
+        if (targetPath && /\.pdf$/i.test(targetPath)) {
           actionTitle = /(?:create|make|new)\b/i.test(trimmed) ? 'Creating PDF' : 'Editing PDF';
-        } else if (candidatePath) {
-          const base = candidatePath.split('/').pop() || candidatePath;
-          actionTitle = /(?:create|make|new)\b/i.test(trimmed) ? `Creating ${base}` : `Editing ${base}`;
+        } else if (targetPath) {
+          const base = targetPath.split('/').pop() || targetPath;
+          actionTitle = `Creating ${base}`;
         } else if (folderMatch) {
           actionTitle = `Creating Directory ${folderMatch[1]}`;
         } else {
-          actionTitle = (isCodingTask && generatedCode) ? 'Executing Script' : 'Workspace Action';
+          actionTitle = (isCodingTask && generatedCode) ? 'Creating Script' : 'Workspace Action';
         }
       }
 
@@ -1237,10 +1318,8 @@ STRICT RULES:
         .trim();
 
       if (!humanSummary || humanSummary.length < 8) {
-        if (candidatePath) {
-          humanSummary = executedScriptSuccess
-            ? `Successfully updated \`${candidatePath}\`.`
-            : `Completed workspace modifications for \`${candidatePath}\`.`;
+        if (targetPath) {
+          humanSummary = `Created \`${targetPath}\` in workspace.`;
         } else {
           humanSummary = 'Completed the requested workspace task.';
         }
@@ -1249,6 +1328,7 @@ STRICT RULES:
       const actionBadge = (generatedCode || executedScriptSuccess) ? {
         label: actionTitle,
         language: scriptLang,
+        path: targetPath || undefined,
         code: generatedCode || undefined,
         output: scriptOutput || undefined,
         status: (executedScriptSuccess ? 'success' : 'completed') as 'success' | 'completed'
@@ -1257,8 +1337,8 @@ STRICT RULES:
       let finalContent = humanSummary;
       if (proposedDiff) {
         finalContent += `\n\n⚡ **Diff proposal ready:** Generated ${proposedDiff.action} for \`${proposedDiff.path}\`. Review diff in editor and click **Accept Changes** to save to disk.`;
-      } else if (get().permissionMode === 'autonomous' && candidatePath && !executedScriptSuccess && generatedCode) {
-        finalContent += `\n\n✓ **Auto-applied change:** Written to \`${candidatePath}\` on physical disk.`;
+      } else if (targetPath && generatedCode && !(candidatePath && /\.pdf$/i.test(candidatePath))) {
+        finalContent += `\n\n📁 **Stored in workspace:** Saved as \`${targetPath}\` in \`${get().workspaceName}\`.`;
       }
 
       set(state => {

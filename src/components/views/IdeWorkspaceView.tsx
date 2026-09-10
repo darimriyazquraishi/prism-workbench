@@ -1331,6 +1331,20 @@ export const IdeWorkspaceView: React.FC = () => {
                           <span className="font-semibold text-[var(--text-primary)]">
                             {msg.actionBadge.label || 'Editing File'}
                           </span>
+                          {msg.actionBadge.path && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openFileInTab(msg.actionBadge!.path!);
+                              }}
+                              className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/50 text-cyan-400 hover:bg-cyan-900/60 border border-cyan-800/40 cursor-pointer transition-colors"
+                              title="Click to open file in editor tab"
+                            >
+                              <FileCode className="w-3 h-3" />
+                              <span>{msg.actionBadge.path}</span>
+                            </button>
+                          )}
                           {msg.actionBadge.language && (
                             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--bg-base)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                               {msg.actionBadge.language}
@@ -1345,7 +1359,23 @@ export const IdeWorkspaceView: React.FC = () => {
                       {expandedActionIds.has(msg.id) && msg.actionBadge.code && (
                         <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-base)] p-2">
                           <div className="flex items-center justify-between mb-1 pb-1 border-b border-[var(--border-subtle)]/40 text-[10px] font-mono text-[var(--text-tertiary)]">
-                            <span>{msg.actionBadge.language || 'script'}</span>
+                            <div className="flex items-center gap-2">
+                              <span>{msg.actionBadge.language || 'script'}</span>
+                              {msg.actionBadge.path && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openFileInTab(msg.actionBadge!.path!);
+                                  }}
+                                  className="text-cyan-400 hover:text-cyan-300 cursor-pointer flex items-center gap-1"
+                                  title="Open in editor tab"
+                                >
+                                  <FileCode className="w-3 h-3" />
+                                  <span>Open in Tab</span>
+                                </button>
+                              )}
+                            </div>
                             <button
                               type="button"
                               onClick={(e) => {

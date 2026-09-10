@@ -1,4 +1,5 @@
 import { t as __exportAll } from "./rolldown-runtime_D7D4PA-g.mjs";
+import { n as getActiveWorkspaceRoot } from "./workspaceSecurity_CNHgb3cP.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -170,10 +171,12 @@ var POST = async ({ request }) => {
 		const cfgScale = isZImage ? "1.0" : isSdxl ? "1.0" : body.cfgScale ? String(body.cfgScale) : "1.0";
 		const modelName = isZImage ? "Z-Image Turbo (DiT BF16 + Qwen 3 4B)" : isSdxl ? "SDXL-Lightning 4-Step (Safetensors)" : "FLUX.1 [schnell] (GGUF Q4_K_S)";
 		const timestamp = Date.now();
-		const outputDir = path.join(cwd, "workspace", "generated_images");
+		const activeWsRoot = getActiveWorkspaceRoot();
+		const outputDir = path.join(activeWsRoot, "generated_images");
 		fs.mkdirSync(outputDir, { recursive: true });
 		const outputFilename = `img_${effectiveModelId}_${timestamp}.png`;
 		const outputPath = path.join(outputDir, outputFilename);
+		const relPath = `generated_images/${outputFilename}`;
 		const sdCandidates = [
 			path.join(cwd, "tools", "sd", "sd-cli.exe"),
 			path.join(cwd, "LUMI_Desktop", "tools", "sd", "sd-cli.exe"),
@@ -228,7 +231,7 @@ var POST = async ({ request }) => {
 				const stats = fs.statSync(outputPath);
 				result = {
 					success: true,
-					output_path: `workspace/generated_images/${outputFilename}`,
+					output_path: relPath,
 					filename: outputFilename,
 					model_id: effectiveModelId,
 					model_name: modelName,
@@ -250,6 +253,8 @@ var POST = async ({ request }) => {
 				prompt,
 				"--model-id",
 				effectiveModelId,
+				"--output",
+				outputPath,
 				"--width",
 				String(width),
 				"--height",

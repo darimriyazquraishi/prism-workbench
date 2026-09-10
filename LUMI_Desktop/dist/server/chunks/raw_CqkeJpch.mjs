@@ -1,5 +1,5 @@
 import { t as __exportAll } from "./rolldown-runtime_D7D4PA-g.mjs";
-import { s as validatePathWithinWorkspace } from "./workspaceSecurity_CNHgb3cP.mjs";
+import { n as getActiveWorkspaceRoot, s as validatePathWithinWorkspace } from "./workspaceSecurity_CNHgb3cP.mjs";
 import path from "path";
 import fs from "fs";
 //#region src/pages/api/workspace/raw.ts
@@ -30,7 +30,10 @@ var GET = async ({ url }) => {
 	const filename = path.basename(normPath);
 	if (normPath.includes("generated_images/") || normPath.includes("workspace/")) {
 		const cwd = process.cwd();
+		const wsRoot = getActiveWorkspaceRoot();
 		const candPaths = [
+			path.resolve(wsRoot, normPath),
+			path.resolve(wsRoot, "generated_images", filename),
 			path.resolve(cwd, normPath),
 			path.resolve(cwd, "workspace", "generated_images", filename),
 			path.resolve(cwd, "LUMI_Desktop", normPath),

@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
+import { getActiveWorkspaceRoot } from '../../../services/workspace/workspaceSecurity';
 
 export const prerender = false;
 
@@ -187,10 +188,12 @@ export const POST: APIRoute = async ({ request }) => {
       : (isSdxl ? 'SDXL-Lightning 4-Step (Safetensors)' : 'FLUX.1 [schnell] (GGUF Q4_K_S)');
 
     const timestamp = Date.now();
-    const outputDir = path.join(cwd, 'workspace', 'generated_images');
+    const activeWsRoot = getActiveWorkspaceRoot();
+    const outputDir = path.join(activeWsRoot, 'generated_images');
     fs.mkdirSync(outputDir, { recursive: true });
     const outputFilename = `img_${effectiveModelId}_${timestamp}.png`;
     const outputPath = path.join(outputDir, outputFilename);
+    const relPath = `generated_images/${outputFilename}`;
 
     const sdCandidates = [
       path.join(cwd, 'tools', 'sd', 'sd-cli.exe'),
@@ -286,7 +289,7 @@ export const POST: APIRoute = async ({ request }) => {
           const stats = fs.statSync(outputPath);
           result = {
             success: true,
-            output_path: `workspace/generated_images/${outputFilename}`,
+            output_path: relPath,
             filename: outputFilename,
             model_id: effectiveModelId,
             model_name: modelName,
@@ -310,6 +313,7 @@ export const POST: APIRoute = async ({ request }) => {
         scriptPath,
         '--prompt', prompt,
         '--model-id', effectiveModelId,
+        '--output', outputPath,
         '--width', String(width),
         '--height', String(height),
         '--steps', String(steps)

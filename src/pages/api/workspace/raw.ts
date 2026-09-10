@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import fs from 'fs';
 import path from 'path';
-import { validatePathWithinWorkspace } from '../../../services/workspace/workspaceSecurity';
+import { validatePathWithinWorkspace, getActiveWorkspaceRoot } from '../../../services/workspace/workspaceSecurity';
 
 export const prerender = false;
 
@@ -33,7 +33,10 @@ export const GET: APIRoute = async ({ url }) => {
   const filename = path.basename(normPath);
   if (normPath.includes('generated_images/') || normPath.includes('workspace/')) {
     const cwd = process.cwd();
+    const wsRoot = getActiveWorkspaceRoot();
     const candPaths = [
+      path.resolve(wsRoot, normPath),
+      path.resolve(wsRoot, 'generated_images', filename),
       path.resolve(cwd, normPath),
       path.resolve(cwd, 'workspace', 'generated_images', filename),
       path.resolve(cwd, 'LUMI_Desktop', normPath),

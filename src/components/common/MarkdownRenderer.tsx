@@ -33,6 +33,8 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
     }
   };
 
+  const [savedToWs, setSavedToWs] = useState(false);
+
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
     const extMap: Record<string, string> = {
@@ -67,6 +69,56 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
     URL.revokeObjectURL(url);
   };
 
+  const handleSaveToWorkspace = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const extMap: Record<string, string> = {
+      python: 'py',
+      py: 'py',
+      javascript: 'js',
+      js: 'js',
+      typescript: 'ts',
+      ts: 'ts',
+      html: 'html',
+      css: 'css',
+      json: 'json',
+      sql: 'sql',
+      bash: 'sh',
+      sh: 'sh',
+      powershell: 'ps1',
+      csharp: 'cs',
+      cs: 'cs',
+      cpp: 'cpp',
+      c: 'c',
+      rust: 'rs',
+      rs: 'rs',
+      go: 'go'
+    };
+    const ext = extMap[langDisplay] || 'txt';
+    const filename = `script_${Date.now()}.${ext}`;
+
+    try {
+      const res = await fetch('/api/workspace/tools', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: 'create_file',
+          args: { path: filename, content: cleanCode },
+          permissionMode: 'autonomous',
+          approved: true
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        setSavedToWs(true);
+        setTimeout(() => setSavedToWs(false), 2500);
+        return;
+      }
+    } catch {}
+
+    // Fallback: browser download
+    handleDownload(e);
+  };
+
   return (
     <div className="my-3.5 rounded-xl border border-[var(--border-subtle)] bg-[#0d1117] overflow-hidden shadow-md text-xs font-mono select-none">
       {/* Code Header Bar */}
@@ -83,12 +135,21 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={handleDownload}
-            className="flex items-center gap-1 px-2 py-1 rounded bg-[#21262d] hover:bg-[#30363d] text-[#c9d1d9] hover:text-white transition-colors cursor-pointer text-[11px]"
-            title="Download script file"
+            onClick={handleSaveToWorkspace}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#21262d] hover:bg-[#30363d] text-[#c9d1d9] hover:text-white transition-colors cursor-pointer text-[11px]"
+            title="Save file directly to active workspace folder"
           >
-            <Download className="w-3 h-3 text-[#7d8590]" />
-            <span>Save</span>
+            {savedToWs ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-400" />
+                <span className="text-emerald-400 font-semibold">Saved in Workspace!</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3 h-3 text-[#7d8590]" />
+                <span>Save to Workspace</span>
+              </>
+            )}
           </button>
           <button
             type="button"
